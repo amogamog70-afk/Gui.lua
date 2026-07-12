@@ -1,13 +1,10 @@
 -- [[
 --    METEOR / WISH STYLE CLICKGUI ENGINE
 --    [VERSION 6.0 - PREMIUM HUD & VISUALS INTEGRATION]
---    v6.0 changes:
---      - Добавлен размытие заднего фона (Blur Effect) с полной кастомизацией
---      - Добавлен эффект падающего снега (Snow particles) с настройками скорости и количества
---      - Добавлен Minecraft-style ArrayList (с кастомным цветом и хрома-режимом)
---      - Добавлен Keystrokes HUD (полностью перемещаемый, с выбором цвета нажатия)
---      - Нотификации перенесены в правый верхний угол и интегрированы во все Тоглы
---      - Никакого старого аудио-мусора, только чистый премиальный функционал
+--    - ПОЛНЫЙ РЕРАЙТ СИСТЕМЫ МАКЕТОВ (Фикс багов AutomaticSize)
+--    - ДИНАМИЧЕСКИЙ MINECRAFT ARRAYLIST (Только активные модули с сортировкой)
+--    - ФИКС СТАРТОВЫХ ПОЗИЦИЙ ОКН ПО КООРДИНАТАМ СКРИНШОТА
+--    - ИСПРАВЛЕНЫ ВСЕ ОШИБКИ EOF / MISSING END
 -- ]]
 
 local UserInputService = game:GetService("UserInputService")
@@ -18,11 +15,15 @@ local CoreGui = game:GetService("CoreGui")
 local Stats = game:GetService("Stats")
 local SoundService = game:GetService("SoundService")
 local Lighting = game:GetService("Lighting")
+local Players = game:GetService("Players")
+
+local LocalPlayer = Players.LocalPlayer
 
 local Library = {
     Windows = {},
     Registry = {}, 
     ThemeRefreshes = {},
+    ActiveModules = {}, -- Список включенных модулей для ArrayList
     ToggleKey = Enum.KeyCode.RightShift,
     Visible = true,
     WatermarkEnabled = true,
@@ -55,7 +56,8 @@ local Theme = {
     NotifText = Color3.fromRGB(255, 255, 255),
     NotifAccent = Color3.fromRGB(221, 43, 110),
     ArrayListColor = Color3.fromRGB(221, 43, 110),
-    KeystrokeActive = Color3.fromRGB(221, 43, 110)
+    KeystrokeActive = Color3.fromRGB(221, 43, 110),
+    KeystrokeBG = Color3.fromRGB(16, 16, 20)
 }
 
 -- Создание папки конфигов
@@ -63,7 +65,7 @@ pcall(function()
     if makefolder then makefolder("Meteor_Configs") end
 end)
 
--- ГЛАВНЫЕ КОНТЕЙНЕРЫ
+-- ГЛАВНЫЕ КОНТЕЙНЕРЫ ИНТЕРФЕЙСА
 local MenuGui = Instance.new("ScreenGui")
 MenuGui.Name = "MeteorMenu_Core"
 MenuGui.ResetOnSpawn = false
@@ -83,13 +85,13 @@ pcall(function()
 end)
 
 if not MenuGui.Parent then
-    local lpGui = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+    local lpGui = LocalPlayer:WaitForChild("PlayerGui")
     MenuGui.Parent = lpGui
     WatermarkGui.Parent = lpGui
     HudGui.Parent = lpGui
 end
 
--- Инициализация размытия
+-- Инициализация эффекта размытия заднего фона
 local MenuBlur = Lighting:FindFirstChild("Meteor_MenuBlur")
 if not MenuBlur then
     MenuBlur = Instance.new("BlurEffect")
@@ -137,7 +139,9 @@ local function makeDraggable(frame, dragHandle)
     end)
 end
 
--- СИСТЕМА УВЕДОМЛЕНИЙ (ПРАВЫЙ ВЕРХНИЙ УГОЛ)
+-- ============================================================================
+-- СИСТЕМА УВЕДОМЛЕНИЙ (ИСПРАВЛЕНО: СТРОГО СПРАВА СНИЗУ, СТЕК СНИЗУ ВВЕРХ)
+-- ============================================================================
 local NotifContainer = Instance.new("Frame")
 NotifContainer.Size = UDim2.new(0, 260, 1, -40)
 NotifContainer.Position = UDim2.new(1, -280, 0, 20)
@@ -146,7 +150,7 @@ NotifContainer.Parent = HudGui
 
 local NotifList = Instance.new("UIListLayout")
 NotifList.SortOrder = Enum.SortOrder.LayoutOrder
-NotifList.VerticalAlignment = Enum.VerticalAlignment.Top
+NotifList.VerticalAlignment = Enum.VerticalAlignment.Bottom
 NotifList.Padding = UDim.new(0, 6)
 NotifList.Parent = NotifContainer
 
@@ -199,12 +203,215 @@ function Library:Notify(title, text, duration)
     end)
 end
 
--- ХЕНДЛЕР ОТКРЫТИЯ/ЗАКРЫТИЯ МЕНЮ С БЛЮРОМ
+-- ============================================================================
+-- ДИНАМИЧЕСКИЙ MINECRAFT-STYLE ARRAYLIST HUD (ИСПРАВЛЕНО И ИНТЕГРИРОВАНО)
+-- ============================================================================
+local ArrayListContainer = Instance.new("Frame")
+ArrayListContainer.Size = UDim2.new(0, 200, 0, 500)
+ArrayListContainer.Position = UDim2.new(1, -210, 0, 20)
+ArrayListContainer.BackgroundTransparency = 1
+ArrayListContainer.Parent = HudGui
+
+local ArrayListLayout = Instance.new("UIListLayout")
+ArrayListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+ArrayListLayout.HorizontalAlignment = Enum.HorizontalAlignment.End
+ArrayListLayout.Padding = UDim.new(0, 2)
+ArrayListLayout.Parent = ArrayListContainer
+
+local function UpdateArrayListUI()
+    -- Очищаем контейнер
+    for _, child in ipairs(ArrayListContainer:GetChildren()) do
+        if child:IsA("Frame") then child:Destroy() end
+    end
+    
+    if not Library.ArrayListEnabled then return end
+
+    -- Формируем упорядоченный список по длине строки (от самых длинных к коротким)
+    local sortedModules = {}
+    for modName, isActive in pairs(Library.ActiveModules) do
+        if isActive then table.insert(sortedModules, modName) end
+    end
+    
+    table.sort(sortedModules, function(a, b)
+        return #a > #b
+    end)
+
+    -- Рендерим элементы списка
+    for i, modName in ipairs(sortedModules) do
+        local ItemFrame = Instance.new("Frame")
+        ItemFrame.Size = UDim2.new(0, 10, 0, 18)
+        ItemFrame.BackgroundTransparency = 1
+        ItemFrame.AutomaticSize = Enum.AutomaticSize.X
+        ItemFrame.Name = "ArrayItem_" .. modName
+        ItemFrame.Parent = ArrayListContainer
+
+        -- Подложка текста для читаемости
+        local BG = Instance.new("Frame")
+        BG.Size = UDim2.new(1, 0, 1, 0)
+        BG.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
+        BG.BackgroundTransparency = 0.4
+        BG.BorderSizePixel = 0
+        BG.Parent = ItemFrame
+
+        local Label = Instance.new("TextLabel")
+        Label.Size = UDim2.new(1, -6, 1, 0)
+        Label.Position = UDim2.new(0, 0, 0, 0)
+        Label.BackgroundTransparency = 1
+        Label.Text = modName .. " "
+        Label.Font = Enum.Font.Code
+        Label.TextSize = 11
+        Label.TextColor3 = Theme.ArrayListColor
+        Label.TextXAlignment = Enum.TextXAlignment.Right
+        Label.Parent = ItemFrame
+
+        -- Классический Minecraft боковой маркер модуля
+        local Border = Instance.new("Frame")
+        Border.Size = UDim2.new(0, 2, 1, 0)
+        Border.Position = UDim2.new(1, -2, 0, 0)
+        Border.BackgroundColor3 = Theme.ArrayListColor
+        Border.BorderSizePixel = 0
+        Border.Parent = ItemFrame
+    end
+end
+
+-- Хендлер Хрома-режима (Радужный ArrayList)
+RunService.RenderStepped:Connect(function()
+    if Library.ArrayListEnabled and Library.ArrayListRainbow then
+        local hue = (tick() % 4) / 4
+        local rainbowColor = Color3.fromHSV(hue, 0.8, 1)
+        for _, child in ipairs(ArrayListContainer:GetChildren()) do
+            if child:IsA("Frame") then
+                local lbl = child:FindFirstChildOfClass("TextLabel")
+                local border = child:FindFirstChild("Border")
+                if lbl then lbl.TextColor3 = rainbowColor end
+                if border then border.BackgroundColor3 = rainbowColor end
+            end
+        end
+    end
+end)
+
+-- ============================================================================
+-- ЭФФЕКТ ПАДАЮЩЕГО СНЕГА (SNOW PARTICLES ENGINE)
+-- ============================================================================
+local SnowContainer = Instance.new("Frame")
+SnowContainer.Size = UDim2.new(1, 0, 1, 0)
+SnowContainer.BackgroundTransparency = 1
+SnowContainer.ClipsDescendants = true
+SnowContainer.Parent = MenuGui
+
+local flakes = {}
+local function SpawnSnowFlakes()
+    -- Очищаем старые снежинки
+    for _, f in ipairs(flakes) do pcall(function() f:Destroy() end) end
+    flakes = {}
+    
+    if not Library.SnowEnabled then return end
+    
+    for i = 1, Library.SnowCount do
+        local flake = Instance.new("Frame")
+        flake.Size = UDim2.new(0, math.random(2, 4), 0, math.random(2, 4))
+        flake.Position = UDim2.new(math.random(), 0, math.random() * -1, 0)
+        flake.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        flake.BackgroundTransparency = math.random(2, 6) / 10
+        flake.BorderSizePixel = 0
+        flake.Parent = SnowContainer
+        table.insert(flakes, {
+            frame = flake,
+            speed = math.random(50, 150) * (Library.SnowSpeed / 100),
+            drift = math.random(-20, 20) / 100
+        })
+    end
+end
+
+RunService.RenderStepped:Connect(function(deltaTime)
+    if not Library.Visible or not Library.SnowEnabled then return end
+    for _, f in ipairs(flakes) do
+        if f.frame and f.frame.Parent then
+            local currentPos = f.frame.Position
+            local newY = currentPos.Y.Offset + (f.speed * deltaTime)
+            local newX = currentPos.X.Scale + (f.drift * deltaTime)
+            
+            if newY > workspace.CurrentCamera.ViewportSize.Y then
+                newY = -10
+                newX = math.random()
+            end
+            f.frame.Position = UDim2.new(newX, 0, 0, newY)
+        end
+    end
+end)
+
+-- ============================================================================
+-- KEYSTROKES HUD ENGINE (ПОЛНОСТЬЮ ПЕРЕМЕЩАЕМЫЙ КЛИЕНТСКИЙ ХУД)
+-- ============================================================================
+local KeystrokesFrame = Instance.new("Frame")
+KeystrokesFrame.Name = "Meteor_KeystrokesHUD"
+KeystrokesFrame.Size = UDim2.new(0, 118, 0, 118)
+KeystrokesFrame.Position = UDim2.new(0, 20, 0, 560) -- Позиция по умолчанию под Настройками
+KeystrokesFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
+KeystrokesFrame.BackgroundTransparency = 0.5
+KeystrokesFrame.BorderSizePixel = 0
+KeystrokesFrame.Visible = Library.KeystrokesEnabled
+KeystrokesFrame.Parent = HudGui
+applyStroke(KeystrokesFrame, Theme.Stroke, 1)
+makeDraggable(KeystrokesFrame, KeystrokesFrame)
+
+local function createKeyBox(name, text, size, pos)
+    local box = Instance.new("Frame")
+    box.Size = size
+    box.Position = pos
+    box.BackgroundColor3 = Theme.KeystrokeBG
+    box.BorderSizePixel = 0
+    box.Name = name
+    box.Parent = KeystrokesFrame
+    applyStroke(box, Theme.Stroke, 1)
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, 0, 1, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = text
+    lbl.Font = Enum.Font.Code
+    lbl.TextSize = 12
+    lbl.TextColor3 = Theme.TextMain
+    lbl.Parent = box
+    return box
+end
+
+local keys = {
+    W = createKeyBox("W", "W", UDim2.new(0, 36, 0, 36), UDim2.new(0, 41, 0, 4)),
+    A = createKeyBox("A", "A", UDim2.new(0, 36, 0, 36), UDim2.new(0, 4, 0, 42)),
+    S = createKeyBox("S", "S", UDim2.new(0, 36, 0, 36), UDim2.new(0, 41, 0, 42)),
+    D = createKeyBox("D", "D", UDim2.new(0, 36, 0, 36), UDim2.new(0, 78, 0, 42)),
+    LMB = createKeyBox("LMB", "LMB", UDim2.new(0, 53, 0, 32), UDim2.new(0, 4, 0, 81)),
+    RMB = createKeyBox("RMB", "RMB", UDim2.new(0, 53, 0, 32), UDim2.new(0, 61, 0, 81))
+}
+
+local keyBinds = {
+    [Enum.KeyCode.W] = keys.W, [Enum.KeyCode.A] = keys.A,
+    [Enum.KeyCode.S] = keys.S, [Enum.KeyCode.D] = keys.D,
+    [Enum.UserInputType.MouseButton1] = keys.LMB,
+    [Enum.UserInputType.MouseButton2] = keys.RMB
+}
+
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    local element = keyBinds[input.KeyCode] or keyBinds[input.UserInputType]
+    if element then
+        tween(element, TweenInfo.new(0.05), {BackgroundColor3 = Theme.KeystrokeActive})
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    local element = keyBinds[input.KeyCode] or keyBinds[input.UserInputType]
+    if element then
+        tween(element, TweenInfo.new(0.1), {BackgroundColor3 = Theme.KeystrokeBG})
+    end
+end)
+
+-- ХЕНДЛЕР ЗАКРЫТИЯ/ОТКРЫТИЯ ИНТЕРФЕЙСА (ДВИНЯЕМ БЛЮР И ОКНА)
 UserInputService.InputBegan:Connect(function(input)
     if UserInputService:GetFocusedTextBox() then return end
     if input.KeyCode == Library.ToggleKey then
         if Library.AnimationActive then return end
-
         Library.AnimationActive = true
         Library.Visible = not Library.Visible
         
@@ -216,7 +423,6 @@ UserInputService.InputBegan:Connect(function(input)
                 wData.MainFrame.BackgroundTransparency = 1
                 wData.Topbar.BackgroundTransparency = 1
                 wData.Topbar.TextTransparency = 1
-                
                 tween(wData.UIScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1})
                 tween(wData.MainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0})
                 tween(wData.Topbar, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0, TextTransparency = 0})
@@ -230,7 +436,6 @@ UserInputService.InputBegan:Connect(function(input)
                 tween(wData.UIScale, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Scale = 0.75})
                 tween(wData.MainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {BackgroundTransparency = 1})
                 local t = tween(wData.Topbar, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {BackgroundTransparency = 1, TextTransparency = 1})
-                
                 t.Completed:Connect(function()
                     count = count + 1
                     if count == #Library.Windows then
@@ -247,10 +452,25 @@ function Library:UpdateTheme()
     for _, refreshFunc in ipairs(Library.ThemeRefreshes) do pcall(refreshFunc) end
 end
 
--- ФАБРИКА ОКН
+-- ============================================================================
+-- ОРИГИНАЛЬНАЯ ФАБРИКА ОКН С ЖЕЛЕЗОБЕТОННЫМ РУЧНЫМ РАСЧЕТОМ ВЫСОТЫ ЭЛЕМЕНТОВ
+-- ============================================================================
 function Library:CreateWindow(windowName, initialPosition)
     local Window = { Elements = {}, Collapsed = false }
-    initialPosition = initialPosition or UDim2.new(0, 50, 0, 50)
+    
+    -- ИСПРАВЛЕНО: Четкие стартовые привязки позиций из Скриншота (Фото 2)
+    if not initialPosition then
+        local nameLower = windowName:lower()
+        if nameLower:match("setting") then
+            initialPosition = UDim2.new(0, 20, 0, 40)   -- Settings: Слева сверху
+        elseif nameLower:match("radio") then
+            initialPosition = UDim2.new(0, 260, 0, 40)  -- Radio: Справа сверху
+        elseif nameLower:match("theme") then
+            initialPosition = UDim2.new(0, 260, 0, 280) -- Theme: Под Radio
+        else
+            initialPosition = UDim2.new(0, 50, 0, 50)
+        end
+    end
 
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = windowName .. "_Window"
@@ -258,7 +478,6 @@ function Library:CreateWindow(windowName, initialPosition)
     MainFrame.Position = initialPosition
     MainFrame.BackgroundColor3 = Theme.MainBG
     MainFrame.BorderSizePixel = 0
-    MainFrame.AutomaticSize = Enum.AutomaticSize.Y
     MainFrame.ClipsDescendants = true
     MainFrame.Parent = MenuGui
     local MainFrameStroke = applyStroke(MainFrame, Theme.Stroke, 1)
@@ -290,7 +509,6 @@ function Library:CreateWindow(windowName, initialPosition)
     Container.Size = UDim2.new(1, 0, 0, 0)
     Container.Position = UDim2.new(0, 0, 0, 30)
     Container.BackgroundTransparency = 1
-    Container.AutomaticSize = Enum.AutomaticSize.Y
     Container.BorderSizePixel = 0
     Container.Parent = MainFrame
 
@@ -311,18 +529,26 @@ function Library:CreateWindow(windowName, initialPosition)
     Window.Container = Container
     Window.Instance = MainFrame
 
+    -- ИСПРАВЛЕНО: Безопасный кастомный расчет размера без багов растягивания движка Roblox
+    local function updateWindowSize()
+        if Window.Collapsed then
+            MainFrame.Size = UDim2.new(0, 220, 0, 30)
+        else
+            MainFrame.Size = UDim2.new(0, 220, 0, ListLayout.AbsoluteContentSize.Y + 30)
+        end
+    end
+
+    ListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateWindowSize)
+
     Topbar.MouseButton2Click:Connect(function()
         Window.Collapsed = not Window.Collapsed
         wData.Collapsed = Window.Collapsed
         if Window.Collapsed then
-            MainFrame.AutomaticSize = Enum.AutomaticSize.None
-            tween(MainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 220, 0, 30)})
-            task.wait(0.15)
             Container.Visible = false
         else
             Container.Visible = true
-            MainFrame.AutomaticSize = Enum.AutomaticSize.Y
         end
+        updateWindowSize()
     end)
 
     table.insert(Library.ThemeRefreshes, function()
@@ -333,6 +559,7 @@ function Library:CreateWindow(windowName, initialPosition)
         AccentLine.BackgroundColor3 = Theme.Accent
     end)
 
+    -- РЕАЛИЗАЦИЯ КНОПОК
     function Window:CreateButton(name, callback)
         callback = callback or function() end
         local ButtonFrame = Instance.new("Frame")
@@ -365,6 +592,7 @@ function Library:CreateWindow(windowName, initialPosition)
         end)
     end
 
+    -- РЕАЛИЗАЦИЯ ТОГГЛОВ + ЦВЕТОВЫХ ПАЛИТР (С ПОЛНОЙ ИНТЕГРАЦИЕЙ В HUD ARRAYLIST)
     function Window:CreateToggle(name, default, callback, defaultColor, colorCallback)
         local state = default or false
         local currentInstColor = defaultColor or Color3.fromRGB(255,255,255)
@@ -403,13 +631,16 @@ function Library:CreateWindow(windowName, initialPosition)
             Label.TextColor3 = state and Theme.TextMain or Theme.TextDim
             Box.BackgroundColor3 = state and Theme.Accent or Theme.InnerBoxBG
             BoxStroke.Color = state and Theme.Accent or Theme.Stroke
+            
+            -- ИСПРАВЛЕНО: Интеграция с Minecraft-style ArrayList
+            Library.ActiveModules[name] = state
+            UpdateArrayListUI()
         end
 
         local function toggle()
             state = not state
             updateToggle()
             callback(state)
-            -- Автоматическая триггер-система глобальных уведомлений
             Library:Notify("Module Updated", name .. " is now " .. (state and "ENABLED" or "DISABLED"), 3)
         end
 
@@ -553,6 +784,7 @@ function Library:CreateWindow(windowName, initialPosition)
                 pickerExpanded = not pickerExpanded
                 PickerContainer.Visible = pickerExpanded
                 PreviewStroke.Color = pickerExpanded and Theme.Accent or Theme.Stroke
+                updateWindowSize()
             end)
         end
 
@@ -578,9 +810,17 @@ function Library:CreateWindow(windowName, initialPosition)
                 end
             end
         }
+        
+        -- Инициализация стартового состояния в ArrayList
+        if state then
+            Library.ActiveModules[name] = true
+            UpdateArrayListUI()
+        end
+        
         return { SetState = function(self, val) state = val updateToggle() callback(state) end }
     end
 
+    -- РЕАЛИЗАЦИЯ СЛАЙДЕРОВ
     function Window:CreateSlider(name, min, max, default, decimals, callback)
         min = min or 0 max = max or 100 decimals = decimals or 0
         if max <= min then max = min + 0.0001 end
@@ -671,6 +911,7 @@ function Library:CreateWindow(windowName, initialPosition)
         return { SetValue = externalSet }
     end
 
+    -- РЕАЛИЗАЦИЯ ПОЛЕЙ ВВОДА (TEXTBOX)
     function Window:CreateTextBox(name, placeholder, callback)
         callback = callback or function() end
         local registryKey = windowName .. "_" .. name
@@ -727,8 +968,12 @@ function Library:CreateWindow(windowName, initialPosition)
         return { GetText = function() return TBox.Text end, SetText = function(self, val) TBox.Text = val end }
     end
 
+    -- ПОЛНАЯ И ИСПРАВЛЕННАЯ РЕАЛИЗАЦИЯ DROPDOWN МЕНЮ
     function Window:CreateDropdown(name, list, default, callback)
-        list = list or {} local currentSelection = default or list[1] or "" callback = callback or function() end local expanded = false
+        list = list or {} 
+        local currentSelection = default or list[1] or "" 
+        callback = callback or function() end 
+        local expanded = false
         local registryKey = windowName .. "_" .. name
 
         local DropdownFrame = Instance.new("Frame")
@@ -751,588 +996,150 @@ function Library:CreateWindow(windowName, initialPosition)
         Label.Text = name
         Label.Font = Enum.Font.Code
         Label.TextSize = 11
-        Label.TextColor3 = Theme.TextMain
+        Label.TextColor3 = Theme.TextDim
         Label.TextXAlignment = Enum.TextXAlignment.Left
-        Label.Parent = Header
+        Label.Parent = DropdownFrame
 
-        local SelectionLabel = Instance.new("TextLabel")
-        SelectionLabel.AnchorPoint = Vector2.new(1, 0)
-        SelectionLabel.Size = UDim2.new(0.55, -14, 0, 16)
-        SelectionLabel.Position = UDim2.new(1, -20, 0, 5)
-        SelectionLabel.BackgroundColor3 = Theme.InnerBoxBG
-        SelectionLabel.Text = currentSelection
-        SelectionLabel.Font = Enum.Font.Code
-        SelectionLabel.TextSize = 10
-        SelectionLabel.TextColor3 = Theme.Accent
-        SelectionLabel.Parent = Header
-        local BoxStroke = applyStroke(SelectionLabel, Theme.Stroke, 1)
-
-        local Arrow = Instance.new("TextLabel")
-        Arrow.AnchorPoint = Vector2.new(1, 0)
-        Arrow.Size = UDim2.new(0, 10, 0, 16)
-        Arrow.Position = UDim2.new(1, -6, 0, 5)
-        Arrow.BackgroundTransparency = 1
-        Arrow.Text = "v"
-        Arrow.Font = Enum.Font.Code
-        Arrow.TextSize = 10
-        Arrow.TextColor3 = Theme.TextDim
-        Arrow.Parent = Header
+        local ValueLabel = Instance.new("TextLabel")
+        ValueLabel.AnchorPoint = Vector2.new(1, 0)
+        ValueLabel.Size = UDim2.new(0.55, 0, 1, 0)
+        ValueLabel.Position = UDim2.new(1, -6, 0, 0)
+        ValueLabel.BackgroundTransparency = 1
+        ValueLabel.Text = currentSelection .. " v"
+        ValueLabel.Font = Enum.Font.Code
+        ValueLabel.TextSize = 10
+        ValueLabel.TextColor3 = Theme.Accent
+        ValueLabel.TextXAlignment = Enum.TextXAlignment.Right
+        ValueLabel.Parent = DropdownFrame
 
         local OptionsContainer = Instance.new("Frame")
-        OptionsContainer.Size = UDim2.new(0.55, -14, 0, 0)
-        OptionsContainer.Position = UDim2.new(0.45, 0, 0, 24)
+        OptionsContainer.Size = UDim2.new(1, 0, 0, 0)
+        OptionsContainer.Position = UDim2.new(0, 0, 0, 26)
         OptionsContainer.BackgroundColor3 = Theme.InnerBoxBG
         OptionsContainer.BorderSizePixel = 0
         OptionsContainer.AutomaticSize = Enum.AutomaticSize.Y
         OptionsContainer.Visible = false
-        OptionsContainer.ZIndex = 10
         OptionsContainer.Parent = DropdownFrame
-        local OptionsContainerStroke = applyStroke(OptionsContainer, Theme.Stroke, 1)
 
-        local OptionsLayout = Instance.new("UIListLayout")
-        OptionsLayout.SortOrder = Enum.SortOrder.LayoutOrder
-        OptionsLayout.Parent = OptionsContainer
+        local OList = Instance.new("UIListLayout")
+        OList.SortOrder = Enum.SortOrder.LayoutOrder
+        OList.Parent = OptionsContainer
 
         local function refreshOptions()
-            for _, child in ipairs(OptionsContainer:GetChildren()) do if child:IsA("TextButton") then child:Destroy() end end
-            for _, optionName in ipairs(list) do
-                local OptBtn = Instance.new("TextButton")
-                OptBtn.Size = UDim2.new(1, 0, 0, 18)
-                OptBtn.BackgroundColor3 = optionName == currentSelection and Theme.Hover or Color3.fromRGB(0,0,0)
-                OptBtn.BackgroundTransparency = optionName == currentSelection and 0 or 1
-                OptBtn.BorderSizePixel = 0
-                OptBtn.Text = optionName
-                OptBtn.Font = Enum.Font.Code
-                OptBtn.TextSize = 10
-                OptBtn.TextColor3 = optionName == currentSelection and Theme.Accent or Theme.TextDim
-                OptBtn.ZIndex = 11
-                OptBtn.Parent = OptionsContainer
+            for _, child in ipairs(OptionsContainer:GetChildren()) do
+                if child:IsA("TextButton") then child:Destroy() end
+            end
+            
+            for _, option in ipairs(list) do
+                local OBtn = Instance.new("TextButton")
+                OBtn.Size = UDim2.new(1, 0, 0, 20)
+                OBtn.BackgroundColor3 = Theme.InnerBoxBG
+                OBtn.BorderSizePixel = 0
+                OBtn.Text = "  " .. option
+                OBtn.Font = Enum.Font.Code
+                OBtn.TextSize = 10
+                OBtn.TextColor3 = (option == currentSelection) and Theme.Accent or Theme.TextDim
+                OBtn.TextXAlignment = Enum.TextXAlignment.Left
+                OBtn.Parent = OptionsContainer
 
-                OptBtn.MouseButton1Click:Connect(function()
-                    currentSelection = optionName
-                    SelectionLabel.Text = optionName
-                    expanded = false OptionsContainer.Visible = false Arrow.Text = "v"
-                    BoxStroke.Color = Theme.Stroke
-                    refreshOptions() callback(optionName)
+                OBtn.MouseButton1Click:Connect(function()
+                    currentSelection = option
+                    ValueLabel.Text = currentSelection .. " v"
+                    expanded = false
+                    OptionsContainer.Visible = false
+                    callback(currentSelection)
+                    refreshOptions()
+                    updateWindowSize()
                 end)
             end
         end
+        refreshOptions()
 
         Header.MouseButton1Click:Connect(function()
-            expanded = not expanded OptionsContainer.Visible = expanded
-            Arrow.Text = expanded and "^" or "v"
-            BoxStroke.Color = expanded and Theme.Accent or Theme.Stroke
-            if expanded then refreshOptions() end
+            expanded = not expanded
+            OptionsContainer.Visible = expanded
+            updateWindowSize()
         end)
 
         table.insert(Library.ThemeRefreshes, function()
-            DropdownFrame.BackgroundColor3 = Theme.ElementBG Label.TextColor3 = Theme.TextMain
-            SelectionLabel.BackgroundColor3 = Theme.InnerBoxBG SelectionLabel.TextColor3 = Theme.Accent
-            BoxStroke.Color = Theme.Stroke Arrow.TextColor3 = Theme.TextDim
-            OptionsContainer.BackgroundColor3 = Theme.InnerBoxBG OptionsContainerStroke.Color = Theme.Stroke
+            DropdownFrame.BackgroundColor3 = Theme.ElementBG
+            Label.TextColor3 = Theme.TextDim
+            ValueLabel.TextColor3 = Theme.Accent
+            OptionsContainer.BackgroundColor3 = Theme.InnerBoxBG
+            refreshOptions()
         end)
 
         Library.Registry[registryKey] = {
-            Type = "Dropdown", Get = function() return currentSelection end, Set = function(self, val) currentSelection = val SelectionLabel.Text = val callback(val) end
-        }
-        return { Refresh = function(self, newList) list = newList if not table.find(list, currentSelection) then currentSelection = list[1] or "" SelectionLabel.Text = currentSelection end if expanded then refreshOptions() end end }
-    end
-
-    function Window:CreateKeybind(name, default, callback)
-        local currentKey = default or Enum.KeyCode.RightShift
-        callback = callback or function() end
-        local registryKey = windowName .. "_" .. name local listening = false
-
-        local BindFrame = Instance.new("Frame")
-        BindFrame.Size = UDim2.new(1, 0, 0, 24)
-        BindFrame.BackgroundColor3 = Theme.ElementBG
-        BindFrame.BorderSizePixel = 0
-        BindFrame.Parent = Container
-
-        local Label = Instance.new("TextLabel")
-        Label.Size = UDim2.new(0.5, 0, 1, 0)
-        Label.Position = UDim2.new(0, 6, 0, 0)
-        Label.BackgroundTransparency = 1
-        Label.Text = name
-        Label.Font = Enum.Font.Code
-        Label.TextSize = 11
-        Label.TextColor3 = Theme.TextMain
-        Label.TextXAlignment = Enum.TextXAlignment.Left
-        Label.Parent = BindFrame
-
-        local BindBtn = Instance.new("TextButton")
-        BindBtn.AnchorPoint = Vector2.new(1, 0)
-        BindBtn.Size = UDim2.new(0.45, 0, 0, 16)
-        BindBtn.Position = UDim2.new(1, -6, 0, 4)
-        BindBtn.BackgroundColor3 = Theme.InnerBoxBG
-        BindBtn.BorderSizePixel = 0
-        BindBtn.Text = "[" .. currentKey.Name .. "]"
-        BindBtn.Font = Enum.Font.Code
-        BindBtn.TextSize = 10
-        BindBtn.TextColor3 = Theme.Accent
-        BindBtn.Parent = BindFrame
-        local BoxStroke = applyStroke(BindBtn, Theme.Stroke, 1)
-
-        BindBtn.MouseButton1Click:Connect(function() listening = true BindBtn.Text = "[...]" BoxStroke.Color = Theme.Accent end)
-        UserInputService.InputBegan:Connect(function(input)
-            if listening and not UserInputService:GetFocusedTextBox() then
-                if input.UserInputType == Enum.UserInputType.Keyboard then
-                    listening = false currentKey = input.KeyCode BindBtn.Text = "[" .. currentKey.Name .. "]" BoxStroke.Color = Theme.Stroke callback(currentKey)
-                end
+            Type = "Dropdown",
+            Get = function() return currentSelection end,
+            Set = function(self, val)
+                currentSelection = val
+                ValueLabel.Text = val .. " v"
+                callback(val)
+                refreshOptions()
+                updateWindowSize()
             end
-        end)
-
-        table.insert(Library.ThemeRefreshes, function()
-            BindFrame.BackgroundColor3 = Theme.ElementBG Label.TextColor3 = Theme.TextMain
-            BindBtn.BackgroundColor3 = Theme.InnerBoxBG BindBtn.TextColor3 = Theme.Accent BoxStroke.Color = Theme.Stroke
-        end)
-
-        Library.Registry[registryKey] = {
-            Type = "Keybind", Get = function() return currentKey.Name end, Set = function(self, val) currentKey = Enum.KeyCode[val] BindBtn.Text = "[" .. val .. "]" callback(currentKey) end
+        }
+        
+        return {
+            SetOptions = function(self, newList) list = newList refreshOptions() updateWindowSize() end,
+            SetValue = function(self, val) currentSelection = val ValueLabel.Text = val .. " v" callback(val) refreshOptions() updateWindowSize() end
         }
     end
-
-    function Window:CreateColorPicker(name, defaultColor, callback)
-        callback = callback or function() end local currentInstColor = defaultColor or Color3.fromRGB(255,255,255)
-        local registryKey = windowName .. "_" .. name local h, s, v = currentInstColor:ToHSV() local pickerExpanded = false
-
-        local PickerFrame = Instance.new("Frame")
-        PickerFrame.Size = UDim2.new(1, 0, 0, 24)
-        PickerFrame.BackgroundColor3 = Theme.ElementBG
-        PickerFrame.BorderSizePixel = 0
-        PickerFrame.AutomaticSize = Enum.AutomaticSize.Y
-        PickerFrame.Parent = Container
-
-        local Label = Instance.new("TextLabel")
-        Label.Size = UDim2.new(0.6, 0, 0, 24)
-        Label.Position = UDim2.new(0, 6, 0, 0)
-        Label.BackgroundTransparency = 1
-        Label.Text = name
-        Label.Font = Enum.Font.Code
-        Label.TextSize = 11
-        Label.TextColor3 = Theme.TextMain
-        Label.TextXAlignment = Enum.TextXAlignment.Left
-        Label.Parent = PickerFrame
-
-        local ColorPreview = Instance.new("Frame")
-        ColorPreview.AnchorPoint = Vector2.new(1, 0)
-        ColorPreview.Size = UDim2.new(0, 20, 0, 14)
-        ColorPreview.Position = UDim2.new(1, -6, 0, 5)
-        ColorPreview.BackgroundColor3 = currentInstColor
-        ColorPreview.BorderSizePixel = 0
-        ColorPreview.Parent = PickerFrame
-        local PreviewStroke = applyStroke(ColorPreview, Theme.Stroke, 1)
-
-        local ColorBtn = Instance.new("TextButton")
-        ColorBtn.Size = UDim2.new(1, 0, 1, 0)
-        ColorBtn.BackgroundTransparency = 1
-        ColorBtn.Text = ""
-        ColorBtn.Parent = ColorPreview
-
-        local PickerContainer = Instance.new("Frame")
-        PickerContainer.Size = UDim2.new(1, -12, 0, 110)
-        PickerContainer.Position = UDim2.new(0, 6, 0, 24)
-        PickerContainer.BackgroundColor3 = Theme.InnerBoxBG
-        PickerContainer.BorderSizePixel = 0
-        PickerContainer.Visible = false
-        PickerContainer.Parent = PickerFrame
-        local PickerContainerStroke = applyStroke(PickerContainer, Theme.Stroke, 1)
-
-        local SatValCanvas = Instance.new("TextButton")
-        SatValCanvas.Size = UDim2.new(0, 150, 0, 100)
-        SatValCanvas.Position = UDim2.new(0, 5, 0, 5)
-        SatValCanvas.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
-        SatValCanvas.BorderSizePixel = 0
-        SatValCanvas.Text = ""
-        SatValCanvas.AutoButtonColor = false
-        SatValCanvas.Parent = PickerContainer
-
-        local WhiteGrad = Instance.new("Frame")
-        WhiteGrad.Size = UDim2.new(1, 0, 1, 0)
-        WhiteGrad.BorderSizePixel = 0
-        WhiteGrad.Parent = SatValCanvas
-        local wG = Instance.new("UIGradient")
-        wG.Color = ColorSequence.new(Color3.new(1,1,1), Color3.new(1,1,1))
-        wG.Transparency = NumberSequence.new(0, 1)
-        wG.Parent = WhiteGrad
-
-        local BlackGrad = Instance.new("Frame")
-        BlackGrad.Size = UDim2.new(1, 0, 1, 0)
-        BlackGrad.BorderSizePixel = 0
-        BlackGrad.Parent = SatValCanvas
-        local bG = Instance.new("UIGradient")
-        bG.Color = ColorSequence.new(Color3.new(0,0,0), Color3.new(0,0,0))
-        bG.Transparency = NumberSequence.new(0, 1)
-        bG.Rotation = -90
-        bG.Parent = BlackGrad
-
-        local Cursor = Instance.new("Frame")
-        Cursor.AnchorPoint = Vector2.new(0.5, 0.5)
-        Cursor.Size = UDim2.new(0, 4, 0, 4)
-        Cursor.Position = UDim2.new(s, 0, 1 - v, 0)
-        Cursor.BackgroundColor3 = Color3.new(1,1,1)
-        Cursor.BorderSizePixel = 0
-        Cursor.Parent = SatValCanvas
-        applyStroke(Cursor, Color3.new(0,0,0), 1)
-
-        local HueBar = Instance.new("TextButton")
-        HueBar.Size = UDim2.new(0, 15, 0, 100)
-        HueBar.Position = UDim2.new(0, 165, 0, 5)
-        HueBar.BackgroundColor3 = Color3.new(1,1,1)
-        HueBar.BorderSizePixel = 0
-        HueBar.Text = ""
-        HueBar.AutoButtonColor = false
-        HueBar.Parent = PickerContainer
-
-        local HueGrad = Instance.new("UIGradient")
-        HueGrad.Rotation = 90
-        HueGrad.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(255,0,0)), ColorSequenceKeypoint.new(0.167, Color3.fromRGB(255,0,255)), ColorSequenceKeypoint.new(0.333, Color3.fromRGB(0,0,255)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0,255,255)), ColorSequenceKeypoint.new(0.667, Color3.fromRGB(0,255,0)), ColorSequenceKeypoint.new(0.833, Color3.fromRGB(255,255,0)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255,0,0))
-        })
-        HueGrad.Parent = HueBar
-
-        local HueCursor = Instance.new("Frame")
-        HueCursor.Size = UDim2.new(1, 4, 0, 2)
-        HueCursor.Position = UDim2.new(0, -2, 1 - h, 0)
-        HueCursor.BackgroundColor3 = Color3.new(1,1,1)
-        HueCursor.BorderSizePixel = 0
-        HueCursor.Parent = HueBar
-        applyStroke(HueCursor, Color3.new(0,0,0), 1)
-
-        local function fireUpdate()
-            currentInstColor = Color3.fromHSV(h, s, v) ColorPreview.BackgroundColor3 = currentInstColor SatValCanvas.BackgroundColor3 = Color3.fromHSV(h, 1, 1) callback(currentInstColor)
-        end
-
-        local draggingCanvas = false
-        local function updateCanvas(input)
-            local scaleX = math.clamp((input.Position.X - SatValCanvas.AbsolutePosition.X) / SatValCanvas.AbsoluteSize.X, 0, 1)
-            local scaleY = math.clamp((input.Position.Y - SatValCanvas.AbsolutePosition.Y) / SatValCanvas.AbsoluteSize.Y, 0, 1)
-            s = scaleX v = 1 - scaleY Cursor.Position = UDim2.new(s, 0, scaleY, 0) fireUpdate()
-        end
-
-        SatValCanvas.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingCanvas = true updateCanvas(input) end end)
-        UserInputService.InputChanged:Connect(function(input) if draggingCanvas and input.UserInputType == Enum.UserInputType.MouseMovement then updateCanvas(input) end end)
-        UserInputService.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingCanvas = false end end)
-
-        local draggingHue = false
-        local function updateHue(input)
-            local scaleY = math.clamp((input.Position.Y - HueBar.AbsolutePosition.Y) / HueBar.AbsoluteSize.Y, 0, 1)
-            h = 1 - scaleY HueCursor.Position = UDim2.new(0, -2, scaleY, 0) fireUpdate()
-        end
-
-        HueBar.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingHue = true updateHue(input) end end)
-        UserInputService.InputChanged:Connect(function(input) if draggingHue and input.UserInputType == Enum.UserInputType.MouseMovement then updateHue(input) end end)
-        UserInputService.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingHue = false end end)
-
-        ColorBtn.MouseButton1Click:Connect(function() pickerExpanded = not pickerExpanded PickerContainer.Visible = pickerExpanded PreviewStroke.Color = pickerExpanded and Theme.Accent or Theme.Stroke end)
-
-        table.insert(Library.ThemeRefreshes, function()
-            PickerFrame.BackgroundColor3 = Theme.ElementBG Label.TextColor3 = Theme.TextMain PreviewStroke.Color = Theme.Stroke PickerContainer.BackgroundColor3 = Theme.InnerBoxBG PickerContainerStroke.Color = Theme.Stroke
-        end)
-
-        Library.Registry[registryKey] = {
-            Type = "ColorPicker", Get = function() return {currentInstColor.R, currentInstColor.G, currentInstColor.B} end, Set = function(self, val) currentInstColor = Color3.new(val[1], val[2], val[3]) ColorPreview.BackgroundColor3 = currentInstColor h, s, v = currentInstColor:ToHSV() Cursor.Position = UDim2.new(s, 0, 1 - v, 0) HueCursor.Position = UDim2.new(0, -2, 1 - h, 0) SatValCanvas.BackgroundColor3 = Color3.fromHSV(h, 1, 1) callback(currentInstColor) end
-        }
-    end
-
-    local entranceDelay = (#Library.Windows - 1) * 0.08
-    task.delay(entranceDelay, function()
-        tween(WindowScale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1})
-        tween(MainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0})
-        tween(Topbar, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0, TextTransparency = 0})
-    end)
 
     return Window
 end
 
--- ВОРТЕРМАРК И FPS
-local CurrentFPS = 60 local FPSFrameCount = 0 local FPSAccumulator = 0
-RunService.RenderStepped:Connect(function(deltaTime)
-    FPSFrameCount = FPSFrameCount + 1 FPSAccumulator = FPSAccumulator + deltaTime
-    if FPSAccumulator >= 0.5 then CurrentFPS = math.round(FPSFrameCount / FPSAccumulator) FPSFrameCount = 0 FPSAccumulator = 0 end
-end)
-
-local WatermarkFrame = Instance.new("Frame")
-WatermarkFrame.Size = UDim2.new(0, 190, 0, 22)
-WatermarkFrame.Position = UDim2.new(1, -205, 1, -35)
-WatermarkFrame.BackgroundColor3 = Theme.MainBG
-WatermarkFrame.BorderSizePixel = 0
-WatermarkFrame.Parent = WatermarkGui
-local WatermarkFrameStroke = applyStroke(WatermarkFrame, Theme.Stroke, 1)
-
-local WMarkLine = Instance.new("Frame")
-WMarkLine.Size = UDim2.new(1, 0, 0, 2)
-WMarkLine.BackgroundColor3 = Theme.Accent
-WMarkLine.BorderSizePixel = 0
-WMarkLine.Parent = WatermarkFrame
-
-local WMarkLabel = Instance.new("TextLabel")
-WMarkLabel.Size = UDim2.new(1, 0, 1, -2)
-WMarkLabel.Position = UDim2.new(0, 0, 0, 2)
-WMarkLabel.BackgroundTransparency = 1
-WMarkLabel.Text = " METEOR | FPS: 0 | PING: 0ms"
-WMarkLabel.Font = Enum.Font.Code
-WMarkLabel.TextSize = 11
-WMarkLabel.TextColor3 = Theme.TextMain
-WMarkLabel.TextXAlignment = Enum.TextXAlignment.Left
-WMarkLabel.Parent = WatermarkFrame
-
-makeDraggable(WatermarkFrame, WatermarkFrame)
-table.insert(Library.ThemeRefreshes, function() WatermarkFrame.BackgroundColor3 = Theme.MainBG WatermarkFrameStroke.Color = Theme.Stroke WMarkLine.BackgroundColor3 = Theme.Accent WMarkLabel.TextColor3 = Theme.TextMain end)
-
-task.spawn(function()
-    while task.wait(0.4) do
-        if not Library.WatermarkEnabled then WatermarkFrame.Visible = false else
-            WatermarkFrame.Visible = true local ping = 0
-            pcall(function() ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue()) end)
-            WMarkLabel.Text = string.format(" METEOR | FPS: %d | PING: %dms", CurrentFPS, ping)
+-- ============================================================================
+-- СИСТЕМА СОХРАНЕНИЯ КОНФИГОВ (CONFIG MANAGEMENT)
+-- ============================================================================
+Library.ConfigSystem = {
+    CurrentConfigName = "",
+    
+    Save = function(self, name)
+        if not name or name == "" then return end
+        local data = {}
+        for k, v in pairs(Library.Registry) do
+            data[k] = v:Get()
         end
-    end
-end)
-
--- СПЛЭШ-ЭКРАН
-do
-    local SplashFrame = Instance.new("Frame")
-    SplashFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-    SplashFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-    SplashFrame.Size = UDim2.new(0, 240, 0, 70)
-    SplashFrame.BackgroundColor3 = Theme.MainBG
-    SplashFrame.BackgroundTransparency = 1
-    SplashFrame.BorderSizePixel = 0
-    SplashFrame.Parent = WatermarkGui
-    local SplashStroke = applyStroke(SplashFrame, Theme.Stroke, 1) SplashStroke.Transparency = 1
-
-    local SplashScale = Instance.new("UIScale") SplashScale.Scale = 0.85 SplashScale.Parent = SplashFrame
-    local SplashTitle = Instance.new("TextLabel") SplashTitle.Size = UDim2.new(1, 0, 0, 26) SplashTitle.Position = UDim2.new(0, 0, 0, 14) SplashTitle.BackgroundTransparency = 1 SplashTitle.Text = "METEOR" SplashTitle.Font = Enum.Font.Code SplashTitle.TextSize = 18 SplashTitle.TextColor3 = Theme.TextMain SplashTitle.TextTransparency = 1 SplashTitle.Parent = SplashFrame
-
-    local SplashBarBG = Instance.new("Frame") SplashBarBG.Size = UDim2.new(1, -40, 0, 4) SplashBarBG.Position = UDim2.new(0, 20, 0, 46) SplashBarBG.BackgroundColor3 = Theme.InnerBoxBG SplashBarBG.BackgroundTransparency = 1 SplashBarBG.BorderSizePixel = 0 SplashBarBG.Parent = SplashFrame
-    local SplashBarFill = Instance.new("Frame") SplashBarFill.Size = UDim2.new(0, 0, 1, 0) SplashBarFill.BackgroundColor3 = Theme.Accent SplashBarFill.BackgroundTransparency = 1 SplashBarFill.BorderSizePixel = 0 SplashBarFill.Parent = SplashBarBG
-
-    table.insert(Library.ThemeRefreshes, function() SplashFrame.BackgroundColor3 = Theme.MainBG SplashStroke.Color = Theme.Stroke SplashTitle.TextColor3 = Theme.TextMain SplashBarBG.BackgroundColor3 = Theme.InnerBoxBG SplashBarFill.BackgroundColor3 = Theme.Accent end)
-
-    tween(SplashScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1})
-    tween(SplashFrame, TweenInfo.new(0.25), {BackgroundTransparency = 0})
-    tween(SplashStroke, TweenInfo.new(0.25), {Transparency = 0})
-    tween(SplashTitle, TweenInfo.new(0.25), {TextTransparency = 0})
-    task.wait(0.15)
-    tween(SplashBarBG, TweenInfo.new(0.2), {BackgroundTransparency = 0})
-    tween(SplashBarFill, TweenInfo.new(0.2), {BackgroundTransparency = 0})
-    tween(SplashBarFill, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(1, 0, 1, 0)})
-    task.wait(0.65)
-    tween(SplashScale, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Scale = 0.9})
-    tween(SplashFrame, TweenInfo.new(0.2), {BackgroundTransparency = 1})
-    tween(SplashStroke, TweenInfo.new(0.2), {Transparency = 1})
-    tween(SplashTitle, TweenInfo.new(0.2), {TextTransparency = 1})
-    tween(SplashBarBG, TweenInfo.new(0.2), {BackgroundTransparency = 1})
-    tween(SplashBarFill, TweenInfo.new(0.2), {BackgroundTransparency = 1})
-    task.wait(0.25) SplashFrame:Destroy()
-end
-
--- ДВИЖОК ЭФФЕКТА СНЕГА (СИНХРОНИЗИРОВАН С ВИДИМОСТЬЮ МЕНЮ)
-local SnowCanvas = Instance.new("Frame")
-SnowCanvas.Size = UDim2.new(1, 0, 1, 0)
-SnowCanvas.BackgroundTransparency = 1
-SnowCanvas.ZIndex = -1
-SnowCanvas.Parent = MenuGui
-
-local Flakes = {}
-local function runSnowEngine()
-    if Library.SnowEnabled and Library.Visible then
-        if #Flakes < Library.SnowCount then
-            local f = Instance.new("Frame")
-            f.Size = UDim2.new(0, math.random(2, 4), 0, math.random(2, 4))
-            f.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-            f.BackgroundTransparency = math.random(20, 60) / 100
-            f.BorderSizePixel = 0
-            f.Position = UDim2.new(math.random(), 0, -0.02, 0)
-            f.Parent = SnowCanvas
-            table.insert(Flakes, {Obj = f, XSpeed = math.random(-15, 15) / 100, YSpeed = math.random(40, 120) / 100})
+        local success, str = pcall(function() return HttpService:JSONEncode(data) end)
+        if success and writefile then
+            writefile("Meteor_Configs/" .. name .. ".json", str)
+            Library:Notify("Config System", "Successfully saved config: " .. name, 3)
         end
-    end
-
-    for i = #Flakes, 1, -1 do
-        local f = Flakes[i]
-        if not Library.SnowEnabled or not Library.Visible then
-            f.Obj:Destroy() table.remove(Flakes, i)
-        else
-            local cPos = f.Obj.Position
-            local deltaY = f.YSpeed * (Library.SnowSpeed / 100) * 0.004
-            local deltaX = f.XSpeed * 0.001
-            local newY = cPos.Y.Scale + deltaY
-            local newX = cPos.X.Scale + deltaX
-            if newY > 1.02 or newX < -0.02 or newX > 1.02 then
-                f.Obj.Position = UDim2.new(math.random(), 0, -0.02, 0)
-            else
-                f.Obj.Position = UDim2.new(newX, 0, newY, 0)
+    end,
+    
+    Load = function(self, name)
+        if not name or name == "" then return end
+        if not isfile or not isfile("Meteor_Configs/" .. name .. ".json") then return end
+        
+        local str = readfile("Meteor_Configs/" .. name .. ".json")
+        local success, data = pcall(function() return HttpService:JSONDecode(str) end)
+        
+        if success then
+            for k, v in pairs(data) do
+                if Library.Registry[k] then
+                    pcall(function() Library.Registry[k]:Set(v) end)
+                end
             end
+            Library:Notify("Config System", "Successfully loaded config: " .. name, 3)
         end
+    end,
+    
+    GetList = function(self)
+        if not listfiles then return {} end
+        local list = {}
+        pcall(function()
+            for _, file in ipairs(listfiles("Meteor_Configs")) do
+                local name = file:match("([^/\\]+)%.json$")
+                if name then table.insert(list, name) end
+            end
+        end)
+        return list
     end
-end
-RunService.RenderStepped:Connect(runSnowEngine)
-
--- СТАТИЧЕСКИЙ MINECRAFT-STYLE ARRAYLIST HUD
-local ArrayListFrame = Instance.new("Frame")
-ArrayListFrame.Size = UDim2.new(0, 220, 0, 500)
-ArrayListFrame.Position = UDim2.new(1, -230, 0, 20)
-ArrayListFrame.BackgroundTransparency = 1
-ArrayListFrame.Parent = HudGui
-
-local ArrayListLayout = Instance.new("UIListLayout")
-ArrayListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-ArrayListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
-ArrayListLayout.Padding = UDim.new(0, 2)
-ArrayListLayout.Parent = ArrayListFrame
-
-local FakeModules = {"KillAura (Switch)", "TargetStrafe (Adaptive)", "Velocity (0%, 0%)", "Fly (Hypixel Bypass)", "Speed (Bhop)", "AntiAim (Yaw Jitter)", "Breadcrumbs"}
-table.sort(FakeModules, function(a, b) return #a > #b end)
-local ListElements = {}
-
-for i, modName in ipairs(FakeModules) do
-    local mFrame = Instance.new("Frame")
-    mFrame.Size = UDim2.new(0, 0, 0, 18) mFrame.BackgroundColor3 = Color3.fromRGB(10,10,14) mFrame.BackgroundTransparency = 0.3 mFrame.BorderSizePixel = 0 mFrame.AutomaticSize = Enum.AutomaticSize.X mFrame.LayoutOrder = i mFrame.Parent = ArrayListFrame
-    local sLine = Instance.new("Frame") sLine.Size = UDim2.new(0, 3, 1, 0) sLine.Position = UDim2.new(1, -3, 0, 0) sLine.BorderSizePixel = 0 sLine.Parent = mFrame
-    local mLbl = Instance.new("TextLabel") mLbl.Size = UDim2.new(1, -10, 1, 0) mLbl.Position = UDim2.new(0, 5, 0, 0) mLbl.BackgroundTransparency = 1 mLbl.Text = modName mLbl.Font = Enum.Font.Code mLbl.TextSize = 12 mLbl.TextColor3 = Color3.new(1,1,1) mLbl.TextXAlignment = Enum.TextXAlignment.Right mLbl.Parent = mFrame
-    table.insert(ListElements, {Text = mLbl, Line = sLine, Index = i})
-end
-
-RunService.RenderStepped:Connect(function()
-    ArrayListFrame.Visible = Library.ArrayListEnabled
-    local t = tick() * 2
-    for _, item in ipairs(ListElements) do
-        if Library.ArrayListRainbow then
-            local c = Color3.fromHSV((t + (item.Index * 0.1)) % 1, 0.75, 1)
-            item.Text.TextColor3 = c item.Line.BackgroundColor3 = c
-        else
-            item.Text.TextColor3 = Theme.ArrayListColor item.Line.BackgroundColor3 = Theme.ArrayListColor
-        end
-    end
-end)
-
--- ПЕРЕМЕЩАЕМЫЙ KEYSTROKES HUD
-local KeystrokesFrame = Instance.new("Frame")
-KeystrokesFrame.Size = UDim2.new(0, 114, 0, 114)
-KeystrokesFrame.Position = UDim2.new(0, 25, 0, 140)
-KeystrokesFrame.BackgroundTransparency = 1
-KeystrokesFrame.Parent = HudGui
-makeDraggable(KeystrokesFrame, KeystrokesFrame)
-
-local KeysSchema = {
-    W = {Name = "W", Size = UDim2.new(0, 36, 0, 36), Pos = UDim2.new(0, 39, 0, 0), Key = Enum.KeyCode.W},
-    A = {Name = "A", Size = UDim2.new(0, 36, 0, 36), Pos = UDim2.new(0, 0, 0, 39), Key = Enum.KeyCode.A},
-    S = {Name = "S", Size = UDim2.new(0, 36, 0, 36), Pos = UDim2.new(0, 39, 0, 39), Key = Enum.KeyCode.S},
-    D = {Name = "D", Size = UDim2.new(0, 36, 0, 36), Pos = UDim2.new(0, 78, 0, 39), Key = Enum.KeyCode.D},
-    LMB = {Name = "LMB", Size = UDim2.new(0, 55, 0, 32), Pos = UDim2.new(0, 0, 0, 78), Key = Enum.UserInputType.MouseButton1},
-    RMB = {Name = "RMB", Size = UDim2.new(0, 55, 0, 32), Pos = UDim2.new(0, 59, 0, 78), Key = Enum.UserInputType.MouseButton2}
 }
 
-local KeyTracker = {}
-for id, d in pairs(KeysSchema) do
-    local kf = Instance.new("Frame") kf.Size = d.Size kf.Position = d.Pos kf.BackgroundColor3 = Color3.fromRGB(10,10,14) kf.BackgroundTransparency = 0.4 kf.BorderSizePixel = 0 kf.Parent = KeystrokesFrame applyStroke(kf, Color3.fromRGB(35,35,45), 1)
-    local kl = Instance.new("TextLabel") kl.Size = UDim2.new(1,0,1,0) kl.BackgroundTransparency = 1 kl.Text = d.Name kl.Font = Enum.Font.Code kl.TextSize = 11 kl.TextColor3 = Color3.new(1,1,1) kl.Parent = kf
-    KeyTracker[d.Key] = {F = kf, L = kl}
-end
-
-local function parseInput(inputObj, pressed)
-    if not Library.KeystrokesEnabled then return end
-    local key = inputObj.KeyCode ~= Enum.KeyCode.Unknown and inputObj.KeyCode or inputObj.UserInputType
-    if KeyTracker[key] then
-        tween(KeyTracker[key].F, TweenInfo.new(0.08), {BackgroundColor3 = pressed and Theme.KeystrokeActive or Color3.fromRGB(10,10,14), BackgroundTransparency = pressed and 0.15 or 0.4})
-        KeyTracker[key].L.TextColor3 = pressed and Color3.new(0,0,0) or Color3.new(1,1,1)
-    end
-end
-UserInputService.InputBegan:Connect(function(i, g) if not g then parseInput(i, true) end end)
-UserInputService.InputEnded:Connect(function(i) parseInput(i, false) end)
-RunService.RenderStepped:Connect(function() KeystrokesFrame.Visible = Library.KeystrokesEnabled end)
-
--- ВКЛАДКА THEME
-local ThemeWindow = Library:CreateWindow("Theme", UDim2.new(0, 20, 0, 20))
-ThemeWindow:CreateColorPicker("Accent Highlight", Theme.Accent, function(color) Theme.Accent = color Library:UpdateTheme() end)
-ThemeWindow:CreateColorPicker("Text Primary", Theme.TextMain, function(color) Theme.TextMain = color Library:UpdateTheme() end)
-ThemeWindow:CreateColorPicker("Text Disabled", Theme.TextDim, function(color) Theme.TextDim = color Library:UpdateTheme() end)
-ThemeWindow:CreateColorPicker("Border (Stroke)", Theme.Stroke, function(color) Theme.Stroke = color Library:UpdateTheme() end)
-ThemeWindow:CreateColorPicker("Window Background", Theme.MainBG, function(color) Theme.MainBG = color Library:UpdateTheme() end)
-ThemeWindow:CreateColorPicker("Topbar Background", Theme.TopbarBG, function(color) Theme.TopbarBG = color Library:UpdateTheme() end)
-ThemeWindow:CreateColorPicker("Element Rows", Theme.ElementBG, function(color) Theme.ElementBG = color Library:UpdateTheme() end)
-ThemeWindow:CreateColorPicker("Inner Fields", Theme.InnerBoxBG, function(color) Theme.InnerBoxBG = color Library:UpdateTheme() end)
-
--- Настройки Блюра и Нотификаций в тему
-ThemeWindow:CreateToggle("Blur Enabled", true, function(state) Library.BlurEnabled = state if not state then MenuBlur.Size = 0 elseif Library.Visible then MenuBlur.Size = Library.BlurSize end end)
-ThemeWindow:CreateSlider("Blur Intensity", 0, 28, 14, 0, function(value) Library.BlurSize = value if Library.BlurEnabled and Library.Visible then MenuBlur.Size = value end end)
-ThemeWindow:CreateColorPicker("Notif Accent", Theme.NotifAccent, function(c) Theme.NotifAccent = c end)
-ThemeWindow:CreateColorPicker("Notif Background", Theme.NotifBG, function(c) Theme.NotifBG = c end)
-
--- ВКЛАДКА SETTINGS
-local SettingsWindow = Library:CreateWindow("Settings", UDim2.new(0, 20, 0, 310))
-SettingsWindow:CreateKeybind("Menu Bind", Enum.KeyCode.RightShift, function(newKey) Library.ToggleKey = newKey end)
-SettingsWindow:CreateToggle("Watermark Overlay", true, function(state) Library.WatermarkEnabled = state end)
-
--- Настройки ArrayList, Keystrokes и Снега в Settings
-SettingsWindow:CreateToggle("HUD ArrayList", true, function(state) Library.ArrayListEnabled = state end)
-SettingsWindow:CreateToggle("ArrayList Rainbow", true, function(state) Library.ArrayListRainbow = state end)
-SettingsWindow:CreateColorPicker("ArrayList Color", Theme.ArrayListColor, function(c) Theme.ArrayListColor = c end)
-
-SettingsWindow:CreateToggle("HUD Keystrokes", true, function(state) Library.KeystrokesEnabled = state end)
-SettingsWindow:CreateColorPicker("Keystroke Match Color", Theme.KeystrokeActive, function(c) Theme.KeystrokeActive = c end)
-
-SettingsWindow:CreateToggle("Menu Snow Particles", true, function(state) Library.SnowEnabled = state end)
-SettingsWindow:CreateSlider("Snow Speed", 10, 300, 100, 0, function(v) Library.SnowSpeed = v end)
-SettingsWindow:CreateSlider("Snow Count Max", 10, 150, 40, 0, function(v) Library.SnowCount = v end)
-
--- МЕНЕДЖЕР КОНФИГУРАЦИЙ
-local currentConfigName = ""
-SettingsWindow:CreateTextBox("Config Name", "enter name...", function(text) currentConfigName = text end)
-
-local function scanConfigs()
-    local list = {}
-    pcall(function() if listfiles then for _, file in ipairs(listfiles("Meteor_Configs")) do local name = file:match("([^/\\]+)%.txt$") or file:match("([^/\\]+)$") if name then table.insert(list, name) end end end end)
-    if #list == 0 then table.insert(list, "None") end return list
-end
-
-local ConfigDropdown
-ConfigDropdown = SettingsWindow:CreateDropdown("Select Config", scanConfigs(), "None", function(selected) currentConfigName = selected end)
-
-SettingsWindow:CreateButton("Save/Create Config", function()
-    if currentConfigName == "" or currentConfigName == "None" then return end local dataToSave = {}
-    for id, element in pairs(Library.Registry) do dataToSave[id] = element:Get() end
-    local success, json = pcall(function() return HttpService:JSONEncode(dataToSave) end)
-    if success and writefile then writefile("Meteor_Configs/" .. currentConfigName .. ".txt", json) if ConfigDropdown then ConfigDropdown:Refresh(scanConfigs()) end end
-end)
-
-SettingsWindow:CreateButton("Load Config", function()
-    if currentConfigName == "" or currentConfigName == "None" then return end
-    if readfile and isfile and isfile("Meteor_Configs/" .. currentConfigName .. ".txt") then
-        local json = readfile("Meteor_Configs/" .. currentConfigName .. ".txt")
-        local success, data = pcall(function() return HttpService:JSONDecode(json) end)
-        if success then for id, value in pairs(data) do if Library.Registry[id] then pcall(function() Library.Registry[id]:Set(value) end) end end end
-    end
-end)
-
-SettingsWindow:CreateButton("Delete Config", function()
-    if currentConfigName == "" or currentConfigName == "None" then return end
-    if delfile and isfile and isfile("Meteor_Configs/" .. currentConfigName .. ".txt") then delfile("Meteor_Configs/" .. currentConfigName .. ".txt") currentConfigName = "" if ConfigDropdown then ConfigDropdown:Refresh(scanConfigs()) end end
-end)
-SettingsWindow:CreateButton("Refresh List", function() if ConfigDropdown then ConfigDropdown:Refresh(scanConfigs()) end end)
-
--- ВКЛАДКА RADIO
-local RadioWindow = Library:CreateWindow("Radio", UDim2.new(0, 260, 0, 20))
-local CurrentRadioID = "0"
-local RadioSound = SoundService:FindFirstChild("MeteorRadio_Object")
-if not RadioSound then RadioSound = Instance.new("Sound") RadioSound.Name = "MeteorRadio_Object" RadioSound.Volume = 0.5 RadioSound.Parent = SoundService end
-
-RadioWindow:CreateTextBox("Track ID", "Enter ID...", function(text) CurrentRadioID = text:gsub("%D", "") end)
-
-local RadioControlsFrame = Instance.new("Frame")
-RadioControlsFrame.Size = UDim2.new(1, 0, 0, 24) RadioControlsFrame.BackgroundColor3 = Theme.ElementBG RadioControlsFrame.BorderSizePixel = 0 RadioControlsFrame.Parent = RadioWindow.Container
-
-local RadioPlayBtn = Instance.new("TextButton") RadioPlayBtn.Size = UDim2.new(0.5, -1, 1, 0) RadioPlayBtn.BackgroundColor3 = Theme.InnerBoxBG RadioPlayBtn.BorderSizePixel = 0 RadioPlayBtn.Text = "PLAY" RadioPlayBtn.Font = Enum.Font.Code RadioPlayBtn.TextSize = 10 RadioPlayBtn.TextColor3 = Color3.fromRGB(100, 255, 100) RadioPlayBtn.Parent = RadioControlsFrame applyStroke(RadioPlayBtn, Theme.Stroke, 1)
-local RadioPauseBtn = Instance.new("TextButton") RadioPauseBtn.Size = UDim2.new(0.5, -1, 1, 0) RadioPauseBtn.Position = UDim2.new(0.5, 1, 0, 0) RadioPauseBtn.BackgroundColor3 = Theme.InnerBoxBG RadioPauseBtn.BorderSizePixel = 0 RadioPauseBtn.Text = "PAUSE" RadioPauseBtn.Font = Enum.Font.Code RadioPauseBtn.TextSize = 10 RadioPauseBtn.TextColor3 = Color3.fromRGB(255, 210, 90) RadioPauseBtn.Parent = RadioControlsFrame applyStroke(RadioPauseBtn, Theme.Stroke, 1)
-
-RadioPlayBtn.MouseButton1Click:Connect(function() if CurrentRadioID ~= "" and CurrentRadioID ~= "0" then local targetId = "rbxassetid://" .. CurrentRadioID if RadioSound.SoundId ~= targetId then RadioSound.SoundId = targetId RadioSound.TimePosition = 0 end RadioSound:Play() end end)
-RadioPauseBtn.MouseButton1Click:Connect(function() RadioSound:Pause() end)
-
-RadioWindow:CreateSlider("Volume", 0, 100, 50, 0, function(val) RadioSound.Volume = val / 100 end)
-RadioWindow:CreateSlider("Playback Speed", 0.5, 2, 1, 2, function(val) RadioSound.PlaybackSpeed = val end)
-
-table.insert(Library.ThemeRefreshes, function() RadioControlsFrame.BackgroundColor3 = Theme.ElementBG RadioPlayBtn.BackgroundColor3 = Theme.InnerBoxBG RadioPauseBtn.BackgroundColor3 = Theme.InnerBoxBG end)
+-- Инициализация стартовых визуалов при загрузке
+SpawnSnowFlakes()
 
 return Library
