@@ -1,18 +1,9 @@
 -- [[
 --    METEOR / WISH STYLE CLICKGUI ENGINE
---    [VERSION 5.1 - FIXES, SPLASH SCREEN & RADIO UPDATE]
---    v5.1 changes:
---      - Исправлен FPS-счётчик в вотермарке (раньше мог "залипать" на одном значении)
---      - Вотермарк больше не падает насовсем, если Stats.Network недоступен (обёрнуто в pcall)
---      - Исправлена перемотка трека (Seek) в Settings — раньше не работала из-за поиска
---        объекта по несуществующему имени
---      - Исправлено залипание клавиши показа/скрытия меню, если окон ещё нет
---      - У каждого окна теперь есть плавная анимация появления при создании (каскадом)
---      - Добавлен компактный сплэш-экран перед инициализацией постоянных вкладок
---      - Добавлена новая постоянная вкладка "Radio": Track ID, Play/Pause, громкость,
---        скорость воспроизведения — всё автоматически сохраняется через тот же Save/Load
---        Config, что и остальные элементы
---      - Guard от деления на ноль в слайдерах (min == max)
+--    [VERSION 5.3 - COLLAPSE BUG FIXED]
+--    v5.3 changes:
+--      - Исправлен баг со сворачиванием окон на ПКМ (теперь окна корректно сжимаются)
+--      - Сохранены все предыдущие фиксы (без плеера в Settings, рабочее Radio)
 -- ]]
 
 local UserInputService = game:GetService("UserInputService")
@@ -91,8 +82,6 @@ UserInputService.InputBegan:Connect(function(input)
     if input.KeyCode == Library.ToggleKey then
         if Library.AnimationActive then return end
 
-        -- ФИКС: если окон ещё нет, просто переключаем флаг и выходим,
-        -- иначе AnimationActive мог залипнуть в true навсегда
         if #Library.Windows == 0 then
             Library.Visible = not Library.Visible
             MenuGui.Enabled = Library.Visible
@@ -219,7 +208,6 @@ function Library:CreateWindow(windowName, initialPosition)
     ListLayout.Padding = UDim.new(0, 1)
     ListLayout.Parent = Container
 
-    -- Начальное скрытое состояние для анимации появления вкладки при инициализации
     MainFrame.BackgroundTransparency = 1
     Topbar.BackgroundTransparency = 1
     Topbar.TextTransparency = 1
@@ -227,27 +215,23 @@ function Library:CreateWindow(windowName, initialPosition)
 
     makeDraggable(MainFrame, Topbar)
 
-    -- Сохраняем ссылки для глобальной анимации появления
     local wData = {MainFrame = MainFrame, Topbar = Topbar, Container = Container, UIScale = WindowScale, Collapsed = false}
     table.insert(Library.Windows, wData)
 
-    -- ФИКС: раньше Container и MainFrame не были доступны снаружи, из-за чего
-    -- приходилось лезть за ними через MenuGui:WaitForChild("ИмяОкна_Window") по строке.
-    -- Теперь они просто лежат в самом Window.
     Window.Container = Container
     Window.Instance = MainFrame
 
-    -- Плавное сворачивание/разворачивание вкладок по ПКМ
+    -- НАДЕЖНЫЙ ДВИЖОК СВОРЫВАНИЯ ОКОН НА ПКМ (БЕЗ БАГОВ С АВТОРАЗМЕРОМ)
     Topbar.MouseButton2Click:Connect(function()
         Window.Collapsed = not Window.Collapsed
         wData.Collapsed = Window.Collapsed
         
         if Window.Collapsed then
-            MainFrame.AutomaticSize = Enum.AutomaticSize.None
-            tween(MainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 220, 0, 30)})
-            task.wait(0.15)
             Container.Visible = false
+            MainFrame.AutomaticSize = Enum.AutomaticSize.None
+            MainFrame.Size = UDim2.new(0, 220, 0, 30)
         else
+            MainFrame.Size = UDim2.new(0, 220, 0, 30)
             Container.Visible = true
             MainFrame.AutomaticSize = Enum.AutomaticSize.Y
         end
@@ -434,7 +418,7 @@ function Library:CreateWindow(windowName, initialPosition)
                 ColorSequenceKeypoint.new(0.833, Color3.fromRGB(255,255,0)),
                 ColorSequenceKeypoint.new(1, Color3.fromRGB(255,0,0))
             })
-            HueGrad.Parent = HueBar
+            HueGrad.Parent = HueGrad
 
             local HueCursor = Instance.new("Frame")
             HueCursor.Size = UDim2.new(1, 4, 0, 2)
@@ -531,7 +515,7 @@ function Library:CreateWindow(windowName, initialPosition)
 
     function Window:CreateSlider(name, min, max, default, decimals, callback)
         min = min or 0 max = max or 100 decimals = decimals or 0
-        if max <= min then max = min + 0.0001 end -- ФИКС: защита от деления на ноль, если min == max
+        if max <= min then max = min + 0.0001 end
         local value = math.clamp(default or min, min, max)
         callback = callback or function() end
         local registryKey = windowName .. "_" .. name
@@ -625,9 +609,6 @@ function Library:CreateWindow(windowName, initialPosition)
             Set = function(self, val) externalSet(val) end
         }
 
-        -- ФИКС: раньше здесь возвращались только SetValue/UpdateLayout, и код Boombox пытался
-        -- найти состояние перетаскивания и текстовую метку через WaitForChild по несуществующему
-        -- имени "Track Progress" — теперь это отдаётся напрямую.
         return {
             SetValue = externalSet,
             UpdateLayout = function(self, newPct) Fill.Size = UDim2.new(math.clamp(newPct, 0, 1), 0, 1, 0) end,
@@ -1091,7 +1072,6 @@ function Library:CreateWindow(windowName, initialPosition)
         }
     end
 
-    -- ФИКС + ФИЧА: плавное появление окна при создании (каскадом, если окон несколько)
     local entranceDelay = (#Library.Windows - 1) * 0.08
     task.delay(entranceDelay, function()
         tween(WindowScale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1})
@@ -1102,10 +1082,7 @@ function Library:CreateWindow(windowName, initialPosition)
     return Window
 end
 
--- ====================================================================
--- ТОЧНЫЙ ДВИЖОК ОПРЕДЕЛЕНИЯ FPS (ФИКС: раньше считался по одному кадру
--- и мог "залипать" на нестабильном значении — теперь усредняется за 0.5с)
--- ====================================================================
+-- ВОРТЕРМАРК И FPS УСРЕДНЕНИЕ
 local CurrentFPS = 60
 local FPSFrameCount = 0
 local FPSAccumulator = 0
@@ -1160,8 +1137,6 @@ task.spawn(function()
             WatermarkFrame.Visible = false
         else
             WatermarkFrame.Visible = true
-            -- ФИКС: раньше при ошибке чтения пинга (например, Stats недоступен на некоторых
-            -- серверах) весь цикл падал и вотермарк замирал навсегда. Теперь обёрнуто в pcall.
             local ping = 0
             pcall(function()
                 ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
@@ -1171,9 +1146,7 @@ task.spawn(function()
     end
 end)
 
--- ====================================================================
--- КОМПАКТНЫЙ СПЛЭШ-ЭКРАН ПЕРЕД ИНИЦИАЛИЗАЦИЕЙ ПОСТОЯННЫХ ВКЛАДОК
--- ====================================================================
+-- СПЛЭШ-ЭКРАН
 do
     local SplashFrame = Instance.new("Frame")
     SplashFrame.Name = "Meteor_Splash"
@@ -1225,7 +1198,6 @@ do
         SplashBarFill.BackgroundColor3 = Theme.Accent
     end)
 
-    -- Появление сплэша
     tween(SplashScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1})
     tween(SplashFrame, TweenInfo.new(0.25), {BackgroundTransparency = 0})
     tween(SplashStroke, TweenInfo.new(0.25), {Transparency = 0})
@@ -1236,7 +1208,6 @@ do
     tween(SplashBarFill, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(1, 0, 1, 0)})
     task.wait(0.65)
 
-    -- Исчезновение сплэша
     tween(SplashScale, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Scale = 0.9})
     tween(SplashFrame, TweenInfo.new(0.2), {BackgroundTransparency = 1})
     tween(SplashStroke, TweenInfo.new(0.2), {Transparency = 1})
@@ -1247,9 +1218,7 @@ do
     SplashFrame:Destroy()
 end
 
--- ====================================================================
--- АВТОМАТИЧЕСКАЯ ИНИЦИАЛИЗАЦИЯ ВКЛАДКИ THEME
--- ====================================================================
+-- ИНИЦИАЛИЗАЦИЯ ВКЛАДКИ THEME
 local ThemeWindow = Library:CreateWindow("Theme", UDim2.new(0, 20, 0, 20))
 
 ThemeWindow:CreateColorPicker("Accent Highlight", Theme.Accent, function(color)
@@ -1292,9 +1261,7 @@ ThemeWindow:CreateColorPicker("Inner Fields", Theme.InnerBoxBG, function(color)
     Library:UpdateTheme()
 end)
 
--- ====================================================================
--- АВТОМАТИЧЕСКАЯ ИНИЦИАЛИЗАЦИЯ ВКЛАДКИ SETTINGS + BOOMBOX STREAM ENGINE
--- ====================================================================
+-- ИНИЦИАЛИЗАЦИЯ ВКЛАДКИ SETTINGS (БЕЗ АУДИОПЛЕЕРА)
 local SettingsWindow = Library:CreateWindow("Settings", UDim2.new(0, 20, 0, 310))
 
 SettingsWindow:CreateKeybind("Menu Bind", Enum.KeyCode.RightShift, function(newKey)
@@ -1305,102 +1272,7 @@ SettingsWindow:CreateToggle("Watermark Overlay", true, function(state)
     Library.WatermarkEnabled = state
 end)
 
--- РАЗДЕЛ БУМБОКСА (АУДИОПЛЕЕР)
-local CurrentAudioID = "0"
-local BoomboxSound = SoundService:FindFirstChild("MeteorBoombox_Object")
-if not BoomboxSound then
-    BoomboxSound = Instance.new("Sound")
-    BoomboxSound.Name = "MeteorBoombox_Object"
-    BoomboxSound.Volume = 2
-    BoomboxSound.Parent = SoundService
-end
-
-local AudioInput = SettingsWindow:CreateTextBox("Audio AssetID", "Enter ID...", function(text)
-    CurrentAudioID = text:gsub("%D", "") -- Удаляем любые нецифровые символы
-end)
-
--- Создаем кастомный блок управления плеером (Play / Stop) на одной строке
--- ФИКС: раньше парент искался хардкодом через MenuGui:WaitForChild("Settings_Window"):WaitForChild("Container"),
--- теперь используется напрямую SettingsWindow.Container
-local ControlsFrame = Instance.new("Frame")
-ControlsFrame.Size = UDim2.new(1, 0, 0, 24)
-ControlsFrame.BackgroundColor3 = Theme.ElementBG
-ControlsFrame.BorderSizePixel = 0
-ControlsFrame.Parent = SettingsWindow.Container
-
-local PlayBtn = Instance.new("TextButton")
-PlayBtn.Size = UDim2.new(0.5, -1, 1, 0)
-PlayBtn.BackgroundColor3 = Theme.InnerBoxBG
-PlayBtn.BorderSizePixel = 0
-PlayBtn.Text = "PLAY"
-PlayBtn.Font = Enum.Font.Code
-PlayBtn.TextSize = 10
-PlayBtn.TextColor3 = Color3.fromRGB(100, 255, 100)
-PlayBtn.Parent = ControlsFrame
-applyStroke(PlayBtn, Theme.Stroke, 1)
-
-local StopBtn = Instance.new("TextButton")
-StopBtn.Size = UDim2.new(0.5, -1, 1, 0)
-StopBtn.Position = UDim2.new(0.5, 1, 0, 0)
-StopBtn.BackgroundColor3 = Theme.InnerBoxBG
-StopBtn.BorderSizePixel = 0
-StopBtn.Text = "STOP"
-StopBtn.Font = Enum.Font.Code
-StopBtn.TextSize = 10
-StopBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
-StopBtn.Parent = ControlsFrame
-applyStroke(StopBtn, Theme.Stroke, 1)
-
-PlayBtn.MouseButton1Click:Connect(function()
-    if CurrentAudioID ~= "" and CurrentAudioID ~= "0" then
-        BoomboxSound.SoundId = "rbxassetid://" .. CurrentAudioID
-        BoomboxSound:Play()
-    end
-end)
-
-StopBtn.MouseButton1Click:Connect(function()
-    BoomboxSound:Stop()
-end)
-
--- Слайдер перемотки трека
--- ФИКС: раньше перемотка не работала — код искал объект по несуществующему имени
--- "Track Progress" через FindFirstChild, из-за чего UserIsSeeking всегда оставался false.
--- Теперь слайдер сам сообщает, тянет ли его пользователь, через SeekSlider:IsDragging()
-local SeekSlider = SettingsWindow:CreateSlider("Track Progress", 0, 100, 0, 0, function(val)
-    if BoomboxSound.TimeLength > 0 then
-        BoomboxSound.TimePosition = (val / 100) * BoomboxSound.TimeLength
-    end
-end)
-
--- Поток обновления позиции ползунка трека в реальном времени
-task.spawn(function()
-    while true do
-        task.wait(0.2)
-        if BoomboxSound.IsPlaying and BoomboxSound.TimeLength > 0 and not SeekSlider:IsDragging() then
-            local pct = BoomboxSound.TimePosition / BoomboxSound.TimeLength
-            SeekSlider:UpdateLayout(pct)
-            SeekSlider:SetDisplayText(math.round(BoomboxSound.TimePosition) .. "s / " .. math.round(BoomboxSound.TimeLength) .. "s")
-        end
-    end
-end)
-
--- Интеграция плеера в реестр конфигураций для автосохранения
-Library.Registry["Settings_BoomboxAssetID"] = {
-    Type = "TextBox",
-    Get = function() return CurrentAudioID end,
-    Set = function(self, val)
-        CurrentAudioID = val
-        if AudioInput then AudioInput:SetText(val) end
-    end
-}
-
-table.insert(Library.ThemeRefreshes, function()
-    ControlsFrame.BackgroundColor3 = Theme.ElementBG
-    PlayBtn.BackgroundColor3 = Theme.InnerBoxBG
-    StopBtn.BackgroundColor3 = Theme.InnerBoxBG
-end)
-
--- СТАНДАРТНАЯ СИСТЕМА КФГ МЕНЕДЖЕРА
+-- СИСТЕМА КФГ МЕНЕДЖЕРА
 local currentConfigName = ""
 SettingsWindow:CreateTextBox("Config Name", "enter name...", function(text)
     currentConfigName = text
@@ -1466,12 +1338,7 @@ SettingsWindow:CreateButton("Refresh List", function()
     if ConfigDropdown then ConfigDropdown:Refresh(scanConfigs()) end
 end)
 
--- ====================================================================
--- НОВАЯ ВКЛАДКА RADIO — второй, отдельный от Boombox, аудиоплеер
--- Track ID -> Play/Pause, громкость, скорость воспроизведения.
--- Всё автоматически сохраняется через тот же Save/Load Config выше,
--- т.к. CreateTextBox/CreateSlider сами регистрируются в Library.Registry.
--- ====================================================================
+-- ПОСТОЯННАЯ ВКЛАДКА RADIO
 local RadioWindow = Library:CreateWindow("Radio", UDim2.new(0, 260, 0, 20))
 
 local CurrentRadioID = "0"
@@ -1487,8 +1354,6 @@ local RadioTrackInput = RadioWindow:CreateTextBox("Track ID", "Enter ID...", fun
     CurrentRadioID = text:gsub("%D", "")
 end)
 
--- Play / Pause на одной строке (в отличие от Boombox, где Stop сбрасывает трек,
--- Pause сохраняет позицию, а Play с той же позиции продолжает)
 local RadioControlsFrame = Instance.new("Frame")
 RadioControlsFrame.Size = UDim2.new(1, 0, 0, 24)
 RadioControlsFrame.BackgroundColor3 = Theme.ElementBG
