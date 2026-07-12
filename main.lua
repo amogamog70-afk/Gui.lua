@@ -111,18 +111,18 @@ UserInputService.InputBegan:Connect(function(input)
                 wData.Topbar.BackgroundTransparency = 1
                 wData.Topbar.TextTransparency = 1
                 
-                tween(wData.UIScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingStyle.Out), {Scale = 1})
-                tween(wData.MainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingStyle.Out), {BackgroundTransparency = 0})
-                tween(wData.Topbar, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingStyle.Out), {BackgroundTransparency = 0, TextTransparency = 0})
+                tween(wData.UIScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1})
+                tween(wData.MainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0})
+                tween(wData.Topbar, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0, TextTransparency = 0})
             end
             task.wait(0.3)
             Library.AnimationActive = false
         else
             local count = 0
             for _, wData in ipairs(Library.Windows) do
-                tween(wData.UIScale, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingStyle.In), {Scale = 0.75})
-                tween(wData.MainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingStyle.In), {BackgroundTransparency = 1})
-                local t = tween(wData.Topbar, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingStyle.In), {BackgroundTransparency = 1, TextTransparency = 1})
+                tween(wData.UIScale, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Scale = 0.75})
+                tween(wData.MainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {BackgroundTransparency = 1})
+                local t = tween(wData.Topbar, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {BackgroundTransparency = 1, TextTransparency = 1})
                 
                 t.Completed:Connect(function()
                     count = count + 1
@@ -244,7 +244,7 @@ function Library:CreateWindow(windowName, initialPosition)
         
         if Window.Collapsed then
             MainFrame.AutomaticSize = Enum.AutomaticSize.None
-            tween(MainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingStyle.Out), {Size = UDim2.new(0, 220, 0, 30)})
+            tween(MainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 220, 0, 30)})
             task.wait(0.15)
             Container.Visible = false
         else
@@ -1094,9 +1094,9 @@ function Library:CreateWindow(windowName, initialPosition)
     -- ФИКС + ФИЧА: плавное появление окна при создании (каскадом, если окон несколько)
     local entranceDelay = (#Library.Windows - 1) * 0.08
     task.delay(entranceDelay, function()
-        tween(WindowScale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingStyle.Out), {Scale = 1})
-        tween(MainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingStyle.Out), {BackgroundTransparency = 0})
-        tween(Topbar, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingStyle.Out), {BackgroundTransparency = 0, TextTransparency = 0})
+        tween(WindowScale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1})
+        tween(MainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0})
+        tween(Topbar, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0, TextTransparency = 0})
     end)
 
     return Window
@@ -1226,18 +1226,18 @@ do
     end)
 
     -- Появление сплэша
-    tween(SplashScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingStyle.Out), {Scale = 1})
+    tween(SplashScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1})
     tween(SplashFrame, TweenInfo.new(0.25), {BackgroundTransparency = 0})
     tween(SplashStroke, TweenInfo.new(0.25), {Transparency = 0})
     tween(SplashTitle, TweenInfo.new(0.25), {TextTransparency = 0})
     task.wait(0.15)
     tween(SplashBarBG, TweenInfo.new(0.2), {BackgroundTransparency = 0})
     tween(SplashBarFill, TweenInfo.new(0.2), {BackgroundTransparency = 0})
-    tween(SplashBarFill, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingStyle.Out), {Size = UDim2.new(1, 0, 1, 0)})
+    tween(SplashBarFill, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(1, 0, 1, 0)})
     task.wait(0.65)
 
     -- Исчезновение сплэша
-    tween(SplashScale, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingStyle.In), {Scale = 0.9})
+    tween(SplashScale, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Scale = 0.9})
     tween(SplashFrame, TweenInfo.new(0.2), {BackgroundTransparency = 1})
     tween(SplashStroke, TweenInfo.new(0.2), {Transparency = 1})
     tween(SplashTitle, TweenInfo.new(0.2), {TextTransparency = 1})
