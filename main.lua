@@ -1,8 +1,8 @@
 -- [[
 --    METEOR / WISH STYLE CLICKGUI ENGINE
---    [VERSION 4.0 - GOLD EDITION] 
---    Fixes: Persistent Watermark, Non-GPE Keybind Engine, Standalone ColorPickers.
---    Features: Auto Theme Window, Auto Settings Window, Realtime Redraw Matrix, Full CFG JSON Sync.
+--    [VERSION 5.0 - PERFECTION & BOOMBOX UPDATE] 
+--    Fixes: Precise RenderStepped FPS Engine, Smooth Universal Menu Animations.
+--    Features: Built-in Audio Stream Player (Boombox) with CFG Save, Play, Stop, and Real-time Seek Matrix.
 -- ]]
 
 local UserInputService = game:GetService("UserInputService")
@@ -11,6 +11,7 @@ local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
 local Stats = game:GetService("Stats")
+local SoundService = game:GetService("SoundService")
 
 local Library = {
     Windows = {},
@@ -18,7 +19,8 @@ local Library = {
     ThemeRefreshes = {}, -- Матрица функций для динамической перерисовки элементов
     ToggleKey = Enum.KeyCode.RightShift,
     Visible = true,
-    WatermarkEnabled = true
+    WatermarkEnabled = true,
+    AnimationActive = false
 }
 
 local Theme = {
@@ -38,7 +40,7 @@ pcall(function()
     if makefolder then makefolder("Meteor_Configs") end
 end)
 
--- ГЛАВНЫЕ КОНТЕЙНЕРЫ ИНТЕРФЕЙСА (Разделенные для независимой видимости)
+-- ГЛАВНЫЕ КОНТЕЙНЕРЫ ИНТЕРФЕЙСА
 local MenuGui = Instance.new("ScreenGui")
 MenuGui.Name = "MeteorMenu_Core"
 MenuGui.ResetOnSpawn = false
@@ -57,21 +59,6 @@ if not MenuGui.Parent then
     WatermarkGui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
 end
 
--- СТАБИЛЬНЫЙ ДВИЖОК СКРЫТИЯ МЕНЮ (Игнорирует игровые перехваты, кроме чата)
-UserInputService.InputBegan:Connect(function(input)
-    if UserInputService:GetFocusedTextBox() then return end
-    if input.KeyCode == Library.ToggleKey then
-        Library.Visible = not Library.Visible
-        MenuGui.Enabled = Library.Visible
-    end
-end)
-
-function Library:UpdateTheme()
-    for _, refreshFunc in ipairs(Library.ThemeRefreshes) do
-        pcall(refreshFunc)
-    end
-end
-
 local function applyStroke(parent, color, thickness)
     local stroke = Instance.new("UIStroke")
     stroke.Color = color
@@ -86,6 +73,56 @@ local function tween(object, info, properties)
     local t = TweenService:Create(object, info, properties)
     t:Play()
     return t
+end
+
+-- СТАБИЛЬНЫЙ ДВИЖОК СКРЫТИЯ МЕНЮ С ПЛАВНОЙ АНИМАЦИЕЙ (UIScale + Fade)
+UserInputService.InputBegan:Connect(function(input)
+    if UserInputService:GetFocusedTextBox() then return end
+    if input.KeyCode == Library.ToggleKey then
+        if Library.AnimationActive then return end
+        Library.AnimationActive = true
+        Library.Visible = not Library.Visible
+        
+        if Library.Visible then
+            MenuGui.Enabled = true
+            for _, wData in ipairs(Library.Windows) do
+                wData.MainFrame.Size = wData.Collapsed and UDim2.new(0, 220, 0, 30) or UDim2.new(0, 220, 0, 30)
+                wData.UIScale.Scale = 0.75
+                wData.MainFrame.BackgroundTransparency = 1
+                wData.Topbar.BackgroundTransparency = 1
+                wData.Topbar.TextTransparency = 1
+                
+                tween(wData.UIScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingStyle.Out), {Scale = 1})
+                tween(wData.MainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingStyle.Out), {BackgroundTransparency = 0})
+                tween(wData.Topbar, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingStyle.Out), {BackgroundTransparency = 0, TextTransparency = 0})
+            end
+            task.wait(0.3)
+            Library.AnimationActive = false
+        else
+            local count = 0
+            for _, wData in ipairs(Library.Windows) do
+                tween(wData.UIScale, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingStyle.In), {Scale = 0.75})
+                tween(wData.MainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingStyle.In), {BackgroundTransparency = 1})
+                local t = tween(wData.Topbar, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingStyle.In), {BackgroundTransparency = 1, TextTransparency = 1})
+                
+                t.Completed:Connect(function()
+                    count = count + 1
+                    if count == #Library.Windows then
+                        if not Library.Visible then
+                            MenuGui.Enabled = false
+                        end
+                        Library.AnimationActive = false
+                    end
+                end)
+            end
+        end
+    end
+end)
+
+function Library:UpdateTheme()
+    for _, refreshFunc in ipairs(Library.ThemeRefreshes) do
+        pcall(refreshFunc)
+    end
 end
 
 local function makeDraggable(frame, dragHandle)
@@ -122,8 +159,12 @@ function Library:CreateWindow(windowName, initialPosition)
     MainFrame.BackgroundColor3 = Theme.MainBG
     MainFrame.BorderSizePixel = 0
     MainFrame.AutomaticSize = Enum.AutomaticSize.Y
+    MainFrame.ClipsDescendants = true
     MainFrame.Parent = MenuGui
     local MainFrameStroke = applyStroke(MainFrame, Theme.Stroke, 1)
+
+    local WindowScale = Instance.new("UIScale")
+    WindowScale.Parent = MainFrame
 
     local Topbar = Instance.new("TextButton")
     Topbar.Name = "Topbar"
@@ -161,14 +202,26 @@ function Library:CreateWindow(windowName, initialPosition)
 
     makeDraggable(MainFrame, Topbar)
 
+    -- Сохраняем ссылки для глобальной анимации появления
+    local wData = {MainFrame = MainFrame, Topbar = Topbar, Container = Container, UIScale = WindowScale, Collapsed = false}
+    table.insert(Library.Windows, wData)
+
+    -- Плавное сворачивание/разворачивание вкладок по ПКМ
     Topbar.MouseButton2Click:Connect(function()
         Window.Collapsed = not Window.Collapsed
-        Container.Visible = not Window.Collapsed
-        MainFrame.AutomaticSize = Window.Collapsed and Enum.AutomaticSize.None or Enum.AutomaticSize.Y
-        if Window.Collapsed then MainFrame.Size = UDim2.new(0, 220, 0, 30) end
+        wData.Collapsed = Window.Collapsed
+        
+        if Window.Collapsed then
+            MainFrame.AutomaticSize = Enum.AutomaticSize.None
+            tween(MainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingStyle.Out), {Size = UDim2.new(0, 220, 0, 30)})
+            task.wait(0.15)
+            Container.Visible = false
+        else
+            Container.Visible = true
+            MainFrame.AutomaticSize = Enum.AutomaticSize.Y
+        end
     end)
 
-    -- Матричное обновление Окна
     table.insert(Library.ThemeRefreshes, function()
         MainFrame.BackgroundColor3 = Theme.MainBG
         MainFrameStroke.Color = Theme.Stroke
@@ -540,7 +593,7 @@ function Library:CreateWindow(windowName, initialPosition)
             Set = function(self, val) externalSet(val) end
         }
 
-        return { SetValue = externalSet }
+        return { SetValue = externalSet, UpdateLayout = function(self, newPct) Fill.Size = UDim2.new(math.clamp(newPct, 0, 1), 0, 1, 0) end }
     end
 
     function Window:CreateTextBox(name, placeholder, callback)
@@ -598,6 +651,8 @@ function Library:CreateWindow(windowName, initialPosition)
             Get = function() return TBox.Text end,
             Set = function(self, val) TBox.Text = val callback(val, false) end
         }
+        
+        return { GetText = function() return TBox.Text end, SetText = function(self, val) TBox.Text = val end }
     end
 
     function Window:CreateDropdown(name, list, default, callback)
@@ -806,7 +861,6 @@ function Library:CreateWindow(windowName, initialPosition)
         }
     end
 
-    -- НОВЫЙ ЭЛЕМЕНТ: АВТОНОМНЫЙ ЦВЕТОВОЙ ПИKЕР ДЛЯ ВКЛАДКИ THEME
     function Window:CreateColorPicker(name, defaultColor, callback)
         callback = callback or function() end
         local currentInstColor = defaultColor or Color3.fromRGB(255,255,255)
@@ -1001,12 +1055,17 @@ function Library:CreateWindow(windowName, initialPosition)
 end
 
 -- ====================================================================
--- НЕЗАВИСИМЫЙ ВОТЕРМАРК С ФИКСИРОВАННЫМ РЕНДЕРОМ
+-- ТОЧНЫЙ ДВИЖОК ОПРЕДЕЛЕНИЯ FPS ЧЕРЕЗ RENDERSTEPPED (ФИКС БАГА ЗАВИСАНИЯ)
 -- ====================================================================
+local CurrentFPS = 0
+RunService.RenderStepped:Connect(function(deltaTime)
+    CurrentFPS = math.round(1 / deltaTime)
+end)
+
 local WatermarkFrame = Instance.new("Frame")
 WatermarkFrame.Name = "Meteor_Watermark"
-WatermarkFrame.Size = UDim2.new(0, 180, 0, 22)
-WatermarkFrame.Position = UDim2.new(1, -195, 1, -35)
+WatermarkFrame.Size = UDim2.new(0, 190, 0, 22)
+WatermarkFrame.Position = UDim2.new(1, -205, 1, -35)
 WatermarkFrame.BackgroundColor3 = Theme.MainBG
 WatermarkFrame.BorderSizePixel = 0
 WatermarkFrame.Parent = WatermarkGui
@@ -1039,25 +1098,19 @@ table.insert(Library.ThemeRefreshes, function()
 end)
 
 task.spawn(function()
-    local lastIteration = os.clock()
-    while task.wait(0.5) do
+    while task.wait(0.4) do
         if not Library.WatermarkEnabled then 
             WatermarkFrame.Visible = false
         else
             WatermarkFrame.Visible = true
-            local now = os.clock()
-            local fps = math.floor(1 / (now - lastIteration))
-            if fps > 1000 then fps = 60 end
-            lastIteration = now
-            
             local ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
-            WMarkLabel.Text = string.format(" METEOR | FPS: %d | PING: %dms", fps, ping)
+            WMarkLabel.Text = string.format(" METEOR | FPS: %d | PING: %dms", CurrentFPS, ping)
         end
     end
 end)
 
 -- ====================================================================
--- АВТОМАТИЧЕСКАЯ ИНИЦИАЛИЗАЦИЯ ВКЛАДКИ THEME (КАСТОМИЗАЦИЯ СТИЛЕЙ)
+-- АВТОМАТИЧЕСКАЯ ИНИЦИАЛИЗАЦИЯ ВКЛАДКИ THEME
 -- ====================================================================
 local ThemeWindow = Library:CreateWindow("Theme", UDim2.new(0, 20, 0, 20))
 
@@ -1102,7 +1155,7 @@ ThemeWindow:CreateColorPicker("Inner Fields", Theme.InnerBoxBG, function(color)
 end)
 
 -- ====================================================================
--- АВТОМАТИЧЕСКАЯ ИНИЦИАЛИЗАЦИЯ ВКЛАДКИ SETTINGS
+-- АВТОМАТИЧЕСКАЯ ИНИЦИАЛИЗАЦИЯ ВКЛАДКИ SETTINGS + BOOMBOX STREAM ENGINE
 -- ====================================================================
 local SettingsWindow = Library:CreateWindow("Settings", UDim2.new(0, 20, 0, 310))
 
@@ -1114,6 +1167,127 @@ SettingsWindow:CreateToggle("Watermark Overlay", true, function(state)
     Library.WatermarkEnabled = state
 end)
 
+-- РАЗДЕЛ БУМБОКСА (АУДИОПЛЕЕР)
+local CurrentAudioID = "0"
+local BoomboxSound = SoundService:FindFirstChild("MeteorBoombox_Object")
+if not BoomboxSound then
+    BoomboxSound = Instance.new("Sound")
+    BoomboxSound.Name = "MeteorBoombox_Object"
+    BoomboxSound.Volume = 2
+    BoomboxSound.Parent = SoundService
+end
+
+local AudioInput = SettingsWindow:CreateTextBox("Audio AssetID", "Enter ID...", function(text)
+    CurrentAudioID = text:gsub("%D", "") -- Удаляем любые нецифровые символы
+end)
+
+-- Создаем кастомный блок управления плеером (Play / Stop) на одной строке
+local ControlsFrame = Instance.new("Frame")
+ControlsFrame.Size = UDim2.new(1, 0, 0, 24)
+ControlsFrame.BackgroundColor3 = Theme.ElementBG
+ControlsFrame.BorderSizePixel = 0
+ControlsFrame.Parent = MenuGui:WaitForChild("Settings_Window"):WaitForChild("Container")
+
+local PlayBtn = Instance.new("TextButton")
+PlayBtn.Size = UDim2.new(0.5, -1, 1, 0)
+PlayBtn.BackgroundColor3 = Theme.InnerBoxBG
+PlayBtn.BorderSizePixel = 0
+PlayBtn.Text = "PLAY"
+PlayBtn.Font = Enum.Font.Code
+PlayBtn.TextSize = 10
+PlayBtn.TextColor3 = Color3.fromRGB(100, 255, 100)
+PlayBtn.Parent = ControlsFrame
+applyStroke(PlayBtn, Theme.Stroke, 1)
+
+local StopBtn = Instance.new("TextButton")
+StopBtn.Size = UDim2.new(0.5, -1, 1, 0)
+StopBtn.Position = UDim2.new(0.5, 1, 0, 0)
+StopBtn.BackgroundColor3 = Theme.InnerBoxBG
+StopBtn.BorderSizePixel = 0
+StopBtn.Text = "STOP"
+StopBtn.Font = Enum.Font.Code
+StopBtn.TextSize = 10
+StopBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+StopBtn.Parent = ControlsFrame
+applyStroke(StopBtn, Theme.Stroke, 1)
+
+PlayBtn.MouseButton1Click:Connect(function()
+    if CurrentAudioID ~= "" and CurrentAudioID ~= "0" then
+        BoomboxSound.SoundId = "rbxassetid://" .. CurrentAudioID
+        BoomboxSound:Play()
+    end
+end)
+
+StopBtn.MouseButton1Click:Connect(function()
+    BoomboxSound:Stop()
+end)
+
+-- Слайдер перемотки трека
+local UserIsSeeking = false
+local SeekSlider = SettingsWindow:CreateSlider("Track Progress", 0, 100, 0, 0, function(val)
+    if UserIsSeeking and BoomboxSound.TimeLength > 0 then
+        BoomboxSound.TimePosition = (val / 100) * BoomboxSound.TimeLength
+    end
+end)
+
+-- Обработчик мыши для отслеживания ручной перемотки слайдера
+task.spawn(function()
+    local valLabel = MenuGui:WaitForChild("Settings_Window"):WaitForChild("Container")
+    for _, obj in ipairs(valLabel:GetChildren()) do
+        if obj:IsA("Frame") and obj:FindFirstChild("Track Progress") then
+            local bar = obj:FindFirstChild("TextButton") or obj:FindFirstChildOfClass("TextButton")
+            if bar then
+                bar.InputBegan:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 then UserIsSeeking = true end
+                end)
+                UserInputService.InputEnded:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 then UserIsSeeking = false end
+                end)
+            end
+        end
+    end
+end)
+
+-- Поток обновления позиции ползунка трека в реальном времени
+task.spawn(function()
+    while true do
+        task.wait(0.2)
+        if BoomboxSound.IsPlaying and BoomboxSound.TimeLength > 0 and not UserIsSeeking then
+            local pct = BoomboxSound.TimePosition / BoomboxSound.TimeLength
+            SeekSlider:UpdateLayout(pct)
+            local valLabel = MenuGui:FindFirstChild("Settings_Window"):FindFirstChild("Container")
+            if valLabel then
+                for _, child in ipairs(valLabel:GetChildren()) do
+                    if child:IsA("Frame") and child:FindFirstChild("Track Progress") then
+                        for _, lbl in ipairs(child:GetChildren()) do
+                            if lbl:IsA("TextLabel") and lbl.TextXAlignment == Enum.TextXAlignment.Right then
+                                lbl.Text = math.round(BoomboxSound.TimePosition) .. "s / " .. math.round(BoomboxSound.TimeLength) .. "s"
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- Интеграция плеера в реестр конфигураций для автосохранения
+Library.Registry["Settings_BoomboxAssetID"] = {
+    Type = "TextBox",
+    Get = function() return CurrentAudioID end,
+    Set = function(self, val)
+        CurrentAudioID = val
+        if AudioInput then AudioInput:SetText(val) end
+    end
+}
+
+table.insert(Library.ThemeRefreshes, function()
+    ControlsFrame.BackgroundColor3 = Theme.ElementBG
+    PlayBtn.BackgroundColor3 = Theme.InnerBoxBG
+    StopBtn.BackgroundColor3 = Theme.InnerBoxBG
+end)
+
+-- СТАНДАРТНАЯ СИСТЕМА КФГ МЕНЕДЖЕРА
 local currentConfigName = ""
 SettingsWindow:CreateTextBox("Config Name", "enter name...", function(text)
     currentConfigName = text
@@ -1140,12 +1314,10 @@ end)
 
 SettingsWindow:CreateButton("Save/Create Config", function()
     if currentConfigName == "" or currentConfigName == "None" then return end
-    
     local dataToSave = {}
     for id, element in pairs(Library.Registry) do
         dataToSave[id] = element:Get()
     end
-    
     local success, json = pcall(function() return HttpService:JSONEncode(dataToSave) end)
     if success and writefile then
         writefile("Meteor_Configs/" .. currentConfigName .. ".txt", json)
@@ -1155,7 +1327,6 @@ end)
 
 SettingsWindow:CreateButton("Load Config", function()
     if currentConfigName == "" or currentConfigName == "None" then return end
-    
     if readfile and isfile and isfile("Meteor_Configs/" .. currentConfigName .. ".txt") then
         local json = readfile("Meteor_Configs/" .. currentConfigName .. ".txt")
         local success, data = pcall(function() return HttpService:JSONDecode(json) end)
