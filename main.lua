@@ -1,6 +1,6 @@
 --[[
     METEOR / WISH STYLE CLICKGUI LIBRARY FOR ROBLOX
-    [FIXED VERSION] - Fixed floating elements, added advanced asset-less 2D ColorPicker.
+    [UPDATED VERSION] - Inline ColorPickers inside Toggles, Fixed Anchors.
 ]]
 
 local UserInputService = game:GetService("UserInputService")
@@ -10,20 +10,18 @@ local CoreGui = game:GetService("CoreGui")
 local Library = {}
 Library.Windows = {}
 
--- Глобальная палитра цветов интерфейса
 local Theme = {
-    MainBG = Color3.fromRGB(12, 12, 14),       -- Темный фон окон
-    TopbarBG = Color3.fromRGB(18, 18, 22),     -- Фон шапок
-    ElementBG = Color3.fromRGB(16, 16, 20),    -- Фон строк элементов
-    InnerBoxBG = Color3.fromRGB(8, 8, 10),     -- Внутренний фон инпутов
-    Accent = Color3.fromRGB(221, 43, 110),     -- Фирменный неон
-    TextMain = Color3.fromRGB(240, 240, 245),  -- Основной текст
-    TextDim = Color3.fromRGB(140, 140, 145),   -- Скрытый / плейсхолдер текст
-    Stroke = Color3.fromRGB(26, 26, 32),       -- Границы
-    Hover = Color3.fromRGB(24, 24, 30)         -- Наведение мыши
+    MainBG = Color3.fromRGB(12, 12, 14),
+    TopbarBG = Color3.fromRGB(18, 18, 22),
+    ElementBG = Color3.fromRGB(16, 16, 20),
+    InnerBoxBG = Color3.fromRGB(8, 8, 10),
+    Accent = Color3.fromRGB(221, 43, 110),
+    TextMain = Color3.fromRGB(240, 240, 245),
+    TextDim = Color3.fromRGB(140, 140, 145),
+    Stroke = Color3.fromRGB(26, 26, 32),
+    Hover = Color3.fromRGB(24, 24, 30)
 }
 
--- Корневой контейнер GUI
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "MeteorClickGUI_Fixed"
 ScreenGui.ResetOnSpawn = false
@@ -32,7 +30,6 @@ if not ScreenGui.Parent then
     ScreenGui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
 end
 
--- Вспомогательная функция для обводки (Жесткие стыки углов)
 local function applyStroke(parent, color, thickness)
     local stroke = Instance.new("UIStroke")
     stroke.Color = color
@@ -49,9 +46,6 @@ local function tween(object, info, properties)
     return t
 end
 
--- ====================================================================
--- СОЗДАНИЕ ОКНА
--- ====================================================================
 function Library:CreateWindow(windowName, initialPosition)
     local Window = { Elements = {}, Collapsed = false }
     initialPosition = initialPosition or UDim2.new(0, 50, 0, 50)
@@ -100,7 +94,7 @@ function Library:CreateWindow(windowName, initialPosition)
     ListLayout.Padding = UDim.new(0, 1)
     ListLayout.Parent = Container
 
-    -- Логика Драггинга
+    -- Dragging
     local dragging, dragInput, dragStart, startPos
     Topbar.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -122,7 +116,6 @@ function Library:CreateWindow(windowName, initialPosition)
         end
     end)
 
-    -- Сворачивание окон
     Topbar.MouseButton2Click:Connect(function()
         Window.Collapsed = not Window.Collapsed
         Container.Visible = not Window.Collapsed
@@ -130,12 +123,8 @@ function Library:CreateWindow(windowName, initialPosition)
         if Window.Collapsed then MainFrame.Size = UDim2.new(0, 220, 0, 30) end
     end)
 
-    -- ====================================================================
-    -- ЭЛЕМЕНТ: КНОПКА
-    -- ====================================================================
     function Window:CreateButton(name, callback)
         callback = callback or function() end
-
         local ButtonFrame = Instance.new("Frame")
         ButtonFrame.Size = UDim2.new(1, 0, 0, 24)
         ButtonFrame.BackgroundColor3 = Theme.ElementBG
@@ -162,9 +151,9 @@ function Library:CreateWindow(windowName, initialPosition)
     end
 
     -- ====================================================================
-    -- ЭЛЕМЕНТ: ЧЕКБОКС (TOGGLE) [FIXED]
+    -- ОБНОВЛЕННЫЙ ЧЕКБОКС (СО ВСТРОЕННЫМ КОЛОРПИКЕРОМ СЛЕВА ОТ ГАЛОЧКИ)
     -- ====================================================================
-    function Window:CreateToggle(name, default, callback)
+    function Window:CreateToggle(name, default, callback, defaultColor, colorCallback)
         local state = default or false
         callback = callback or function() end
 
@@ -172,10 +161,11 @@ function Library:CreateWindow(windowName, initialPosition)
         ToggleFrame.Size = UDim2.new(1, 0, 0, 24)
         ToggleFrame.BackgroundColor3 = Theme.ElementBG
         ToggleFrame.BorderSizePixel = 0
+        ToggleFrame.AutomaticSize = Enum.AutomaticSize.Y
         ToggleFrame.Parent = Container
 
         local Label = Instance.new("TextLabel")
-        Label.Size = UDim2.new(0.7, 0, 1, 0)
+        Label.Size = UDim2.new(1, defaultColor and -50 or -30, 0, 24)
         Label.Position = UDim2.new(0, 6, 0, 0)
         Label.BackgroundTransparency = 1
         Label.Text = name
@@ -185,8 +175,9 @@ function Library:CreateWindow(windowName, initialPosition)
         Label.TextXAlignment = Enum.TextXAlignment.Left
         Label.Parent = ToggleFrame
 
+        -- Чекбокс (Самый правый край)
         local Box = Instance.new("TextButton")
-        Box.AnchorPoint = Vector2.new(1, 0) -- ФИКС БАГА
+        Box.AnchorPoint = Vector2.new(1, 0)
         Box.Size = UDim2.new(0, 14, 0, 14)
         Box.Position = UDim2.new(1, -6, 0, 5)
         Box.BackgroundColor3 = state and Theme.Accent or Theme.InnerBoxBG
@@ -209,26 +200,172 @@ function Library:CreateWindow(windowName, initialPosition)
 
         Box.MouseButton1Click:Connect(toggle)
         
+        -- Невидимая кнопка для клика по тексту (не перекрывает колорпикер)
         local InvisibleBtn = Instance.new("TextButton")
-        InvisibleBtn.Size = UDim2.new(0.8, 0, 1, 0)
+        InvisibleBtn.Size = UDim2.new(1, defaultColor and -50 or -30, 0, 24)
         InvisibleBtn.BackgroundTransparency = 1
         InvisibleBtn.Text = ""
         InvisibleBtn.Parent = ToggleFrame
         InvisibleBtn.MouseButton1Click:Connect(toggle)
 
+        -- Если передан цвет, создаем кубик СЛЕВА от чекбокса
+        if defaultColor and colorCallback then
+            local h, s, v = defaultColor:ToHSV()
+            local pickerExpanded = false
+
+            local ColorPreview = Instance.new("Frame")
+            ColorPreview.AnchorPoint = Vector2.new(1, 0)
+            ColorPreview.Size = UDim2.new(0, 14, 0, 14)
+            ColorPreview.Position = UDim2.new(1, -25, 0, 5) -- Слева от кнопки включения (gap 5px)
+            ColorPreview.BackgroundColor3 = defaultColor
+            ColorPreview.BorderSizePixel = 0
+            ColorPreview.Parent = ToggleFrame
+            local PreviewStroke = applyStroke(ColorPreview, Theme.Stroke, 1)
+
+            local ColorBtn = Instance.new("TextButton")
+            ColorBtn.Size = UDim2.new(1, 0, 1, 0)
+            ColorBtn.BackgroundTransparency = 1
+            ColorBtn.Text = ""
+            ColorBtn.Parent = ColorPreview
+
+            -- Выдвижная панель палитры (Открывается строго под строкой)
+            local PickerContainer = Instance.new("Frame")
+            PickerContainer.Size = UDim2.new(1, -12, 0, 110)
+            PickerContainer.Position = UDim2.new(0, 6, 0, 24)
+            PickerContainer.BackgroundColor3 = Theme.InnerBoxBG
+            PickerContainer.BorderSizePixel = 0
+            PickerContainer.Visible = false
+            PickerContainer.Parent = ToggleFrame
+            applyStroke(PickerContainer, Theme.Stroke, 1)
+
+            -- 2D Холст Сатурации/Яркости
+            local SatValCanvas = Instance.new("TextButton")
+            SatValCanvas.Size = UDim2.new(0, 150, 0, 100)
+            SatValCanvas.Position = UDim2.new(0, 5, 0, 5)
+            SatValCanvas.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
+            SatValCanvas.BorderSizePixel = 0
+            SatValCanvas.Text = ""
+            SatValCanvas.AutoButtonColor = false
+            SatValCanvas.Parent = PickerContainer
+
+            local WhiteGrad = Instance.new("Frame")
+            WhiteGrad.Size = UDim2.new(1, 0, 1, 0)
+            WhiteGrad.BorderSizePixel = 0
+            WhiteGrad.Parent = SatValCanvas
+            local wG = Instance.new("UIGradient")
+            wG.Color = ColorSequence.new(Color3.new(1,1,1), Color3.new(1,1,1))
+            wG.Transparency = NumberSequence.new(0, 1)
+            wG.Parent = WhiteGrad
+
+            local BlackGrad = Instance.new("Frame")
+            BlackGrad.Size = UDim2.new(1, 0, 1, 0)
+            BlackGrad.BorderSizePixel = 0
+            BlackGrad.Parent = SatValCanvas
+            local bG = Instance.new("UIGradient")
+            bG.Color = ColorSequence.new(Color3.new(0,0,0), Color3.new(0,0,0))
+            bG.Transparency = NumberSequence.new(0, 1)
+            bG.Rotation = -90
+            bG.Parent = BlackGrad
+
+            local Cursor = Instance.new("Frame")
+            Cursor.AnchorPoint = Vector2.new(0.5, 0.5)
+            Cursor.Size = UDim2.new(0, 4, 0, 4)
+            Cursor.Position = UDim2.new(s, 0, 1 - v, 0)
+            Cursor.BackgroundColor3 = Color3.new(1,1,1)
+            Cursor.BorderSizePixel = 0
+            Cursor.Parent = SatValCanvas
+            applyStroke(Cursor, Color3.new(0,0,0), 1)
+
+            -- Вертикальная радуга (Hue)
+            local HueBar = Instance.new("TextButton")
+            HueBar.Size = UDim2.new(0, 15, 0, 100)
+            HueBar.Position = UDim2.new(0, 165, 0, 5)
+            HueBar.BackgroundColor3 = Color3.new(1,1,1)
+            HueBar.BorderSizePixel = 0
+            HueBar.Text = ""
+            HueBar.AutoButtonColor = false
+            HueBar.Parent = PickerContainer
+
+            local HueGrad = Instance.new("UIGradient")
+            HueGrad.Rotation = 90
+            HueGrad.Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Color3.fromRGB(255,0,0)),
+                ColorSequenceKeypoint.new(0.167, Color3.fromRGB(255,0,255)),
+                ColorSequenceKeypoint.new(0.333, Color3.fromRGB(0,0,255)),
+                ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0,255,255)),
+                ColorSequenceKeypoint.new(0.667, Color3.fromRGB(0,255,0)),
+                ColorSequenceKeypoint.new(0.833, Color3.fromRGB(255,255,0)),
+                ColorSequenceKeypoint.new(1, Color3.fromRGB(255,0,0))
+            })
+            HueGrad.Parent = HueBar
+
+            local HueCursor = Instance.new("Frame")
+            HueCursor.Size = UDim2.new(1, 4, 0, 2)
+            HueCursor.Position = UDim2.new(0, -2, 1 - h, 0)
+            HueCursor.BackgroundColor3 = Color3.new(1,1,1)
+            HueCursor.BorderSizePixel = 0
+            HueCursor.Parent = HueBar
+            applyStroke(HueCursor, Color3.new(0,0,0), 1)
+
+            local function fireUpdate()
+                local finalColor = Color3.fromHSV(h, s, v)
+                ColorPreview.BackgroundColor3 = finalColor
+                SatValCanvas.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
+                colorCallback(finalColor)
+            end
+
+            local draggingCanvas = false
+            local function updateCanvas(input)
+                local scaleX = math.clamp((input.Position.X - SatValCanvas.AbsolutePosition.X) / SatValCanvas.AbsoluteSize.X, 0, 1)
+                local scaleY = math.clamp((input.Position.Y - SatValCanvas.AbsolutePosition.Y) / SatValCanvas.AbsoluteSize.Y, 0, 1)
+                s = scaleX
+                v = 1 - scaleY
+                Cursor.Position = UDim2.new(s, 0, scaleY, 0)
+                fireUpdate()
+            end
+
+            SatValCanvas.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingCanvas = true updateCanvas(input) end
+            end)
+            UserInputService.InputChanged:Connect(function(input)
+                if draggingCanvas and input.UserInputType == Enum.UserInputType.MouseMovement then updateCanvas(input) end
+            end)
+            UserInputService.InputEnded:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingCanvas = false end
+            end)
+
+            local draggingHue = false
+            local function updateHue(input)
+                local scaleY = math.clamp((input.Position.Y - HueBar.AbsolutePosition.Y) / HueBar.AbsoluteSize.Y, 0, 1)
+                h = 1 - scaleY
+                HueCursor.Position = UDim2.new(0, -2, scaleY, 0)
+                fireUpdate()
+            end
+
+            HueBar.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingHue = true updateHue(input) end
+            end)
+            UserInputService.InputChanged:Connect(function(input)
+                if draggingHue and input.UserInputType == Enum.UserInputType.MouseMovement then updateHue(input) end
+            end)
+            UserInputService.InputEnded:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingHue = false end
+            end)
+
+            ColorBtn.MouseButton1Click:Connect(function()
+                pickerExpanded = not pickerExpanded
+                PickerContainer.Visible = pickerExpanded
+                PreviewStroke.Color = pickerExpanded and Theme.Accent or Theme.Stroke
+            end)
+        end
+
         local ToggleController = {}
         function ToggleController:SetState(val) state = val updateToggle() callback(state) end
-        function ToggleController:GetState() return state end
         return ToggleController
     end
 
-    -- ====================================================================
-    -- ЭЛЕМЕНТ: ПОЛЗУНОК (SLIDER) [FIXED "FLYING NUMBERS"]
-    -- ====================================================================
     function Window:CreateSlider(name, min, max, default, decimals, callback)
-        min = min or 0
-        max = max or 100
-        decimals = decimals or 0
+        min = min or 0 max = max or 100 decimals = decimals or 0
         local value = math.clamp(default or min, min, max)
         callback = callback or function() end
 
@@ -250,7 +387,7 @@ function Library:CreateWindow(windowName, initialPosition)
         Label.Parent = SliderFrame
 
         local ValueLabel = Instance.new("TextLabel")
-        ValueLabel.AnchorPoint = Vector2.new(1, 0) -- ФИКС БАГА С ЛЕТАЮЩИМИ ЦИФРАМИ
+        ValueLabel.AnchorPoint = Vector2.new(1, 0)
         ValueLabel.Size = UDim2.new(0.35, 0, 0, 18)
         ValueLabel.Position = UDim2.new(1, -6, 0, 2)
         ValueLabel.BackgroundTransparency = 1
@@ -283,7 +420,6 @@ function Library:CreateWindow(windowName, initialPosition)
             value = min + (max - min) * percentage
             local formatStr = "%." .. decimals .. "f"
             value = tonumber(string.format(formatStr, value))
-            
             Fill.Size = UDim2.new(percentage, 0, 1, 0)
             ValueLabel.Text = string.format(formatStr, value)
             callback(value)
@@ -302,20 +438,15 @@ function Library:CreateWindow(windowName, initialPosition)
         local SliderController = {}
         function SliderController:SetValue(val)
             value = math.clamp(val, min, max)
-            local percentage = (value - min) / (max - min)
-            Fill.Size = UDim2.new(percentage, 0, 1, 0)
+            Fill.Size = UDim2.new((value - min) / (max - min), 0, 1, 0)
             ValueLabel.Text = string.format("%." .. decimals .. "f", value)
             callback(value)
         end
         return SliderController
     end
 
-    -- ====================================================================
-    -- ЭЛЕМЕНТ: ТЕКСТБОКС [FIXED]
-    -- ====================================================================
     function Window:CreateTextBox(name, placeholder, callback)
         callback = callback or function() end
-
         local BoxFrame = Instance.new("Frame")
         BoxFrame.Size = UDim2.new(1, 0, 0, 26)
         BoxFrame.BackgroundColor3 = Theme.ElementBG
@@ -334,7 +465,7 @@ function Library:CreateWindow(windowName, initialPosition)
         Label.Parent = BoxFrame
 
         local TBox = Instance.new("TextBox")
-        TBox.AnchorPoint = Vector2.new(1, 0) -- ФИКС БАГА
+        TBox.AnchorPoint = Vector2.new(1, 0)
         TBox.Size = UDim2.new(0.55, 0, 0, 16)
         TBox.Position = UDim2.new(1, -6, 0, 5)
         TBox.BackgroundColor3 = Theme.InnerBoxBG
@@ -357,21 +488,10 @@ function Library:CreateWindow(windowName, initialPosition)
 
         TBox.Focused:Connect(function() Label.TextColor3 = Theme.TextMain BoxStroke.Color = Theme.Accent end)
         TBox.FocusLost:Connect(function(enter) Label.TextColor3 = Theme.TextDim BoxStroke.Color = Theme.Stroke callback(TBox.Text, enter) end)
-
-        local BoxController = {}
-        function BoxController:SetText(txt) TBox.Text = tostring(txt) end
-        return BoxController
     end
 
-    -- ====================================================================
-    -- ЭЛЕМЕНТ: ДРОПДАУН [FIXED]
-    -- ====================================================================
     function Window:CreateDropdown(name, list, default, callback)
-        list = list or {}
-        local currentSelection = default or list[1] or ""
-        callback = callback or function() end
-        local expanded = false
-
+        list = list or {} local currentSelection = default or list[1] or "" callback = callback or function() end local expanded = false
         local DropdownFrame = Instance.new("Frame")
         DropdownFrame.Size = UDim2.new(1, 0, 0, 26)
         DropdownFrame.BackgroundColor3 = Theme.ElementBG
@@ -397,7 +517,7 @@ function Library:CreateWindow(windowName, initialPosition)
         Label.Parent = Header
 
         local SelectionLabel = Instance.new("TextLabel")
-        SelectionLabel.AnchorPoint = Vector2.new(1, 0) -- ФИКС БАГА
+        SelectionLabel.AnchorPoint = Vector2.new(1, 0)
         SelectionLabel.Size = UDim2.new(0.55, -14, 0, 16)
         SelectionLabel.Position = UDim2.new(1, -20, 0, 5)
         SelectionLabel.BackgroundColor3 = Theme.InnerBoxBG
@@ -409,7 +529,7 @@ function Library:CreateWindow(windowName, initialPosition)
         local BoxStroke = applyStroke(SelectionLabel, Theme.Stroke, 1)
 
         local Arrow = Instance.new("TextLabel")
-        Arrow.AnchorPoint = Vector2.new(1, 0) -- ФИКС БАГА
+        Arrow.AnchorPoint = Vector2.new(1, 0)
         Arrow.Size = UDim2.new(0, 10, 0, 16)
         Arrow.Position = UDim2.new(1, -6, 0, 5)
         Arrow.BackgroundTransparency = 1
@@ -469,204 +589,6 @@ function Library:CreateWindow(windowName, initialPosition)
             BoxStroke.Color = expanded and Theme.Accent or Theme.Stroke
             if expanded then refreshOptions() end
         end)
-
-        local DropdownController = {}
-        function DropdownController:SetSelection(val) currentSelection = val SelectionLabel.Text = val refreshOptions() callback(val) end
-        return DropdownController
-    end
-
-    -- ====================================================================
-    -- [NEW] ЭЛЕМЕНТ: НАСТОЯЩАЯ 2D ПАЛИТРА ЦВЕТА (COLORPICKER)
-    -- ====================================================================
-    function Window:CreateColorPicker(name, defaultColor, callback)
-        defaultColor = defaultColor or Color3.fromRGB(255, 255, 255)
-        callback = callback or function() end
-
-        local h, s, v = defaultColor:ToHSV()
-        local expanded = false
-
-        local PickerFrame = Instance.new("Frame")
-        PickerFrame.Size = UDim2.new(1, 0, 0, 26)
-        PickerFrame.BackgroundColor3 = Theme.ElementBG
-        PickerFrame.BorderSizePixel = 0
-        PickerFrame.AutomaticSize = Enum.AutomaticSize.Y
-        PickerFrame.Parent = Container
-
-        local Header = Instance.new("TextButton")
-        Header.Size = UDim2.new(1, 0, 0, 26)
-        Header.BackgroundTransparency = 1
-        Header.Text = ""
-        Header.Parent = PickerFrame
-
-        local Label = Instance.new("TextLabel")
-        Label.Size = UDim2.new(0.6, 0, 1, 0)
-        Label.Position = UDim2.new(0, 6, 0, 0)
-        Label.BackgroundTransparency = 1
-        Label.Text = name
-        Label.Font = Enum.Font.Code
-        Label.TextSize = 11
-        Label.TextColor3 = Theme.TextMain
-        Label.TextXAlignment = Enum.TextXAlignment.Left
-        Label.Parent = Header
-
-        -- Маленький кликабельный цветной кубик справа
-        local ColorPreview = Instance.new("Frame")
-        ColorPreview.AnchorPoint = Vector2.new(1, 0)
-        ColorPreview.Size = UDim2.new(0, 16, 0, 16)
-        ColorPreview.Position = UDim2.new(1, -6, 0, 5)
-        ColorPreview.BackgroundColor3 = defaultColor
-        ColorPreview.BorderSizePixel = 0
-        ColorPreview.Parent = Header
-        local PreviewStroke = applyStroke(ColorPreview, Theme.Stroke, 1)
-
-        -- Скрытый по дефолту контейнер для холста и радужного слайдера
-        local PickerContainer = Instance.new("Frame")
-        PickerContainer.Size = UDim2.new(1, -12, 0, 110)
-        PickerContainer.Position = UDim2.new(0, 6, 0, 26)
-        PickerContainer.BackgroundColor3 = Theme.InnerBoxBG
-        PickerContainer.BorderSizePixel = 0
-        PickerContainer.Visible = false
-        PickerContainer.Parent = PickerFrame
-        applyStroke(PickerContainer, Theme.Stroke, 1)
-
-        -- 1. САТУРАЦИЯ / ЯРКОСТЬ (2D Сава-холст)
-        local SatValCanvas = Instance.new("TextButton")
-        SatValCanvas.Size = UDim2.new(0, 160, 0, 100)
-        SatValCanvas.Position = UDim2.new(0, 5, 0, 5)
-        SatValCanvas.BackgroundColor3 = Color3.fromHSV(h, 1, 1) -- Чистый оттенок сзади
-        SatValCanvas.BorderSizePixel = 0
-        SatValCanvas.Text = ""
-        SatValCanvas.AutoButtonColor = false
-        SatValCanvas.Parent = PickerContainer
-
-        -- Градиент Белый -> Прозрачный (Горизонтальный)
-        local WhiteGrad = Instance.new("Frame")
-        WhiteGrad.Size = UDim2.new(1, 0, 1, 0)
-        WhiteGrad.BackgroundTransparency = 0
-        WhiteGrad.BorderSizePixel = 0
-        WhiteGrad.Parent = SatValCanvas
-        local wG = Instance.new("UIGradient")
-        wG.Color = ColorSequence.new(Color3.new(1,1,1), Color3.new(1,1,1))
-        wG.Transparency = NumberSequence.new(0, 1)
-        wG.Parent = WhiteGrad
-
-        -- Градиент Прозрачный -> Черный (Вертикальный)
-        local BlackGrad = Instance.new("Frame")
-        BlackGrad.Size = UDim2.new(1, 0, 1, 0)
-        BlackGrad.BackgroundTransparency = 0
-        BlackGrad.BorderSizePixel = 0
-        BlackGrad.Parent = SatValCanvas
-        local bG = Instance.new("UIGradient")
-        bG.Color = ColorSequence.new(Color3.new(0,0,0), Color3.new(0,0,0))
-        bG.Transparency = NumberSequence.new(0, 1)
-        bG.Rotation = -90
-        bG.Parent = BlackGrad
-
-        -- Кружок-прицел выбора на 2D карте
-        local Cursor = Instance.new("Frame")
-        Cursor.AnchorPoint = Vector2.new(0.5, 0.5)
-        Cursor.Size = UDim2.new(0, 4, 0, 4)
-        Cursor.Position = UDim2.new(s, 0, 1 - v, 0)
-        Cursor.BackgroundColor3 = Color3.new(255,255,255)
-        Cursor.BorderSizePixel = 0
-        Cursor.Parent = SatValCanvas
-        applyStroke(Cursor, Color3.new(0,0,0), 1)
-
-        -- 2. ВЕРТИКАЛЬНЫЙ РАДУЖНЫЙ СЛАЙДЕР (HUE)
-        local HueBar = Instance.new("TextButton")
-        HueBar.Size = UDim2.new(0, 15, 0, 100)
-        HueBar.Position = UDim2.new(0, 172, 0, 5)
-        HueBar.BackgroundColor3 = Color3.new(1,1,1)
-        HueBar.BorderSizePixel = 0
-        HueBar.Text = ""
-        HueBar.AutoButtonColor = false
-        HueBar.Parent = PickerContainer
-
-        local HueGrad = Instance.new("UIGradient")
-        HueGrad.Rotation = 90
-        HueGrad.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(255,0,0)),
-            ColorSequenceKeypoint.new(0.167, Color3.fromRGB(255,0,255)),
-            ColorSequenceKeypoint.new(0.333, Color3.fromRGB(0,0,255)),
-            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0,255,255)),
-            ColorSequenceKeypoint.new(0.667, Color3.fromRGB(0,255,0)),
-            ColorSequenceKeypoint.new(0.833, Color3.fromRGB(255,255,0)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(255,0,0))
-        })
-        HueGrad.Parent = HueBar
-
-        -- Полоска индикатор на Hue ползунке
-        local HueCursor = Instance.new("Frame")
-        HueCursor.Size = UDim2.new(1, 4, 0, 2)
-        HueCursor.Position = UDim2.new(0, -2, 1 - h, 0)
-        HueCursor.BackgroundColor3 = Color3.new(255,255,255)
-        HueCursor.BorderSizePixel = 0
-        HueCursor.Parent = HueBar
-        applyStroke(HueCursor, Color3.new(0,0,0), 1)
-
-        -- Обновление результирующего цвета
-        local function fireUpdate()
-            local finalColor = Color3.fromHSV(h, s, v)
-            ColorPreview.BackgroundColor3 = finalColor
-            SatValCanvas.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
-            callback(finalColor)
-        end
-
-        -- Логика движения по 2D Холсту
-        local draggingCanvas = false
-        local function updateCanvas(input)
-            local scaleX = math.clamp((input.Position.X - SatValCanvas.AbsolutePosition.X) / SatValCanvas.AbsoluteSize.X, 0, 1)
-            local scaleY = math.clamp((input.Position.Y - SatValCanvas.AbsolutePosition.Y) / SatValCanvas.AbsoluteSize.Y, 0, 1)
-            s = scaleX
-            v = 1 - scaleY
-            Cursor.Position = UDim2.new(s, 0, scaleY, 0)
-            fireUpdate()
-        end
-
-        SatValCanvas.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingCanvas = true updateCanvas(input) end
-        end)
-        UserInputService.InputChanged:Connect(function(input)
-            if draggingCanvas and input.UserInputType == Enum.UserInputType.MouseMovement then updateCanvas(input) end
-        end)
-        UserInputService.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingCanvas = false end
-        end)
-
-        -- Логика движения по Радуге (Hue)
-        local draggingHue = false
-        local function updateHue(input)
-            local scaleY = math.clamp((input.Position.Y - HueBar.AbsolutePosition.Y) / HueBar.AbsoluteSize.Y, 0, 1)
-            h = 1 - scaleY
-            HueCursor.Position = UDim2.new(0, -2, scaleY, 0)
-            fireUpdate()
-        end
-
-        HueBar.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingHue = true updateHue(input) end
-        end)
-        UserInputService.InputChanged:Connect(function(input)
-            if draggingHue and input.UserInputType == Enum.UserInputType.MouseMovement then updateHue(input) end
-        end)
-        UserInputService.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingHue = false end
-        end)
-
-        -- Разворачивание панели палитры
-        Header.MouseButton1Click:Connect(function()
-            expanded = not expanded
-            PickerContainer.Visible = expanded
-            PreviewStroke.Color = expanded and Theme.Accent or Theme.Stroke
-        end)
-
-        local ColorController = {}
-        function ColorController:SetColor(newColor)
-            h, s, v = newColor:ToHSV()
-            Cursor.Position = UDim2.new(s, 0, 1 - v, 0)
-            HueCursor.Position = UDim2.new(0, -2, 1 - h, 0)
-            fireUpdate()
-        end
-        return ColorController
     end
 
     return Window
