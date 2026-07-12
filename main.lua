@@ -1,14 +1,22 @@
 --[[
-    METEOR / WISH STYLE CLICKGUI LIBRARY FOR ROBLOX
-    [UPDATED VERSION] - Inline ColorPickers inside Toggles, Fixed Anchors.
+    METEOR / WISH STYLE CLICKGUI LIBRARY WITH BUILT-IN SETTINGS & CONFIG SYSTEM
+    [VERSION 3.0] - Keybinds, Draggable Watermark, Workspace CFG (.txt files)
 ]]
 
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
+local Stats = game:GetService("Stats")
 
-local Library = {}
-Library.Windows = {}
+local Library = {
+    Windows = {},
+    Registry = {}, -- Регистрация всех настроек для КФГ
+    ToggleKey = Enum.KeyCode.RightShift,
+    Visible = true,
+    WatermarkEnabled = true
+}
 
 local Theme = {
     MainBG = Color3.fromRGB(12, 12, 14),
@@ -22,13 +30,27 @@ local Theme = {
     Hover = Color3.fromRGB(24, 24, 30)
 }
 
+-- Создание папки для конфигов в workspace инжектора
+pcall(function()
+    if makefolder then makefolder("Meteor_Configs") end
+end)
+
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "MeteorClickGUI_Fixed"
+ScreenGui.Name = "MeteorClickGUI_Engine"
 ScreenGui.ResetOnSpawn = false
 pcall(function() ScreenGui.Parent = CoreGui end)
 if not ScreenGui.Parent then
     ScreenGui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
 end
+
+-- Переключение видимости меню по бинду
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if input.KeyCode == Library.ToggleKey then
+        Library.Visible = not Library.Visible
+        ScreenGui.Enabled = Library.Visible
+    end
+end)
 
 local function applyStroke(parent, color, thickness)
     local stroke = Instance.new("UIStroke")
@@ -44,6 +66,30 @@ local function tween(object, info, properties)
     local t = TweenService:Create(object, info, properties)
     t:Play()
     return t
+end
+
+-- Позволяет делать любой UI элемент перетаскиваемым
+local function makeDraggable(frame, dragHandle)
+    local dragging, dragInput, dragStart, startPos
+    dragHandle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
+        end
+    end)
+    dragHandle.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then dragInput = input end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
 end
 
 function Library:CreateWindow(windowName, initialPosition)
@@ -94,27 +140,7 @@ function Library:CreateWindow(windowName, initialPosition)
     ListLayout.Padding = UDim.new(0, 1)
     ListLayout.Parent = Container
 
-    -- Dragging
-    local dragging, dragInput, dragStart, startPos
-    Topbar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true
-            dragStart = input.Position
-            startPos = MainFrame.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then dragging = false end
-            end)
-        end
-    end)
-    Topbar.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement then dragInput = input end
-    end)
-    UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
-            local delta = input.Position - dragStart
-            MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        end
-    end)
+    makeDraggable(MainFrame, Topbar)
 
     Topbar.MouseButton2Click:Connect(function()
         Window.Collapsed = not Window.Collapsed
@@ -150,12 +176,12 @@ function Library:CreateWindow(windowName, initialPosition)
         end)
     end
 
-    -- ====================================================================
-    -- ОБНОВЛЕННЫЙ ЧЕКБОКС (СО ВСТРОЕННЫМ КОЛОРПИКЕРОМ СЛЕВА ОТ ГАЛОЧКИ)
-    -- ====================================================================
     function Window:CreateToggle(name, default, callback, defaultColor, colorCallback)
         local state = default or false
+        local currentInstColor = defaultColor or Color3.fromRGB(255,255,255)
         callback = callback or function() end
+
+        local registryKey = windowName .. "_" .. name
 
         local ToggleFrame = Instance.new("Frame")
         ToggleFrame.Size = UDim2.new(1, 0, 0, 24)
@@ -175,7 +201,6 @@ function Library:CreateWindow(windowName, initialPosition)
         Label.TextXAlignment = Enum.TextXAlignment.Left
         Label.Parent = ToggleFrame
 
-        -- Чекбокс (Самый правый край)
         local Box = Instance.new("TextButton")
         Box.AnchorPoint = Vector2.new(1, 0)
         Box.Size = UDim2.new(0, 14, 0, 14)
@@ -200,7 +225,6 @@ function Library:CreateWindow(windowName, initialPosition)
 
         Box.MouseButton1Click:Connect(toggle)
         
-        -- Невидимая кнопка для клика по тексту (не перекрывает колорпикер)
         local InvisibleBtn = Instance.new("TextButton")
         InvisibleBtn.Size = UDim2.new(1, defaultColor and -50 or -30, 0, 24)
         InvisibleBtn.BackgroundTransparency = 1
@@ -208,16 +232,16 @@ function Library:CreateWindow(windowName, initialPosition)
         InvisibleBtn.Parent = ToggleFrame
         InvisibleBtn.MouseButton1Click:Connect(toggle)
 
-        -- Если передан цвет, создаем кубик СЛЕВА от чекбокса
+        local ColorPreview
         if defaultColor and colorCallback then
-            local h, s, v = defaultColor:ToHSV()
+            local h, s, v = currentInstColor:ToHSV()
             local pickerExpanded = false
 
-            local ColorPreview = Instance.new("Frame")
+            ColorPreview = Instance.new("Frame")
             ColorPreview.AnchorPoint = Vector2.new(1, 0)
             ColorPreview.Size = UDim2.new(0, 14, 0, 14)
-            ColorPreview.Position = UDim2.new(1, -25, 0, 5) -- Слева от кнопки включения (gap 5px)
-            ColorPreview.BackgroundColor3 = defaultColor
+            ColorPreview.Position = UDim2.new(1, -25, 0, 5)
+            ColorPreview.BackgroundColor3 = currentInstColor
             ColorPreview.BorderSizePixel = 0
             ColorPreview.Parent = ToggleFrame
             local PreviewStroke = applyStroke(ColorPreview, Theme.Stroke, 1)
@@ -228,7 +252,6 @@ function Library:CreateWindow(windowName, initialPosition)
             ColorBtn.Text = ""
             ColorBtn.Parent = ColorPreview
 
-            -- Выдвижная панель палитры (Открывается строго под строкой)
             local PickerContainer = Instance.new("Frame")
             PickerContainer.Size = UDim2.new(1, -12, 0, 110)
             PickerContainer.Position = UDim2.new(0, 6, 0, 24)
@@ -238,7 +261,6 @@ function Library:CreateWindow(windowName, initialPosition)
             PickerContainer.Parent = ToggleFrame
             applyStroke(PickerContainer, Theme.Stroke, 1)
 
-            -- 2D Холст Сатурации/Яркости
             local SatValCanvas = Instance.new("TextButton")
             SatValCanvas.Size = UDim2.new(0, 150, 0, 100)
             SatValCanvas.Position = UDim2.new(0, 5, 0, 5)
@@ -276,7 +298,6 @@ function Library:CreateWindow(windowName, initialPosition)
             Cursor.Parent = SatValCanvas
             applyStroke(Cursor, Color3.new(0,0,0), 1)
 
-            -- Вертикальная радуга (Hue)
             local HueBar = Instance.new("TextButton")
             HueBar.Size = UDim2.new(0, 15, 0, 100)
             HueBar.Position = UDim2.new(0, 165, 0, 5)
@@ -308,10 +329,10 @@ function Library:CreateWindow(windowName, initialPosition)
             applyStroke(HueCursor, Color3.new(0,0,0), 1)
 
             local function fireUpdate()
-                local finalColor = Color3.fromHSV(h, s, v)
-                ColorPreview.BackgroundColor3 = finalColor
+                currentInstColor = Color3.fromHSV(h, s, v)
+                ColorPreview.BackgroundColor3 = currentInstColor
                 SatValCanvas.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
-                colorCallback(finalColor)
+                colorCallback(currentInstColor)
             end
 
             local draggingCanvas = false
@@ -359,6 +380,27 @@ function Library:CreateWindow(windowName, initialPosition)
             end)
         end
 
+        -- Регистрация в КФГ движок
+        Library.Registry[registryKey] = {
+            Type = "Toggle",
+            Get = function()
+                return {
+                    State = state,
+                    Color = defaultColor and {currentInstColor.R, currentInstColor.G, currentInstColor.B} or nil
+                }
+            end,
+            Set = function(self, data)
+                state = data.State
+                updateToggle()
+                callback(state)
+                if data.Color and colorCallback then
+                    currentInstColor = Color3.new(data.Color[1], data.Color[2], data.Color[3])
+                    if ColorPreview then ColorPreview.BackgroundColor3 = currentInstColor end
+                    colorCallback(currentInstColor)
+                end
+            end
+        }
+
         local ToggleController = {}
         function ToggleController:SetState(val) state = val updateToggle() callback(state) end
         return ToggleController
@@ -368,6 +410,7 @@ function Library:CreateWindow(windowName, initialPosition)
         min = min or 0 max = max or 100 decimals = decimals or 0
         local value = math.clamp(default or min, min, max)
         callback = callback or function() end
+        local registryKey = windowName .. "_" .. name
 
         local SliderFrame = Instance.new("Frame")
         SliderFrame.Size = UDim2.new(1, 0, 0, 34)
@@ -435,18 +478,27 @@ function Library:CreateWindow(windowName, initialPosition)
             if input.UserInputType == Enum.UserInputType.MouseButton1 then sliding = false end
         end)
 
-        local SliderController = {}
-        function SliderController:SetValue(val)
+        local function externalSet(val)
             value = math.clamp(val, min, max)
-            Fill.Size = UDim2.new((value - min) / (max - min), 0, 1, 0)
+            local pct = (value - min) / (max - min)
+            Fill.Size = UDim2.new(pct, 0, 1, 0)
             ValueLabel.Text = string.format("%." .. decimals .. "f", value)
             callback(value)
         end
-        return SliderController
+
+        Library.Registry[registryKey] = {
+            Type = "Slider",
+            Get = function() return value end,
+            Set = function(self, val) externalSet(val) end
+        }
+
+        return { SetValue = externalSet }
     end
 
     function Window:CreateTextBox(name, placeholder, callback)
         callback = callback or function() end
+        local registryKey = windowName .. "_" .. name
+
         local BoxFrame = Instance.new("Frame")
         BoxFrame.Size = UDim2.new(1, 0, 0, 26)
         BoxFrame.BackgroundColor3 = Theme.ElementBG
@@ -481,17 +533,20 @@ function Library:CreateWindow(windowName, initialPosition)
         TBox.Parent = BoxFrame
         local BoxStroke = applyStroke(TBox, Theme.Stroke, 1)
 
-        local Padding = Instance.new("UIPadding")
-        Padding.PaddingLeft = UDim.new(0, 4)
-        Padding.PaddingRight = UDim.new(0, 4)
-        Padding.Parent = TBox
-
         TBox.Focused:Connect(function() Label.TextColor3 = Theme.TextMain BoxStroke.Color = Theme.Accent end)
         TBox.FocusLost:Connect(function(enter) Label.TextColor3 = Theme.TextDim BoxStroke.Color = Theme.Stroke callback(TBox.Text, enter) end)
+
+        Library.Registry[registryKey] = {
+            Type = "TextBox",
+            Get = function() return TBox.Text end,
+            Set = function(self, val) TBox.Text = val callback(val, false) end
+        }
     end
 
     function Window:CreateDropdown(name, list, default, callback)
         list = list or {} local currentSelection = default or list[1] or "" callback = callback or function() end local expanded = false
+        local registryKey = windowName .. "_" .. name
+
         local DropdownFrame = Instance.new("Frame")
         DropdownFrame.Size = UDim2.new(1, 0, 0, 26)
         DropdownFrame.BackgroundColor3 = Theme.ElementBG
@@ -589,9 +644,238 @@ function Library:CreateWindow(windowName, initialPosition)
             BoxStroke.Color = expanded and Theme.Accent or Theme.Stroke
             if expanded then refreshOptions() end
         end)
+
+        local DropdownController = {}
+        function DropdownController:Refresh(newList)
+            list = newList
+            if not table.find(list, currentSelection) then
+                currentSelection = list[1] or ""
+                SelectionLabel.Text = currentSelection
+            end
+            if expanded then refreshOptions() end
+        end
+
+        Library.Registry[registryKey] = {
+            Type = "Dropdown",
+            Get = function() return currentSelection end,
+            Set = function(self, val) 
+                currentSelection = val 
+                SelectionLabel.Text = val 
+                callback(val) 
+            end
+        }
+
+        return DropdownController
+    end
+
+    -- НОВЫЙ ЭЛЕМЕНТ: КЕЙБИНД
+    function Window:CreateKeybind(name, default, callback)
+        local currentKey = default or Enum.KeyCode.RightShift
+        callback = callback or function() end
+        local registryKey = windowName .. "_" .. name
+        local listening = false
+
+        local BindFrame = Instance.new("Frame")
+        BindFrame.Size = UDim2.new(1, 0, 0, 24)
+        BindFrame.BackgroundColor3 = Theme.ElementBG
+        BindFrame.BorderSizePixel = 0
+        BindFrame.Parent = Container
+
+        local Label = Instance.new("TextLabel")
+        Label.Size = UDim2.new(0.5, 0, 1, 0)
+        Label.Position = UDim2.new(0, 6, 0, 0)
+        Label.BackgroundTransparency = 1
+        Label.Text = name
+        Label.Font = Enum.Font.Code
+        Label.TextSize = 11
+        Label.TextColor3 = Theme.TextMain
+        Label.TextXAlignment = Enum.TextXAlignment.Left
+        Label.Parent = BindFrame
+
+        local BindBtn = Instance.new("TextButton")
+        BindBtn.AnchorPoint = Vector2.new(1, 0)
+        BindBtn.Size = UDim2.new(0.45, 0, 0, 16)
+        BindBtn.Position = UDim2.new(1, -6, 0, 4)
+        BindBtn.BackgroundColor3 = Theme.InnerBoxBG
+        BindBtn.BorderSizePixel = 0
+        BindBtn.Text = "[" .. currentKey.Name .. "]"
+        BindBtn.Font = Enum.Font.Code
+        BindBtn.TextSize = 10
+        BindBtn.TextColor3 = Theme.Accent
+        BindBtn.Parent = BindFrame
+        local BoxStroke = applyStroke(BindBtn, Theme.Stroke, 1)
+
+        BindBtn.MouseButton1Click:Connect(function()
+            listening = true
+            BindBtn.Text = "[...]"
+            BoxStroke.Color = Theme.Accent
+        end)
+
+        UserInputService.InputBegan:Connect(function(input, gpe)
+            if listening and not gpe then
+                if input.UserInputType == Enum.UserInputType.Keyboard then
+                    listening = false
+                    currentKey = input.KeyCode
+                    BindBtn.Text = "[" .. currentKey.Name .. "]"
+                    BoxStroke.Color = Theme.Stroke
+                    callback(currentKey)
+                end
+            end
+        end)
+
+        Library.Registry[registryKey] = {
+            Type = "Keybind",
+            Get = function() return currentKey.Name end,
+            Set = function(self, val)
+                currentKey = Enum.KeyCode[val]
+                BindBtn.Text = "[" .. val .. "]"
+                callback(currentKey)
+            end
+        }
     end
 
     return Window
 end
+
+-- ====================================================================
+-- СИСТЕМА WATERMARK (НЕЗАВИСИМЫЙ И ДВИГАЕМЫЙ КЛИЕНТСКИЙ ИНТЕРФЕЙС)
+-- ====================================================================
+local WatermarkFrame = Instance.new("Frame")
+WatermarkFrame.Name = "Meteor_Watermark"
+WatermarkFrame.Size = UDim2.new(0, 180, 0, 22)
+WatermarkFrame.Position = UDim2.new(1, -195, 1, -35) -- Правый нижний угол по дефолту
+WatermarkFrame.BackgroundColor3 = Theme.MainBG
+WatermarkFrame.BorderSizePixel = 0
+WatermarkFrame.Parent = ScreenGui
+applyStroke(WatermarkFrame, Theme.Stroke, 1)
+
+local WMarkLine = Instance.new("Frame")
+WMarkLine.Size = UDim2.new(1, 0, 0, 2)
+WMarkLine.BackgroundColor3 = Theme.Accent
+WMarkLine.BorderSizePixel = 0
+WMarkLine.Parent = WatermarkFrame
+
+local WMarkLabel = Instance.new("TextLabel")
+WMarkLabel.Size = UDim2.new(1, 0, 1, -2)
+WMarkLabel.Position = UDim2.new(0, 0, 0, 2)
+WMarkLabel.BackgroundTransparency = 1
+WMarkLabel.Text = " METEOR | FPS: 0 | PING: 0ms"
+WMarkLabel.Font = Enum.Font.Code
+WMarkLabel.TextSize = 11
+WMarkLabel.TextColor3 = Theme.TextMain
+WMarkLabel.TextXAlignment = Enum.TextXAlignment.Left
+WMarkLabel.Parent = WatermarkFrame
+
+makeDraggable(WatermarkFrame, WatermarkFrame)
+
+-- Цикл обновлений FPS/Ping
+task.spawn(function()
+    local lastIteration = os.clock()
+    local frameHistory = {}
+    while task.wait(0.5) do
+        if not Library.WatermarkEnabled then 
+            WatermarkFrame.Visible = false
+        else
+            WatermarkFrame.Visible = true
+            local now = os.clock()
+            local fps = math.floor(1 / (now - lastIteration))
+            if fps > 1000 then fps = 60 end -- фикс багов загрузки
+            lastIteration = now
+            
+            local ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
+            WMarkLabel.Text = string.format(" METEOR | FPS: %d | PING: %dms", fps, ping)
+        end
+    end
+end)
+
+
+-- ====================================================================
+-- АВТОМАТИЧЕСКАЯ ИНИЦИАЛИЗАЦИЯ ВКЛАДКИ SETTINGS
+-- ====================================================================
+local SettingsWindow = Library:CreateWindow("Settings", UDim2.new(0, 20, 0, 20))
+
+-- 1. Смена кнопки закрытия чита (Стабильно правый шифт по дефолту)
+SettingsWindow:CreateKeybind("Menu Bind", Enum.KeyCode.RightShift, function(newKey)
+    Library.ToggleKey = newKey
+end)
+
+-- 2. Включение/Выключение Вотермарка
+SettingsWindow:CreateToggle("Watermark", true, function(state)
+    Library.WatermarkEnabled = state
+end)
+
+-- 3. Функционал КФГ менеджмента
+local currentConfigName = ""
+SettingsWindow:CreateTextBox("Config Name", "enter name...", function(text)
+    currentConfigName = text
+end)
+
+local function scanConfigs()
+    local list = {}
+    pcall(function()
+        if listfiles then
+            for _, file in ipairs(listfiles("Meteor_Configs")) do
+                local name = file:match("([^/\\]+)%.txt$") or file:match("([^/\\]+)$")
+                if name then table.insert(list, name) end
+            end
+        end
+    end)
+    if #list == 0 then table.insert(list, "None") end
+    return list
+end
+
+local ConfigDropdown -- Ссылка для обновлений списков в рантайме
+ConfigDropdown = SettingsWindow:CreateDropdown("Select Config", scanConfigs(), "None", function(selected)
+    currentConfigName = selected
+end)
+
+-- Кнопка: Создать/Сохранить КФГ
+SettingsWindow:CreateButton("Save/Create Config", function()
+    if currentConfigName == "" or currentConfigName == "None" then return end
+    
+    local dataToSave = {}
+    for id, element in pairs(Library.Registry) do
+        dataToSave[id] = element:Get()
+    end
+    
+    local success, json = pcall(function() return HttpService:JSONEncode(dataToSave) end)
+    if success and writefile then
+        writefile("Meteor_Configs/" .. currentConfigName .. ".txt", json)
+        if ConfigDropdown then ConfigDropdown:Refresh(scanConfigs()) end
+    end
+end)
+
+-- Кнопка: Загрузить КФГ
+SettingsWindow:CreateButton("Load Config", function()
+    if currentConfigName == "" or currentConfigName == "None" then return end
+    
+    if readfile and isfile and isfile("Meteor_Configs/" .. currentConfigName .. ".txt") then
+        local json = readfile("Meteor_Configs/" .. currentConfigName .. ".txt")
+        local success, data = pcall(function() return HttpService:JSONDecode(json) end)
+        if success then
+            for id, value in pairs(data) do
+                if Library.Registry[id] then
+                    pcall(function() Library.Registry[id]:Set(value) end)
+                end
+            end
+        end
+    end
+end)
+
+-- Кнопка: Удалить КФH
+SettingsWindow:CreateButton("Delete Config", function()
+    if currentConfigName == "" or currentConfigName == "None" then return end
+    if delfile and isfile and isfile("Meteor_Configs/" .. currentConfigName .. ".txt") then
+        delfile("Meteor_Configs/" .. currentConfigName .. ".txt")
+        currentConfigName = ""
+        if ConfigDropdown then ConfigDropdown:Refresh(scanConfigs()) end
+    end
+end)
+
+-- Кнопка: Обновить Список текстовиков
+SettingsWindow:CreateButton("Refresh List", function()
+    if ConfigDropdown then ConfigDropdown:Refresh(scanConfigs()) end
+end)
+
 
 return Library
