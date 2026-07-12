@@ -1,7 +1,8 @@
 -- [[
---    METEOR / WISH STYLE CLICKGUI ENGINE [VERSION 4.5 - ULTIMATE ADIO & VISUAL UPDATE]
---    Fixes: FPS Counter Freeze, Memory Leaks, Z-Index Overlap.
---    Features: Realtime Audio Engine (Sync Slider), Canvas Snow Particle System, Core Blur Control.
+--    METEOR / WISH STYLE CLICKGUI ENGINE
+--    [VERSION 4.5 - COMPREHENSIVE REBORN] 
+--    Fixes: Persistent Watermark, Non-GPE Keybind Engine, Standalone ColorPickers.
+--    Features: Live FPS/Ping Counter, Audio Analyzer Tab, Custom Snow Particles, Screen Blur Shader.
 -- ]]
 
 local UserInputService = game:GetService("UserInputService")
@@ -9,9 +10,9 @@ local TweenService = game:GetService("TweenService")
 local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
-local SoundService = game:GetService("SoundService")
+local Stats = game:GetService("Stats")
 local Lighting = game:GetService("Lighting")
-local Players = game:GetService("Players")
+local SoundService = game:GetService("SoundService")
 
 local Library = {
     Windows = {},
@@ -19,8 +20,7 @@ local Library = {
     ThemeRefreshes = {},
     ToggleKey = Enum.KeyCode.RightShift,
     Visible = true,
-    WatermarkEnabled = true,
-    Particles = {}
+    WatermarkEnabled = true
 }
 
 local Theme = {
@@ -35,16 +35,15 @@ local Theme = {
     Hover = Color3.fromRGB(24, 24, 30)
 }
 
--- Инициализация папки конфигов
+-- Инициализация папки под конфиги
 pcall(function()
     if makefolder then makefolder("Meteor_Configs") end
 end)
 
--- Создание основных контейнеров GUI
+-- Создание контейнеров интерфейса
 local MenuGui = Instance.new("ScreenGui")
 MenuGui.Name = "MeteorMenu_Core"
 MenuGui.ResetOnSpawn = false
-MenuGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
 
 local WatermarkGui = Instance.new("ScreenGui")
 WatermarkGui.Name = "MeteorWatermark_Core"
@@ -56,42 +55,8 @@ pcall(function()
 end)
 
 if not MenuGui.Parent then
-    local LocalPlayer = Players.LocalPlayer
-    local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-    MenuGui.Parent = PlayerGui
-    WatermarkGui.Parent = PlayerGui
-end
-
--- Контейнер для эффекта снега (поверх фона меню, но под элементами)
-local SnowContainer = Instance.new("Frame")
-SnowContainer.Name = "SnowContainer"
-SnowContainer.Size = UDim2.new(1, 0, 1, 0)
-SnowContainer.BackgroundTransparency = 1
-SnowContainer.ClipsDescendants = true
-SnowContainer.Parent = MenuGui
-
--- Создание глобального Blur (DepthOfField для кастомного размытия UI)
-local UIBlur = Lighting:FindFirstChild("Meteor_UI_Blur")
-if not UIBlur then
-    UIBlur = Instance.new("DepthOfFieldEffect")
-    UIBlur.Name = "Meteor_UI_Blur"
-    UIBlur.Enabled = false
-    UIBlur.FarIntensity = 0
-    UIBlur.FocusDistance = 5
-    UIBlur.InFocusRadius = 30
-    UIBlur.NearIntensity = 1 -- Базовая сила размытия
-    UIBlur.Parent = Lighting
-end
-
--- Инициализация аудио-движка библиотеки
-local LibraryAudio = SoundService:FindFirstChild("Meteor_AudioEngine")
-if not LibraryAudio then
-    LibraryAudio = Instance.new("Sound")
-    LibraryAudio.Name = "Meteor_AudioEngine"
-    LibraryAudio.Volume = 0.5
-    LibraryAudio.PlaybackSpeed = 1
-    LibraryAudio.Looped = true
-    LibraryAudio.Parent = SoundService
+    MenuGui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+    WatermarkGui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
 end
 
 -- Переключатель видимости меню
@@ -100,11 +65,14 @@ UserInputService.InputBegan:Connect(function(input)
     if input.KeyCode == Library.ToggleKey then
         Library.Visible = not Library.Visible
         MenuGui.Enabled = Library.Visible
-        if UIBlur.Enabled then
-            UIBlur.Enabled = Library.Visible
-        end
     end
 end)
+
+function Library:UpdateTheme()
+    for _, refreshFunc in ipairs(Library.ThemeRefreshes) do
+        pcall(refreshFunc)
+    end
+end
 
 local function applyStroke(parent, color, thickness)
     local stroke = Instance.new("UIStroke")
@@ -145,112 +113,128 @@ local function makeDraggable(frame, dragHandle)
     end)
 end
 
--- ДВИЖОК ЭФФЕКТА СНЕГА (Snow Effect Engine)
-local SnowSettings = { Enabled = false, Speed = 50, Count = 40 }
-local function UpdateSnowSystem()
-    if not SnowSettings.Enabled then
-        for _, flake in ipairs(Library.Particles) do flake:Destroy() end
-        table.clear(Library.Particles)
-        return
-    end
+-- ==========================================
+-- СИСТЕМА ЭФФЕКТОВ (СНЕГ И БЛЮР)
+-- ==========================================
+local SnowCanvas = Instance.new("Frame")
+SnowCanvas.Size = UDim2.new(1, 0, 1, 0)
+SnowCanvas.BackgroundTransparency = 1
+SnowCanvas.ZIndex = 0
+SnowCanvas.Parent = MenuGui
 
-    while #Library.Particles < SnowSettings.Count do
-        local flake = Instance.new("Frame")
-        flake.Size = UDim2.new(0, math.random(2, 4), 0, math.random(2, 4))
-        flake.Position = UDim2.new(math.random(), 0, -0.05, 0)
-        flake.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        flake.BackgroundTransparency = math.random(2, 6) / 10
-        flake.BorderSizePixel = 0
-        flake.Parent = SnowContainer
-        table.insert(Library.Particles, flake)
+local snowflakes = {}
+local snowEnabled = false
+local snowSpeed = 150
+
+local function setSnowActive(state)
+    snowEnabled = state
+    if not state then
+        for _, flake in ipairs(snowflakes) do flake.Instance:Destroy() end
+        table.clear(snowflakes)
+    else
+        for i = 1, 80 do
+            local flake = Instance.new("Frame")
+            flake.Size = UDim2.new(0, math.random(2, 4), 0, math.random(2, 4))
+            flake.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            flake.BorderSizePixel = 0
+            flake.BackgroundTransparency = math.random(3, 6) / 10
+            flake.Position = UDim2.new(math.random(), 0, math.random(), 0)
+            flake.Parent = SnowCanvas
+            table.insert(snowflakes, {Instance = flake, SpeedModifier = math.random(6, 14) / 10})
+        end
     end
 end
 
-RunService.RenderStepped:Connect(function(deltaTime)
-    if SnowSettings.Enabled and Library.Visible then
-        for i, flake in ipairs(Library.Particles) do
-            if flake and flake.Parent then
-                local currentPos = flake.Position
-                local fall = (SnowSettings.Speed * deltaTime) / MenuGui.AbsoluteSize.Y
-                local newY = currentPos.Y.Scale + fall
-                
-                -- Легкое покачивание по оси X
-                local sway = math.sin(tick() + i) * 0.001
-                local newX = currentPos.X.Scale + sway
-
-                if newY > 1.05 then
-                    newY = -0.02
-                    newX = math.random()
-                end
-                flake.Position = UDim2.new(newX, 0, newY, 0)
-            end
+RunService.RenderStepped:Connect(function(dt)
+    if not snowEnabled or not Library.Visible then return end
+    local viewport = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1000, 1000)
+    for _, flakeData in ipairs(snowflakes) do
+        local flake = flakeData.Instance
+        local curPos = flake.Position
+        local newY = curPos.Y.Offset + (snowSpeed * flakeData.SpeedModifier * dt)
+        if newY > viewport.Y then
+            newY = -10
+            flake.Position = UDim2.new(math.random(), 0, 0, newY)
+        else
+            flake.Position = UDim2.new(curPos.X.Scale, 0, 0, newY)
         end
     end
 end)
 
--- СТАБИЛЬНЫЙ ДВИЖОК ВОТЕРМАРКА (Без просадок FPS)
-local WatermarkFrame = Instance.new("Frame")
-WatermarkFrame.Size = UDim2.new(0, 260, 0, 24)
-WatermarkFrame.Position = UDim2.new(0, 10, 0, 10)
-WatermarkFrame.BackgroundColor3 = Theme.MainBG
-WatermarkFrame.Parent = WatermarkGui
-applyStroke(WatermarkFrame, Theme.Stroke, 1)
+local BlurShader = Lighting:FindFirstChild("Meteor_BlurShader")
+if not BlurShader then
+    BlurShader = Instance.new("BlurEffect")
+    BlurShader.Name = "Meteor_BlurShader"
+    BlurShader.Size = 0
+    BlurShader.Parent = Lighting
+end
 
-local WatermarkText = Instance.new("TextLabel")
-WatermarkText.Size = UDim2.new(1, -10, 1, 0)
-WatermarkText.Position = UDim2.new(0, 6, 0, 0)
-WatermarkText.BackgroundTransparency = 1
-WatermarkText.Text = "meteor gold | fps: -- | ping: -- ms"
-WatermarkText.Font = Enum.Font.Code
-WatermarkText.TextSize = 11
-WatermarkText.TextColor3 = Theme.TextMain
-WatermarkText.TextXAlignment = Enum.TextXAlignment.Left
-WatermarkText.Parent = WatermarkFrame
+-- ==========================================
+-- ДВИЖОК ВАТЕРМАРКА (ИСПРАВЛЕННЫЙ FPS)
+-- ==========================================
+local function initWatermarkEngine()
+    local WatermarkFrame = Instance.new("Frame")
+    WatermarkFrame.Size = UDim2.new(0, 260, 0, 26)
+    WatermarkFrame.Position = UDim2.new(0, 15, 0, 15)
+    WatermarkFrame.BackgroundColor3 = Theme.MainBG
+    WatermarkFrame.BorderSizePixel = 0
+    WatermarkFrame.Parent = WatermarkGui
+    local wmStroke = applyStroke(WatermarkFrame, Theme.Stroke, 1)
 
-local wmAccent = Instance.new("Frame")
-wmAccent.Size = UDim2.new(1, 0, 0, 1)
-wmAccent.Position = UDim2.new(0, 0, 1, -1)
-wmAccent.BackgroundColor3 = Theme.Accent
-wmAccent.BorderSizePixel = 0
-wmAccent.Parent = WatermarkFrame
+    local AccentLine = Instance.new("Frame")
+    AccentLine.Size = UDim2.new(1, 0, 0, 2)
+    AccentLine.BackgroundColor3 = Theme.Accent
+    AccentLine.BorderSizePixel = 0
+    AccentLine.Parent = WatermarkFrame
 
-local fpsBuffer = {}
-local lastSystemUpdate = 0
+    local TextLabel = Instance.new("TextLabel")
+    TextLabel.Size = UDim2.new(1, -10, 1, -2)
+    TextLabel.Position = UDim2.new(0, 8, 0, 2)
+    TextLabel.BackgroundTransparency = 1
+    TextLabel.Font = Enum.Font.Code
+    TextLabel.TextSize = 12
+    TextLabel.TextColor3 = Theme.TextMain
+    TextLabel.TextXAlignment = Enum.TextXAlignment.Left
+    TextLabel.Text = "Meteor Client | FPS: Calibrating... | Ping: 0ms"
+    TextLabel.Parent = WatermarkFrame
 
-RunService.RenderStepped:Connect(function(dt)
-    if not Library.WatermarkEnabled then 
-        WatermarkFrame.Visible = false 
-        return 
-    end
-    WatermarkFrame.Visible = true
-    
-    table.insert(fpsBuffer, dt)
-    if #fpsBuffer > 60 then table.remove(fpsBuffer, 1) end
-    
-    if tick() - lastSystemUpdate >= 0.5 then -- Лимитируем обновление текста до 2 раз в секунду
-        lastSystemUpdate = tick()
-        local totalDt = 0
-        for _, v in ipairs(fpsBuffer) do totalDt = totalDt + v end
-        local fps = math.round(#fpsBuffer / totalDt)
+    local lastUpdate = 0
+    RunService.RenderStepped:Connect(function(dt)
+        if not Library.WatermarkEnabled then
+            WatermarkFrame.Visible = false
+            return
+        end
+        WatermarkFrame.Visible = true
         
-        local ping = 0
-        pcall(function()
-            ping = math.round(Stats:GetNetworkStats().Ping)
-        end)
-        
-        WatermarkText.Text = string.format("meteor gold | fps: %d | ping: %d ms", fps, ping)
-    end
-end)
+        local now = os.clock()
+        if now - lastUpdate >= 0.3 then -- Стабилизатор герцовки
+            local currentFps = math.floor(1 / dt)
+            if currentFps > 999 then currentFps = 999 end -- Защита от спайков
+            local currentPing = math.floor(Stats.Network.ServerPing:GetValue() * 1000)
+            
+            TextLabel.Text = string.format("Meteor Client | FPS: %d | Ping: %dms", currentFps, currentPing)
+            lastUpdate = now
+        end
+    end)
 
+    table.insert(Library.ThemeRefreshes, function()
+        WatermarkFrame.BackgroundColor3 = Theme.MainBG
+        wmStroke.Color = Theme.Stroke
+        AccentLine.BackgroundColor3 = Theme.Accent
+        TextLabel.TextColor3 = Theme.TextMain
+    end)
+end
 
--- СОЗДАНИЕ ОКНА МЕНЮ
+-- ==========================================
+-- ОСНОВНОЙ КОНСТРУКТОР СБОРКИ UI
+-- ==========================================
 function Library:CreateWindow(windowName, initialPosition)
     local Window = { Elements = {}, Collapsed = false }
     initialPosition = initialPosition or UDim2.new(0, 50, 0, 50)
 
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = windowName .. "_Window"
-    MainFrame.Size = UDim2.new(0, 220, 0, 30)
+    MainFrame.Size = UDim2.new(0, 230, 0, 30)
     MainFrame.Position = initialPosition
     MainFrame.BackgroundColor3 = Theme.MainBG
     MainFrame.BorderSizePixel = 0
@@ -298,7 +282,7 @@ function Library:CreateWindow(windowName, initialPosition)
         Window.Collapsed = not Window.Collapsed
         Container.Visible = not Window.Collapsed
         MainFrame.AutomaticSize = Window.Collapsed and Enum.AutomaticSize.None or Enum.AutomaticSize.Y
-        if Window.Collapsed then MainFrame.Size = UDim2.new(0, 220, 0, 30) end
+        if Window.Collapsed then MainFrame.Size = UDim2.new(0, 230, 0, 30) end
     end)
 
     table.insert(Library.ThemeRefreshes, function()
@@ -309,7 +293,6 @@ function Library:CreateWindow(windowName, initialPosition)
         AccentLine.BackgroundColor3 = Theme.Accent
     end)
 
-    -- ЭЛЕМЕНТ: КНОПКА
     function Window:CreateButton(name, callback)
         callback = callback or function() end
         local ButtonFrame = Instance.new("Frame")
@@ -335,12 +318,17 @@ function Library:CreateWindow(windowName, initialPosition)
             tween(ButtonFrame, TweenInfo.new(0.2), {BackgroundColor3 = Theme.Hover})
             callback()
         end)
+
+        table.insert(Library.ThemeRefreshes, function()
+            ButtonFrame.BackgroundColor3 = Theme.ElementBG
+            Btn.TextColor3 = Theme.TextMain
+        end)
     end
 
-    -- ЭЛЕМЕНТ: ПЕРЕКЛЮЧАТЕЛЬ (TOGGLE)
     function Window:CreateToggle(name, default, callback)
         local state = default or false
         callback = callback or function() end
+        local registryKey = windowName .. "_" .. name
 
         local ToggleFrame = Instance.new("Frame")
         ToggleFrame.Size = UDim2.new(1, 0, 0, 24)
@@ -349,7 +337,7 @@ function Library:CreateWindow(windowName, initialPosition)
         ToggleFrame.Parent = Container
 
         local Label = Instance.new("TextLabel")
-        Label.Size = UDim2.new(1, -30, 1, 0)
+        Label.Size = UDim2.new(1, -40, 0, 24)
         Label.Position = UDim2.new(0, 6, 0, 0)
         Label.BackgroundTransparency = 1
         Label.Text = name
@@ -360,9 +348,9 @@ function Library:CreateWindow(windowName, initialPosition)
         Label.Parent = ToggleFrame
 
         local Box = Instance.new("TextButton")
-        Box.AnchorPoint = Vector2.new(1, 0.5)
-        Box.Size = UDim2.new(0, 12, 0, 12)
-        Box.Position = UDim2.new(1, -6, 0.5, 0)
+        Box.AnchorPoint = Vector2.new(1, 0)
+        Box.Size = UDim2.new(0, 14, 0, 14)
+        Box.Position = UDim2.new(1, -6, 0, 5)
         Box.BackgroundColor3 = state and Theme.Accent or Theme.InnerBoxBG
         Box.BorderSizePixel = 0
         Box.Text = ""
@@ -382,19 +370,34 @@ function Library:CreateWindow(windowName, initialPosition)
         end
 
         Box.MouseButton1Click:Connect(toggle)
+        
         local InvisibleBtn = Instance.new("TextButton")
-        InvisibleBtn.Size = UDim2.new(1, -30, 1, 0)
+        InvisibleBtn.Size = UDim2.new(1, -30, 0, 24)
         InvisibleBtn.BackgroundTransparency = 1
         InvisibleBtn.Text = ""
         InvisibleBtn.Parent = ToggleFrame
         InvisibleBtn.MouseButton1Click:Connect(toggle)
+
+        table.insert(Library.ThemeRefreshes, function()
+            ToggleFrame.BackgroundColor3 = Theme.ElementBG
+            updateToggle()
+        end)
+
+        Library.Registry[registryKey] = {
+            Type = "Toggle",
+            Get = function() return state end,
+            Set = function(self, val) state = val updateToggle() callback(state) end
+        end
+
+        return { SetState = function(self, val) state = val updateToggle() callback(state) end }
     end
 
-    -- ЭЛЕМЕНТ: СЛАЙДЕР
     function Window:CreateSlider(name, min, max, default, decimals, callback)
         min = min or 0 max = max or 100 decimals = decimals or 0
         local value = math.clamp(default or min, min, max)
         callback = callback or function() end
+        local registryKey = windowName .. "_" .. name
+        local sliding = false
 
         local SliderFrame = Instance.new("Frame")
         SliderFrame.Size = UDim2.new(1, 0, 0, 34)
@@ -433,15 +436,14 @@ function Library:CreateWindow(windowName, initialPosition)
         SliderBar.Text = ""
         SliderBar.AutoButtonColor = false
         SliderBar.Parent = SliderFrame
-        applyStroke(SliderBar, Theme.Stroke, 1)
+        local SliderBarStroke = applyStroke(SliderBar, Theme.Stroke, 1)
 
         local Fill = Instance.new("Frame")
-        Fill.Size = UDim2.new((value - min) / (max - min), 0, 1, 0)
+        Fill.Size = UDim2.new((max - min) == 0 and 0 or (value - min) / (max - min), 0, 1, 0)
         Fill.BackgroundColor3 = Theme.Accent
         Fill.BorderSizePixel = 0
         Fill.Parent = SliderBar
 
-        local sliding = false
         local function updateSlider(input)
             local percentage = math.clamp((input.Position.X - SliderBar.AbsolutePosition.X) / SliderBar.AbsoluteSize.X, 0, 1)
             value = min + (max - min) * percentage
@@ -462,19 +464,47 @@ function Library:CreateWindow(windowName, initialPosition)
             if input.UserInputType == Enum.UserInputType.MouseButton1 then sliding = false end
         end)
 
-        return {
-            SetValue = function(val)
-                value = math.clamp(val, min, max)
-                local percentage = (value - min) / (max - min)
-                Fill.Size = UDim2.new(percentage, 0, 1, 0)
-                ValueLabel.Text = string.format("%." .. decimals .. "f", value)
-            end
+        local function externalSet(val)
+            value = math.clamp(val, min, max)
+            local pct = (max - min) == 0 and 0 or (value - min) / (max - min)
+            Fill.Size = UDim2.new(pct, 0, 1, 0)
+            ValueLabel.Text = string.format("%." .. decimals .. "f", value)
+            callback(value)
         end
+
+        local function silentSet(val)
+            value = math.clamp(val, min, max)
+            local pct = (max - min) == 0 and 0 or (value - min) / (max - min)
+            Fill.Size = UDim2.new(pct, 0, 1, 0)
+            ValueLabel.Text = string.format("%." .. decimals .. "f", value)
+        end
+
+        table.insert(Library.ThemeRefreshes, function()
+            SliderFrame.BackgroundColor3 = Theme.ElementBG
+            Label.TextColor3 = Theme.TextMain
+            ValueLabel.TextColor3 = Theme.Accent
+            SliderBar.BackgroundColor3 = Theme.InnerBoxBG
+            SliderBarStroke.Color = Theme.Stroke
+            Fill.BackgroundColor3 = Theme.Accent
+        end)
+
+        Library.Registry[registryKey] = {
+            Type = "Slider",
+            Get = function() return value end,
+            Set = function(self, val) externalSet(val) end
+        end
+
+        return {
+            SetValue = externalSet,
+            SilentSet = silentSet,
+            IsSliding = function() return sliding end,
+            SetMax = function(newMax) max = newMax end
+        }
     end
 
-    -- ЭЛЕМЕНТ: ПОЛЕ ВВОДА (TEXTBOX)
     function Window:CreateTextBox(name, placeholder, callback)
         callback = callback or function() end
+        local registryKey = windowName .. "_" .. name
 
         local BoxFrame = Instance.new("Frame")
         BoxFrame.Size = UDim2.new(1, 0, 0, 26)
@@ -505,83 +535,191 @@ function Library:CreateWindow(windowName, initialPosition)
         TBox.TextColor3 = Theme.TextMain
         TBox.Font = Enum.Font.Code
         TBox.TextSize = 10
+        TBox.TextXAlignment = Enum.TextXAlignment.Center
         TBox.ClearTextOnFocus = false
         TBox.Parent = BoxFrame
         local BoxStroke = applyStroke(TBox, Theme.Stroke, 1)
 
         TBox.Focused:Connect(function() Label.TextColor3 = Theme.TextMain BoxStroke.Color = Theme.Accent end)
         TBox.FocusLost:Connect(function(enter) Label.TextColor3 = Theme.TextDim BoxStroke.Color = Theme.Stroke callback(TBox.Text, enter) end)
+
+        table.insert(Library.ThemeRefreshes, function()
+            BoxFrame.BackgroundColor3 = Theme.ElementBG
+            Label.TextColor3 = Theme.TextDim
+            TBox.BackgroundColor3 = Theme.InnerBoxBG
+            TBox.TextColor3 = Theme.TextMain
+            TBox.PlaceholderColor3 = Theme.TextDim
+            BoxStroke.Color = Theme.Stroke
+        end)
+
+        Library.Registry[registryKey] = {
+            Type = "TextBox",
+            Get = function() return TBox.Text end,
+            Set = function(self, val) TBox.Text = val callback(val, false) end
+        end
+        
+        return { GetText = function() return TBox.Text end, SetText = function(self, txt) TBox.Text = txt end }
+    end
+
+    function Window:CreateKeybind(name, default, callback)
+        local currentKey = default or Enum.KeyCode.RightShift
+        callback = callback or function() end
+        local registryKey = windowName .. "_" .. name
+        local listening = false
+
+        local BindFrame = Instance.new("Frame")
+        BindFrame.Size = UDim2.new(1, 0, 0, 24)
+        BindFrame.BackgroundColor3 = Theme.ElementBG
+        BindFrame.BorderSizePixel = 0
+        BindFrame.Parent = Container
+
+        local Label = Instance.new("TextLabel")
+        Label.Size = UDim2.new(0.5, 0, 1, 0)
+        Label.Position = UDim2.new(0, 6, 0, 0)
+        Label.BackgroundTransparency = 1
+        Label.Text = name
+        Label.Font = Enum.Font.Code
+        Label.TextSize = 11
+        Label.TextColor3 = Theme.TextMain
+        Label.TextXAlignment = Enum.TextXAlignment.Left
+        Label.Parent = BindFrame
+
+        local BindBtn = Instance.new("TextButton")
+        BindBtn.AnchorPoint = Vector2.new(1, 0)
+        BindBtn.Size = UDim2.new(0.45, 0, 0, 16)
+        BindBtn.Position = UDim2.new(1, -6, 0, 4)
+        BindBtn.BackgroundColor3 = Theme.InnerBoxBG
+        BindBtn.BorderSizePixel = 0
+        BindBtn.Text = "[" .. currentKey.Name .. "]"
+        BindBtn.Font = Enum.Font.Code
+        BindBtn.TextSize = 10
+        BindBtn.TextColor3 = Theme.Accent
+        BindBtn.Parent = BindFrame
+        local BoxStroke = applyStroke(BindBtn, Theme.Stroke, 1)
+
+        BindBtn.MouseButton1Click:Connect(function()
+            listening = true
+            BindBtn.Text = "[...]"
+            BoxStroke.Color = Theme.Accent
+        end)
+
+        UserInputService.InputBegan:Connect(function(input)
+            if listening and input.UserInputType == Enum.UserInputType.Keyboard then
+                currentKey = input.KeyCode
+                listening = false
+                BindBtn.Text = "[" .. currentKey.Name .. "]"
+                BoxStroke.Color = Theme.Stroke
+                callback(currentKey)
+            end
+        end)
+
+        table.insert(Library.ThemeRefreshes, function()
+            BindFrame.BackgroundColor3 = Theme.ElementBG
+            Label.TextColor3 = Theme.TextMain
+            BindBtn.BackgroundColor3 = Theme.InnerBoxBG
+            if not listening then BoxStroke.Color = Theme.Stroke end
+        end)
+
+        Library.Registry[registryKey] = {
+            Type = "Keybind",
+            Get = function() return currentKey.Name end,
+            Set = function(self, val) currentKey = Enum.KeyCode[val] BindBtn.Text = "[" .. currentKey.Name .. "]" end
+        end
     end
 
     return Window
 end
 
---- ====================================================================
---- АВТОМАТИЧЕСКАЯ ИНИЦИАЛИЗАЦИЯ НОВЫХ ВКАЛАДОК (ADIO & НАСТРОЙКИ)
---- ====================================================================
+-- Инициализация Базового Хэда
+initWatermarkEngine()
 
--- 1. Создание вкладки постоянных настроек визуалов
-local SettingsWindow = Library:CreateWindow("Настройки", UDim2.new(0, 50, 0, 50))
+-- ==========================================
+-- СОЗДАНИЕ ПРЕДУСТАНОВЛЕННЫХ ВКЛАДОК
+-- ==========================================
 
-SettingsWindow:CreateToggle("Эффект Снега", false, function(state)
-    SnowSettings.Enabled = state
-    UpdateSnowSystem()
-end)
+-- 1. ВКЛАДКА "AUDIO PLAYER" (ADIO)
+local AudioWindow = Library:CreateWindow("Adio", UDim2.new(0, 50, 0, 60))
+local LocalSound = Instance.new("Sound")
+LocalSound.Name = "Meteor_LocalSoundEngine"
+LocalSound.Parent = SoundService
 
-SettingsWindow:CreateSlider("Скорость Снега", 10, 200, 50, 0, function(value)
-    SnowSettings.Speed = value
-end)
+local currentAudioId = ""
 
-SettingsWindow:CreateSlider("Количество Снега", 10, 150, 40, 0, function(value)
-    SnowSettings.Count = value
-    UpdateSnowSystem()
-end)
-
-SettingsWindow:CreateToggle("Размытие Заднего Плана", false, function(state)
-    UIBlur.Enabled = state and Library.Visible
-end)
-
-SettingsWindow:CreateSlider("Сила Размытия (Blur)", 1, 50, 10, 0, function(value)
-    UIBlur.NearIntensity = value / 10
-end)
-
-
--- 2. Создание музыкальной вкладки «Adio»
-local AudioWindow = Library:CreateWindow("Adio", UDim2.new(0, 280, 0, 50))
-
-AudioWindow:CreateTextBox("ID Аудио", "Введи Asset ID...", function(text, enter)
-    local assetId = tonumber(text)
-    if assetId then
-        LibraryAudio.SoundId = "rbxassetid://" .. assetId
-        LibraryAudio:Play()
+AudioWindow:CreateTextBox("Audio ID", "Вставь ID трека", function(text, enter)
+    if text ~= "" then
+        currentAudioId = text
+        LocalSound.SoundId = "rbxassetid://" .. text
     end
 end)
 
-AudioWindow:CreateSlider("Громкость", 0, 100, 50, 0, function(value)
-    LibraryAudio.Volume = value / 100
+AudioWindow:CreateButton("Play / Reload", function()
+    if currentAudioId ~= "" then
+        LocalSound:Play()
+    end
 end)
 
-AudioWindow:CreateSlider("Скорость", 1, 30, 10, 1, function(value)
-    LibraryAudio.PlaybackSpeed = value / 10
+AudioWindow:CreateButton("Pause / Resume", function()
+    if LocalSound.IsPlaying then
+        LocalSound:Pause()
+    else
+        LocalSound:Resume()
+    end
 end)
 
--- Создание интеллектуального тайм-слайдера для отслеживания длины и перемотки трека
-local TrackSlider = AudioWindow:CreateSlider("Позиция", 0, 100, 0, 0, function(percent)
-    if LibraryAudio.TimeLength > 0 then
-        -- Вычисляем позицию во время ручной смены
-        local targetTime = (percent / 100) * LibraryAudio.TimeLength
-        if math.abs(LibraryAudio.TimePosition - targetTime) > 2 then -- Защита от авто-цикла петли
-            LibraryAudio.TimePosition = targetTime
+local volSlider = AudioWindow:CreateSlider("Громкость", 0, 10, 2, 1, function(val)
+    LocalSound.Volume = val
+end)
+
+local speedSlider = AudioWindow:CreateSlider("Скорость", 0.5, 3, 1, 2, function(val)
+    LocalSound.PlaybackSpeed = val
+end)
+
+local trackSlider = AudioWindow:CreateSlider("Перемотка", 0, 100, 0, 1, function(val)
+    if LocalSound.IsLoaded and LocalSound.TimeLength > 0 then
+        -- Меняем позицию только если юзер физически перетаскивает ползунок
+        LocalSound.TimePosition = val
+    end
+end)
+
+-- Луп синхронизации трек-бара и анализа длины аудио в реальном времени
+RunService.RenderStepped:Connect(function()
+    if LocalSound.IsLoaded and LocalSound.TimeLength > 0 then
+        trackSlider:SetMax(LocalSound.TimeLength)
+        
+        -- Если пользователь не трогает ползунок — он двигается сам за песней
+        if not trackSlider:IsSliding() then
+            trackSlider:SilentSet(LocalSound.TimePosition)
+        end
+    else
+        trackSlider:SetMax(0)
+        if not trackSlider:IsSliding() then
+            trackSlider:SilentSet(0)
         end
     end
 end)
 
--- Рендер-луп автообновления позиции бегунка трека во времени
-RunService.Heartbeat:Connect(function()
-    if LibraryAudio.IsPlaying and LibraryAudio.TimeLength > 0 then
-        local progressPercent = (LibraryAudio.TimePosition / LibraryAudio.TimeLength) * 100
-        TrackSlider.SetValue(progressPercent)
-    end
+
+-- 2. ВКЛАДКА "НАСТРОЙКИ" (SETTINGS)
+local SettingsWindow = Library:CreateWindow("Настройки", UDim2.new(0, 300, 0, 60))
+
+SettingsWindow:CreateToggle("Watermark", true, function(state)
+    Library.WatermarkEnabled = state
+end)
+
+SettingsWindow:CreateToggle("Snow Effect", false, function(state)
+    setSnowActive(state)
+end)
+
+SettingsWindow:CreateSlider("Snow Speed", 50, 500, 150, 0, function(val)
+    snowSpeed = val
+end)
+
+SettingsWindow:CreateSlider("Blur Screen", 0, 50, 0, 0, function(val)
+    BlurShader.Size = val
+end)
+
+SettingsWindow:CreateKeybind("Menu Bind", Enum.KeyCode.RightShift, function(key)
+    Library.ToggleKey = key
 end)
 
 return Library
