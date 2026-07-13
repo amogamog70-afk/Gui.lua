@@ -1,7 +1,7 @@
 -- ╔══════════════════════════════════════════════════════════╗
--- ║         METEOR UI LIBRARY — FULL ARCHITECTURE v2.0       ║
--- ║   Button · Toggle · Slider · Dropdown · TextBox          ║
--- ║   ColorPicker · Keybind · Label · Separator              ║
+-- ║         METEOR UI LIBRARY — METEOR CLIENT STYLE v3.0     ║
+-- ║   Минималистичный дизайн · Прозрачные элементы          ║
+-- ║   Вкладки слева · Loading Screen · Fixed RightShift     ║
 -- ╚══════════════════════════════════════════════════════════╝
 
 local TweenService     = game:GetService("TweenService")
@@ -10,32 +10,35 @@ local Players          = game:GetService("Players")
 local RunService       = game:GetService("RunService")
 local LocalPlayer      = Players.LocalPlayer
 
--- ── ТЕМА ────────────────────────────────────────────────────
+-- ── ТЕМА METEOR CLIENT ──────────────────────────────────────
 local Theme = {
-    -- фоны
-    MainBg      = Color3.fromRGB(10, 10, 14),
-    ElementBg   = Color3.fromRGB(17, 17, 23),
-    ElementHov  = Color3.fromRGB(24, 24, 33),
-    PopupBg     = Color3.fromRGB(13, 13, 18),
+    -- фоны (прозрачные/тёмные)
+    MainBg      = Color3.fromRGB(8, 8, 11),        -- почти чёрный
+    ElementBg   = Color3.fromRGB(0, 0, 0),         -- полностью прозрачный (будет через Transparency)
+    ElementHov  = Color3.fromRGB(18, 18, 24),      -- еле заметный hover
+    PopupBg     = Color3.fromRGB(11, 11, 15),
     -- акцент
-    Accent      = Color3.fromRGB(218, 43, 172),
-    AccentDim   = Color3.fromRGB(140, 28, 110),
-    AccentHov   = Color3.fromRGB(240, 60, 195),
+    Accent      = Color3.fromRGB(220, 45, 175),    -- яркий розовый
+    AccentDim   = Color3.fromRGB(145, 30, 115),
+    AccentHov   = Color3.fromRGB(245, 65, 200),
     -- текст
     TextPri     = Color3.fromRGB(255, 255, 255),
-    TextSec     = Color3.fromRGB(120, 120, 132),
-    TextDis     = Color3.fromRGB(60,  60,  72),
+    TextSec     = Color3.fromRGB(130, 130, 142),
+    TextDis     = Color3.fromRGB(70,  70,  82),
     -- UI
-    Border      = Color3.fromRGB(28, 28, 40),
-    TrackBg     = Color3.fromRGB(38, 38, 52),
-    ToggleOff   = Color3.fromRGB(42, 42, 56),
+    Border      = Color3.fromRGB(35, 35, 48),      -- тонкие линии
+    TrackBg     = Color3.fromRGB(40, 40, 54),
+    ToggleOff   = Color3.fromRGB(45, 45, 58),
+    Divider     = Color3.fromRGB(30, 30, 42),      -- разделители
 }
 
 -- ── УТИЛИТЫ ─────────────────────────────────────────────────
 local function Tween(obj, props, t, style, dir)
-    TweenService:Create(obj,
-        TweenInfo.new(t or 0.14, style or Enum.EasingStyle.Quad, dir or Enum.EasingDirection.Out),
-        props):Play()
+    local tween = TweenService:Create(obj,
+        TweenInfo.new(t or 0.16, style or Enum.EasingStyle.Quart, dir or Enum.EasingDirection.Out),
+        props)
+    tween:Play()
+    return tween
 end
 
 local function Corner(parent, radius)
@@ -73,7 +76,9 @@ local function HoverFX(btn, bgNorm, bgHov)
     btn.MouseLeave:Connect(function() Tween(btn, {BackgroundColor3 = bgNorm or Theme.ElementBg }) end)
 end
 
--- ── ПОПАПЫ ──────────────────────────────────────────────────
+-- ══════════════════════════════════════════════════════════
+-- LOADING SCREEN
+-- ══════════════════════════════════════════════════════════
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name           = "MeteorLib"
 ScreenGui.ResetOnSpawn   = false
@@ -81,7 +86,105 @@ ScreenGui.DisplayOrder   = 999
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent         = LocalPlayer:WaitForChild("PlayerGui")
 
-local PopupLayer = Instance.new("Frame")   -- прозрачный слой поверх всего
+local LoadingScreen = Instance.new("Frame")
+LoadingScreen.Size            = UDim2.new(1, 0, 1, 0)
+LoadingScreen.BackgroundColor3 = Color3.fromRGB(5, 5, 8)
+LoadingScreen.BorderSizePixel = 0
+LoadingScreen.ZIndex          = 100
+LoadingScreen.Parent          = ScreenGui
+
+local LoadingLogo = Instance.new("TextLabel")
+LoadingLogo.Size            = UDim2.new(0, 300, 0, 60)
+LoadingLogo.Position        = UDim2.new(0.5, -150, 0.5, -80)
+LoadingLogo.BackgroundTransparency = 1
+LoadingLogo.Text            = "✦ METEOR"
+LoadingLogo.TextColor3      = Theme.Accent
+LoadingLogo.Font            = Enum.Font.GothamBold
+LoadingLogo.TextSize        = 42
+LoadingLogo.TextTransparency = 1
+LoadingLogo.ZIndex          = 101
+LoadingLogo.Parent          = LoadingScreen
+
+local LoadingSubtitle = Instance.new("TextLabel")
+LoadingSubtitle.Size            = UDim2.new(0, 300, 0, 20)
+LoadingSubtitle.Position        = UDim2.new(0.5, -150, 0.5, -10)
+LoadingSubtitle.BackgroundTransparency = 1
+LoadingSubtitle.Text            = "client"
+LoadingSubtitle.TextColor3      = Theme.TextSec
+LoadingSubtitle.Font            = Enum.Font.Gotham
+LoadingSubtitle.TextSize        = 14
+LoadingSubtitle.TextTransparency = 1
+LoadingSubtitle.ZIndex          = 101
+LoadingSubtitle.Parent          = LoadingScreen
+
+-- Progress Bar
+local ProgressBg = Instance.new("Frame")
+ProgressBg.Size            = UDim2.new(0, 300, 0, 3)
+ProgressBg.Position        = UDim2.new(0.5, -150, 0.5, 30)
+ProgressBg.BackgroundColor3 = Theme.Border
+ProgressBg.BorderSizePixel = 0
+ProgressBg.BackgroundTransparency = 1
+ProgressBg.ZIndex          = 101
+ProgressBg.Parent          = LoadingScreen
+Corner(ProgressBg, 2)
+
+local ProgressFill = Instance.new("Frame")
+ProgressFill.Size            = UDim2.new(0, 0, 1, 0)
+ProgressFill.BackgroundColor3 = Theme.Accent
+ProgressFill.BorderSizePixel = 0
+ProgressFill.ZIndex          = 102
+ProgressFill.Parent          = ProgressBg
+Corner(ProgressFill, 2)
+
+local LoadingText = Instance.new("TextLabel")
+LoadingText.Size            = UDim2.new(0, 300, 0, 20)
+LoadingText.Position        = UDim2.new(0.5, -150, 0.5, 45)
+LoadingText.BackgroundTransparency = 1
+LoadingText.Text            = "Initializing..."
+LoadingText.TextColor3      = Theme.TextSec
+LoadingText.Font            = Enum.Font.Gotham
+LoadingText.TextSize        = 11
+LoadingText.TextTransparency = 1
+LoadingText.ZIndex          = 101
+LoadingText.Parent          = LoadingScreen
+
+-- Анимация загрузки
+task.spawn(function()
+    task.wait(0.1)
+    Tween(LoadingLogo, {TextTransparency = 0}, 0.6)
+    task.wait(0.2)
+    Tween(LoadingSubtitle, {TextTransparency = 0}, 0.5)
+    task.wait(0.3)
+    Tween(ProgressBg, {BackgroundTransparency = 0}, 0.4)
+    Tween(LoadingText, {TextTransparency = 0}, 0.4)
+    
+    -- Этапы загрузки
+    local stages = {
+        {text = "Loading UI...", progress = 0.25, time = 0.3},
+        {text = "Loading components...", progress = 0.5, time = 0.3},
+        {text = "Initializing modules...", progress = 0.75, time = 0.3},
+        {text = "Ready!", progress = 1, time = 0.4}
+    }
+    
+    for _, stage in ipairs(stages) do
+        LoadingText.Text = stage.text
+        Tween(ProgressFill, {Size = UDim2.new(stage.progress, 0, 1, 0)}, stage.time, Enum.EasingStyle.Quart)
+        task.wait(stage.time)
+    end
+    
+    task.wait(0.3)
+    -- Fade out
+    Tween(LoadingScreen, {BackgroundTransparency = 1}, 0.5)
+    Tween(LoadingLogo, {TextTransparency = 1}, 0.5)
+    Tween(LoadingSubtitle, {TextTransparency = 1}, 0.5)
+    Tween(ProgressBg, {BackgroundTransparency = 1}, 0.5)
+    Tween(LoadingText, {TextTransparency = 1}, 0.5)
+    task.wait(0.6)
+    LoadingScreen:Destroy()
+end)
+
+-- ── ПОПАПЫ ──────────────────────────────────────────────────
+local PopupLayer = Instance.new("Frame")
 PopupLayer.Size                 = UDim2.new(1,0,1,0)
 PopupLayer.BackgroundTransparency = 1
 PopupLayer.ZIndex               = 50
@@ -98,128 +201,154 @@ PopupLayer.InputBegan:Connect(function(i)
     end
 end)
 
--- ── TOP BAR ─────────────────────────────────────────────────
---   Прижат к самому верху (Y = 0), высота 34 px
-local BAR_W  = 530
-local BAR_H  = 34
-local PAGE_H = 170
+-- ── MAIN WINDOW (METEOR STYLE) ─────────────────────────────
+-- Левая панель вкладок (без фона) + правая область контента
+local WINDOW_W = 560
+local WINDOW_H = 380
+local TAB_W    = 90  -- ширина левой панели
+local CONTENT_W = WINDOW_W - TAB_W
 
-local TopBar = Instance.new("Frame")
-TopBar.Name            = "TopBar"
-TopBar.Size            = UDim2.new(0, BAR_W, 0, BAR_H)
-TopBar.Position        = UDim2.new(0.5, -BAR_W/2, 0, 0)   -- ← верхний край экрана
-TopBar.BackgroundColor3 = Theme.MainBg
-TopBar.BorderSizePixel = 0
-TopBar.ZIndex          = 10
-TopBar.Parent          = ScreenGui
-Corner(TopBar, 0)   -- без скруглений сверху (прижат к краю)
-Stroke(TopBar, Theme.Border, 1)
+-- Главный контейнер
+local MainWindow = Instance.new("Frame")
+MainWindow.Name            = "MainWindow"
+MainWindow.Size            = UDim2.new(0, WINDOW_W, 0, WINDOW_H)
+MainWindow.Position        = UDim2.new(0.5, -WINDOW_W/2, 0.5, -WINDOW_H/2)
+MainWindow.BackgroundColor3 = Theme.MainBg
+MainWindow.BorderSizePixel = 0
+MainWindow.ZIndex          = 10
+MainWindow.Visible         = false  -- покажется после загрузки
+MainWindow.Parent          = ScreenGui
+Corner(MainWindow, 6)
+Stroke(MainWindow, Theme.Border, 1)
 
--- нижняя розовая линия
-local BarLine = Instance.new("Frame")
-BarLine.Size            = UDim2.new(1, 0, 0, 1)
-BarLine.Position        = UDim2.new(0, 0, 1, -1)
-BarLine.BackgroundColor3 = Theme.Accent
-BarLine.BorderSizePixel = 0
-BarLine.ZIndex          = 11
-BarLine.Parent          = TopBar
+-- Показать после загрузки
+task.spawn(function()
+    task.wait(2.2)  -- после loading screen
+    MainWindow.Visible = true
+    MainWindow.BackgroundTransparency = 1
+    Tween(MainWindow, {BackgroundTransparency = 0}, 0.4)
+end)
 
--- логотип/иконка слева
+-- ═══ HEADER (лого + название + кнопки) ═══
+local Header = Instance.new("Frame")
+Header.Size            = UDim2.new(1, 0, 0, 36)
+Header.BackgroundTransparency = 1
+Header.ZIndex          = 11
+Header.Parent          = MainWindow
+
+-- Разделитель под хедером
+local HeaderLine = Instance.new("Frame")
+HeaderLine.Size            = UDim2.new(1, -12, 0, 1)
+HeaderLine.Position        = UDim2.new(0, 6, 1, -1)
+HeaderLine.BackgroundColor3 = Theme.Divider
+HeaderLine.BorderSizePixel = 0
+HeaderLine.ZIndex          = 11
+HeaderLine.Parent          = Header
+
+-- Логотип
 local LogoLabel = Instance.new("TextLabel")
-LogoLabel.Size            = UDim2.new(0, 70, 1, 0)
-LogoLabel.Position        = UDim2.new(0, 8, 0, 0)
+LogoLabel.Size            = UDim2.new(0, 100, 1, 0)
+LogoLabel.Position        = UDim2.new(0, 12, 0, 0)
 LogoLabel.BackgroundTransparency = 1
 LogoLabel.Text            = "✦ meteor"
 LogoLabel.TextColor3      = Theme.Accent
 LogoLabel.Font            = Enum.Font.GothamBold
-LogoLabel.TextSize        = 12
+LogoLabel.TextSize        = 14
 LogoLabel.TextXAlignment  = Enum.TextXAlignment.Left
-LogoLabel.ZIndex          = 11
-LogoLabel.Parent          = TopBar
+LogoLabel.ZIndex          = 12
+LogoLabel.Parent          = Header
 
--- контейнер вкладок (после логотипа)
-local TabContainer = Instance.new("Frame")
-TabContainer.Size               = UDim2.new(0, 310, 1, -2)
-TabContainer.Position           = UDim2.new(0, 84, 0, 0)
-TabContainer.BackgroundTransparency = 1
-TabContainer.ZIndex             = 11
-TabContainer.Parent             = TopBar
-
-local TabLayout = Instance.new("UIListLayout")
-TabLayout.FillDirection  = Enum.FillDirection.Horizontal
-TabLayout.SortOrder      = Enum.SortOrder.LayoutOrder
-TabLayout.Padding        = UDim.new(0, 2)
-TabLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-TabLayout.Parent         = TabContainer
-
--- строка поиска справа
+-- Search Bar (справа)
 local SearchBox = Instance.new("Frame")
-SearchBox.Size            = UDim2.new(0, 120, 0, 20)
-SearchBox.Position        = UDim2.new(1, -128, 0.5, -10)
-SearchBox.BackgroundColor3 = Theme.ElementBg
+SearchBox.Size            = UDim2.new(0, 140, 0, 22)
+SearchBox.Position        = UDim2.new(1, -148, 0.5, -11)
+SearchBox.BackgroundColor3 = Theme.TrackBg
 SearchBox.BorderSizePixel = 0
-SearchBox.ZIndex          = 11
-SearchBox.Parent          = TopBar
+SearchBox.ZIndex          = 12
+SearchBox.Parent          = Header
 Corner(SearchBox, 4)
 Stroke(SearchBox, Theme.Border, 1)
 
-local SearchIcon = Instance.new("ImageLabel")
-SearchIcon.Size            = UDim2.new(0, 12, 0, 12)
-SearchIcon.Position        = UDim2.new(0, 5, 0.5, -6)
+local SearchIcon = Instance.new("TextLabel")
+SearchIcon.Size            = UDim2.new(0, 16, 0, 16)
+SearchIcon.Position        = UDim2.new(0, 6, 0.5, -8)
 SearchIcon.BackgroundTransparency = 1
-SearchIcon.Image           = "rbxassetid://11868577178784 3"   -- твоя лупа
-SearchIcon.ImageColor3     = Theme.TextSec
-SearchIcon.ZIndex          = 12
+SearchIcon.Text            = "🔍"
+SearchIcon.TextColor3      = Theme.TextSec
+SearchIcon.TextSize        = 12
+SearchIcon.ZIndex          = 13
 SearchIcon.Parent          = SearchBox
 
 local SearchInput = Instance.new("TextBox")
-SearchInput.Size            = UDim2.new(1, -22, 1, 0)
-SearchInput.Position        = UDim2.new(0, 20, 0, 0)
+SearchInput.Size            = UDim2.new(1, -28, 1, 0)
+SearchInput.Position        = UDim2.new(0, 24, 0, 0)
 SearchInput.BackgroundTransparency = 1
 SearchInput.Font            = Enum.Font.Gotham
 SearchInput.Text            = ""
-SearchInput.PlaceholderText = "Search.."
+SearchInput.PlaceholderText = "Search..."
 SearchInput.PlaceholderColor3 = Theme.TextSec
 SearchInput.TextColor3      = Theme.TextPri
-SearchInput.TextSize        = 10
+SearchInput.TextSize        = 11
 SearchInput.TextXAlignment  = Enum.TextXAlignment.Left
-SearchInput.ZIndex          = 12
+SearchInput.ZIndex          = 13
 SearchInput.ClearTextOnFocus = false
 SearchInput.Parent          = SearchBox
 
--- ── PAGE CONTAINER (сразу под баром, Y = 34) ────────────────
+-- ═══ LEFT PANEL (вкладки вертикально БЕЗ фона) ═══
+local TabPanel = Instance.new("Frame")
+TabPanel.Size            = UDim2.new(0, TAB_W, 1, -36)
+TabPanel.Position        = UDim2.new(0, 0, 0, 36)
+TabPanel.BackgroundTransparency = 1  -- нет фона!
+TabPanel.ZIndex          = 11
+TabPanel.Parent          = MainWindow
+
+local TabLayout = Instance.new("UIListLayout")
+TabLayout.FillDirection  = Enum.FillDirection.Vertical
+TabLayout.SortOrder      = Enum.SortOrder.LayoutOrder
+TabLayout.Padding        = UDim.new(0, 2)
+TabLayout.Parent         = TabPanel
+
+local TabPad = Instance.new("UIPadding")
+TabPad.PaddingTop    = UDim.new(0, 8)
+TabPad.PaddingLeft   = UDim.new(0, 6)
+TabPad.PaddingRight  = UDim.new(0, 6)
+TabPad.Parent        = TabPanel
+
+-- Вертикальный разделитель справа от вкладок
+local VerticalDivider = Instance.new("Frame")
+VerticalDivider.Size            = UDim2.new(0, 1, 1, -48)
+VerticalDivider.Position        = UDim2.new(0, TAB_W, 0, 42)
+VerticalDivider.BackgroundColor3 = Theme.Divider
+VerticalDivider.BorderSizePixel = 0
+VerticalDivider.ZIndex          = 11
+VerticalDivider.Parent          = MainWindow
+
+-- ═══ CONTENT AREA (справа от вкладок) ═══
 local PageContainer = Instance.new("Frame")
 PageContainer.Name            = "Pages"
-PageContainer.Size            = UDim2.new(0, BAR_W, 0, PAGE_H)
-PageContainer.Position        = UDim2.new(0.5, -BAR_W/2, 0, BAR_H)
-PageContainer.BackgroundColor3 = Theme.MainBg
-PageContainer.BorderSizePixel = 0
+PageContainer.Size            = UDim2.new(0, CONTENT_W, 1, -36)
+PageContainer.Position        = UDim2.new(0, TAB_W, 0, 36)
+PageContainer.BackgroundTransparency = 1
 PageContainer.ClipsDescendants = true
-PageContainer.ZIndex          = 9
-PageContainer.Parent          = ScreenGui
-Corner(PageContainer, 0)
-Stroke(PageContainer, Theme.Border, 1)
+PageContainer.ZIndex          = 10
+PageContainer.Parent          = MainWindow
 
--- ── DRAG (перетаскивание за TopBar) ─────────────────────────
+-- ── DRAG (перетаскивание за Header) ────────────────────────
 do
     local dragging, dragStart, startPos
-    TopBar.InputBegan:Connect(function(i)
+    Header.InputBegan:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging  = true
             dragStart = i.Position
-            startPos  = TopBar.Position
+            startPos  = MainWindow.Position
         end
     end)
     UserInputService.InputChanged:Connect(function(i)
         if dragging and i.UserInputType == Enum.UserInputType.MouseMovement then
             local delta = i.Position - dragStart
-            local newPos = UDim2.new(
+            MainWindow.Position = UDim2.new(
                 startPos.X.Scale, startPos.X.Offset + delta.X,
                 startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-            TopBar.Position        = newPos
-            PageContainer.Position = UDim2.new(
-                newPos.X.Scale, newPos.X.Offset,
-                newPos.Y.Scale, newPos.Y.Offset + BAR_H)
             PopupLayer:ClearAllChildren()
         end
     end)
@@ -233,19 +362,30 @@ end
 -- ════════════════════════════════════════════════════════════
 local Library     = {}
 local Pages       = {}
-local AllElements = {}   -- для поиска
+local AllElements = {}
 local ActivePage  = nil
 local FirstActivate = nil
 
--- скрыть/показать по RightShift
+-- ══ FIXED RIGHTSHIFT TOGGLE ══
+-- Изоляция от других биндов и правильное скрытие
 local guiVisible = true
+local rightShiftPressed = false
+
 UserInputService.InputBegan:Connect(function(i, gp)
     if gp then return end
     if i.KeyCode == Enum.KeyCode.RightShift then
-        guiVisible = not guiVisible
-        TopBar.Visible         = guiVisible
-        PageContainer.Visible  = guiVisible
-        if not guiVisible then CloseAllPopups() end
+        if not rightShiftPressed then
+            rightShiftPressed = true
+            guiVisible = not guiVisible
+            MainWindow.Visible    = guiVisible
+            if not guiVisible then CloseAllPopups() end
+        end
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(i, gp)
+    if i.KeyCode == Enum.KeyCode.RightShift then
+        rightShiftPressed = false
     end
 end)
 
@@ -266,7 +406,7 @@ SearchInput:GetPropertyChangedSignal("Text"):Connect(function()
 end)
 
 -- ════════════════════════════════════════════════════════════
--- CreateTab
+-- CreateTab (вертикальные вкладки слева)
 -- ════════════════════════════════════════════════════════════
 function Library:CreateTab(name, icon)
 
@@ -276,93 +416,103 @@ function Library:CreateTab(name, icon)
     Page.Size                 = UDim2.new(1, 0, 1, 0)
     Page.BackgroundTransparency = 1
     Page.Visible              = false
-    Page.ScrollBarThickness   = 2
+    Page.ScrollBarThickness   = 3
     Page.ScrollBarImageColor3 = Theme.Accent
     Page.CanvasSize           = UDim2.new(0,0,0,0)
     Page.AutomaticCanvasSize  = Enum.AutomaticSize.Y
     Page.ZIndex               = 10
     Page.Parent               = PageContainer
 
-    -- сетка элементов
+    -- сетка элементов (2 колонки)
     local Grid = Instance.new("UIGridLayout")
-    Grid.CellSize    = UDim2.new(0, 165, 0, 30)
-    Grid.CellPadding = UDim2.new(0, 8, 0, 6)
+    Grid.CellSize    = UDim2.new(0, 218, 0, 32)
+    Grid.CellPadding = UDim2.new(0, 6, 0, 5)
     Grid.SortOrder   = Enum.SortOrder.LayoutOrder
     Grid.Parent      = Page
 
     local GridPad = Instance.new("UIPadding")
-    GridPad.PaddingTop    = UDim.new(0, 8)
-    GridPad.PaddingLeft   = UDim.new(0, 8)
-    GridPad.PaddingRight  = UDim.new(0, 8)
-    GridPad.PaddingBottom = UDim.new(0, 8)
+    GridPad.PaddingTop    = UDim.new(0, 10)
+    GridPad.PaddingLeft   = UDim.new(0, 10)
+    GridPad.PaddingRight  = UDim.new(0, 10)
+    GridPad.PaddingBottom = UDim.new(0, 10)
     GridPad.Parent        = Page
 
-    -- кнопка вкладки
+    -- ═══ КНОПКА ВКЛАДКИ (вертикально слева) ═══
     local TabBtn = Instance.new("TextButton")
-    TabBtn.Size            = UDim2.new(0, 64, 1, -6)
+    TabBtn.Size            = UDim2.new(1, -12, 0, 34)
     TabBtn.BackgroundTransparency = 1
     TabBtn.Font            = Enum.Font.GothamSemibold
     TabBtn.Text            = (icon and (icon .. "  ") or "") .. name
     TabBtn.TextColor3      = Theme.TextSec
-    TabBtn.TextSize        = 11
+    TabBtn.TextSize        = 12
     TabBtn.AutoButtonColor = false
     TabBtn.ZIndex          = 12
-    TabBtn.Parent          = TabContainer
+    TabBtn.Parent          = TabPanel
 
-    -- розовый индикатор под активной вкладкой
-    local TabLine = Instance.new("Frame")
-    TabLine.Size            = UDim2.new(0.7, 0, 0, 1)
-    TabLine.Position        = UDim2.new(0.15, 0, 1, -1)
-    TabLine.BackgroundColor3 = Theme.Accent
-    TabLine.BackgroundTransparency = 1   -- скрыт по умолчанию
-    TabLine.BorderSizePixel = 0
-    TabLine.ZIndex          = 13
-    TabLine.Parent          = TabBtn
+    -- Тонкий индикатор слева (при активности)
+    local TabIndicator = Instance.new("Frame")
+    TabIndicator.Size            = UDim2.new(0, 2, 0.7, 0)
+    TabIndicator.Position        = UDim2.new(0, -4, 0.15, 0)
+    TabIndicator.BackgroundColor3 = Theme.Accent
+    TabIndicator.BackgroundTransparency = 1
+    TabIndicator.BorderSizePixel = 0
+    TabIndicator.ZIndex          = 13
+    TabIndicator.Parent          = TabBtn
+    Corner(TabIndicator, 2)
 
     local function Activate()
         CloseAllPopups()
         -- скрыть всё
         for _, p in pairs(Pages) do p.Visible = false end
-        for _, b in ipairs(TabContainer:GetChildren()) do
+        for _, b in ipairs(TabPanel:GetChildren()) do
             if b:IsA("TextButton") then
-                Tween(b, {TextColor3 = Theme.TextSec})
-                local ln = b:FindFirstChildOfClass("Frame")
-                if ln then ln.BackgroundTransparency = 1 end
+                Tween(b, {TextColor3 = Theme.TextSec, BackgroundTransparency = 1})
+                local ind = b:FindFirstChildOfClass("Frame")
+                if ind then ind.BackgroundTransparency = 1 end
             end
         end
         -- показать текущее
         Page.Visible              = true
         ActivePage                = Page
-        Tween(TabBtn, {TextColor3 = Theme.TextPri})
-        TabLine.BackgroundTransparency = 0
+        Tween(TabBtn, {TextColor3 = Theme.TextPri, BackgroundTransparency = 0.95})
+        TabIndicator.BackgroundTransparency = 0
     end
 
     TabBtn.MouseButton1Click:Connect(Activate)
     TabBtn.MouseEnter:Connect(function()
-        if not Page.Visible then Tween(TabBtn, {TextColor3 = Theme.TextPri}) end
+        if not Page.Visible then 
+            Tween(TabBtn, {TextColor3 = Theme.TextPri, BackgroundTransparency = 0.97})
+        end
     end)
     TabBtn.MouseLeave:Connect(function()
-        if not Page.Visible then Tween(TabBtn, {TextColor3 = Theme.TextSec}) end
+        if not Page.Visible then 
+            Tween(TabBtn, {TextColor3 = Theme.TextSec, BackgroundTransparency = 1})
+        end
     end)
 
     Pages[name] = Page
     if not FirstActivate then FirstActivate = Activate end
 
     -- ── ВСПОМОГАТЕЛЬНЫЕ ──────────────────────────────────────
-    local function BaseFrame(spanCols)
-        -- spanCols: nil=1, 2=двойная ширина (для ColPicker, Keybind)
+    local function BaseFrame(spanCols, noBackground)
         local f = Instance.new("Frame")
-        f.BackgroundColor3 = Theme.ElementBg
+        -- БЕЗ ФОНА (как в Meteor Client) если не указано иначе
+        if noBackground then
+            f.BackgroundTransparency = 1
+        else
+            f.BackgroundTransparency = 0.95  -- почти прозрачный
+            f.BackgroundColor3 = Theme.ElementBg
+        end
         f.BorderSizePixel  = 0
         f.LayoutOrder      = #Page:GetChildren()
         if spanCols == 2 then
-            -- UIGridLayout не поддерживает span, поэтому ставим полную ширину
-            f.Size = UDim2.new(1, -16, 0, 30)
+            f.Size = UDim2.new(1, -20, 0, 32)
         end
         f.Parent = Page
-        Corner(f, 4)
-        Stroke(f, Theme.Border, 1)
-        HoverFX(f, Theme.ElementBg, Theme.ElementHov)
+        Corner(f, 5)
+        if not noBackground then
+            Stroke(f, Theme.Border, 1)
+        end
         return f
     end
 
@@ -373,41 +523,33 @@ function Library:CreateTab(name, icon)
     local Elem = {}
 
     -- ══════════════════════════════════════════════════════════
-    -- 1. LABEL (заголовок / текст)
+    -- 1. LABEL (без фона)
     -- ══════════════════════════════════════════════════════════
     function Elem:CreateLabel(text)
-        local f = Instance.new("Frame")
-        f.BackgroundTransparency = 1
-        f.BorderSizePixel = 0
-        f.LayoutOrder     = #Page:GetChildren()
-        f.Parent          = Page
-        local l = Label(f, text, 10, Theme.TextSec, Enum.Font.GothamSemibold)
+        local f = BaseFrame(nil, true)
+        local l = Label(f, text, 11, Theme.TextSec, Enum.Font.GothamSemibold)
         l.Size     = UDim2.new(1, -8, 1, 0)
         l.Position = UDim2.new(0, 8, 0, 0)
         RegElem(f, text)
     end
 
     -- ══════════════════════════════════════════════════════════
-    -- 2. SEPARATOR
+    -- 2. SEPARATOR (минималистичная линия)
     -- ══════════════════════════════════════════════════════════
     function Elem:CreateSeparator(text)
-        local f = Instance.new("Frame")
-        f.BackgroundTransparency = 1
-        f.BorderSizePixel = 0
-        f.LayoutOrder     = #Page:GetChildren()
-        f.Parent          = Page
+        local f = BaseFrame(nil, true)
 
         local line = Instance.new("Frame")
         line.Size            = UDim2.new(1, -8, 0, 1)
         line.Position        = UDim2.new(0, 4, 0.5, 0)
-        line.BackgroundColor3 = Theme.Border
+        line.BackgroundColor3 = Theme.Divider
         line.BorderSizePixel = 0
         line.Parent          = f
 
         if text and text ~= "" then
             local bg = Instance.new("Frame")
-            bg.Size            = UDim2.new(0, #text * 6 + 12, 0, 14)
-            bg.Position        = UDim2.new(0.5, -((#text * 6 + 12)/2), 0.5, -7)
+            bg.Size            = UDim2.new(0, #text * 6 + 10, 0, 14)
+            bg.Position        = UDim2.new(0.5, -((#text * 6 + 10)/2), 0.5, -7)
             bg.BackgroundColor3 = Theme.MainBg
             bg.BorderSizePixel = 0
             bg.Parent          = f
@@ -418,10 +560,12 @@ function Library:CreateTab(name, icon)
     end
 
     -- ══════════════════════════════════════════════════════════
-    -- 3. BUTTON
+    -- 3. BUTTON (БЕЗ фона, только текст + hover)
     -- ══════════════════════════════════════════════════════════
     function Elem:CreateButton(text, callback)
-        local f = BaseFrame()
+        local f = BaseFrame(nil, true)
+        Stroke(f, Theme.Border, 1)
+        
         local lbl = Label(f, text, 11, Theme.TextPri, Enum.Font.GothamSemibold)
         lbl.Size     = UDim2.new(1, -8, 1, 0)
         lbl.Position = UDim2.new(0, 8, 0, 0)
@@ -433,42 +577,56 @@ function Library:CreateTab(name, icon)
         btn.Text   = ""
         btn.Parent = f
 
+        btn.MouseEnter:Connect(function() 
+            Tween(f, {BackgroundTransparency = 0.9})
+            f.BackgroundColor3 = Theme.ElementHov
+        end)
+        btn.MouseLeave:Connect(function() 
+            Tween(f, {BackgroundTransparency = 1})
+        end)
+
         btn.MouseButton1Click:Connect(function()
             CloseAllPopups()
-            Tween(f, {BackgroundColor3 = Theme.Accent}, 0.05)
-            task.delay(0.12, function() Tween(f, {BackgroundColor3 = Theme.ElementBg}) end)
+            f.BackgroundTransparency = 0
+            f.BackgroundColor3 = Theme.Accent
+            Tween(lbl, {TextColor3 = Color3.fromRGB(255,255,255)}, 0.05)
+            task.delay(0.15, function() 
+                Tween(f, {BackgroundTransparency = 1})
+                Tween(lbl, {TextColor3 = Theme.TextPri})
+            end)
             pcall(callback)
         end)
         RegElem(f, text)
     end
 
     -- ══════════════════════════════════════════════════════════
-    -- 4. TOGGLE
+    -- 4. TOGGLE (БЕЗ фона, только switcher)
     -- ══════════════════════════════════════════════════════════
     function Elem:CreateToggle(text, default, callback)
         local state = default or false
-        local f     = BaseFrame()
+        local f     = BaseFrame(nil, true)
+        Stroke(f, Theme.Border, 1)
 
         local lbl = Label(f, text, 11, Theme.TextPri)
-        lbl.Size     = UDim2.new(1, -38, 1, 0)
+        lbl.Size     = UDim2.new(1, -42, 1, 0)
         lbl.Position = UDim2.new(0, 8, 0, 0)
 
-        -- pill-переключатель 26×14
+        -- pill-переключатель 28×15
         local Track = Instance.new("Frame")
-        Track.Size            = UDim2.new(0, 26, 0, 14)
-        Track.Position        = UDim2.new(1, -34, 0.5, -7)
+        Track.Size            = UDim2.new(0, 28, 0, 15)
+        Track.Position        = UDim2.new(1, -36, 0.5, -7.5)
         Track.BackgroundColor3 = state and Theme.Accent or Theme.ToggleOff
         Track.BorderSizePixel = 0
         Track.Parent          = f
-        Corner(Track, 7)
+        Corner(Track, 8)
 
         local Thumb = Instance.new("Frame")
-        Thumb.Size            = UDim2.new(0, 10, 0, 10)
-        Thumb.Position        = UDim2.new(0, state and 14 or 2, 0.5, -5)
+        Thumb.Size            = UDim2.new(0, 11, 0, 11)
+        Thumb.Position        = UDim2.new(0, state and 15 or 2, 0.5, -5.5)
         Thumb.BackgroundColor3 = Color3.fromRGB(255,255,255)
         Thumb.BorderSizePixel = 0
         Thumb.Parent          = Track
-        Corner(Thumb, 5)
+        Corner(Thumb, 6)
 
         local btn = Instance.new("TextButton")
         btn.Size   = UDim2.new(1,0,1,0)
@@ -476,21 +634,28 @@ function Library:CreateTab(name, icon)
         btn.Text   = ""
         btn.Parent = f
 
+        btn.MouseEnter:Connect(function() 
+            f.BackgroundTransparency = 0.92
+            f.BackgroundColor3 = Theme.ElementHov
+        end)
+        btn.MouseLeave:Connect(function() 
+            f.BackgroundTransparency = 1
+        end)
+
         btn.MouseButton1Click:Connect(function()
             CloseAllPopups()
             state = not state
-            Tween(Track, {BackgroundColor3 = state and Theme.Accent or Theme.ToggleOff})
-            Tween(Thumb, {Position = UDim2.new(0, state and 14 or 2, 0.5, -5)})
+            Tween(Track, {BackgroundColor3 = state and Theme.Accent or Theme.ToggleOff}, 0.18)
+            Tween(Thumb, {Position = UDim2.new(0, state and 15 or 2, 0.5, -5.5)}, 0.18)
             pcall(callback, state)
         end)
         RegElem(f, text)
 
-        -- внешний контроль
         return {
             SetState = function(_, v)
                 state = v
                 Tween(Track, {BackgroundColor3 = state and Theme.Accent or Theme.ToggleOff})
-                Tween(Thumb, {Position = UDim2.new(0, state and 14 or 2, 0.5, -5)})
+                Tween(Thumb, {Position = UDim2.new(0, state and 15 or 2, 0.5, -5.5)})
                 pcall(callback, state)
             end,
             GetState = function() return state end,
@@ -498,12 +663,13 @@ function Library:CreateTab(name, icon)
     end
 
     -- ══════════════════════════════════════════════════════════
-    -- 5. SLIDER
+    -- 5. SLIDER (БЕЗ фона)
     -- ══════════════════════════════════════════════════════════
     function Elem:CreateSlider(text, min, max, default, step, callback)
         step = step or 1
         local val = default or min
-        local f   = BaseFrame()
+        local f   = BaseFrame(nil, true)
+        Stroke(f, Theme.Border, 1)
 
         local lbl = Label(f, text, 10, Theme.TextPri)
         lbl.Size     = UDim2.new(1, -48, 0, 14)
@@ -516,7 +682,7 @@ function Library:CreateTab(name, icon)
         -- трек
         local Track = Instance.new("TextButton")
         Track.Size            = UDim2.new(1, -16, 0, 3)
-        Track.Position        = UDim2.new(0, 8, 1, -7)
+        Track.Position        = UDim2.new(0, 8, 1, -8)
         Track.BackgroundColor3 = Theme.TrackBg
         Track.Text            = ""
         Track.BorderSizePixel = 0
@@ -531,15 +697,22 @@ function Library:CreateTab(name, icon)
         Fill.Parent          = Track
         Corner(Fill, 2)
 
-        -- кружок-ручка
         local Knob = Instance.new("Frame")
-        Knob.Size            = UDim2.new(0, 9, 0, 9)
+        Knob.Size            = UDim2.new(0, 10, 0, 10)
         Knob.AnchorPoint     = Vector2.new(0.5, 0.5)
         Knob.Position        = UDim2.new((val-min)/(max-min), 0, 0.5, 0)
         Knob.BackgroundColor3 = Theme.TextPri
         Knob.BorderSizePixel = 0
         Knob.Parent          = Track
         Corner(Knob, 5)
+
+        f.MouseEnter:Connect(function() 
+            f.BackgroundTransparency = 0.92
+            f.BackgroundColor3 = Theme.ElementHov
+        end)
+        f.MouseLeave:Connect(function() 
+            f.BackgroundTransparency = 1
+        end)
 
         local sliding = false
         local function UpdateSlider(input)
@@ -583,22 +756,22 @@ function Library:CreateTab(name, icon)
     end
 
     -- ══════════════════════════════════════════════════════════
-    -- 6. TEXTBOX
+    -- 6. TEXTBOX (БЕЗ внешнего фона)
     -- ══════════════════════════════════════════════════════════
     function Elem:CreateTextBox(label, placeholder, callback)
-        local f = BaseFrame()
+        local f = BaseFrame(nil, true)
 
         local lbl = Label(f, label, 10, Theme.TextSec)
         lbl.Size     = UDim2.new(0, 70, 1, 0)
         lbl.Position = UDim2.new(0, 8, 0, 0)
 
         local inner = Instance.new("Frame")
-        inner.Size            = UDim2.new(1, -88, 0, 18)
-        inner.Position        = UDim2.new(0, 80, 0.5, -9)
+        inner.Size            = UDim2.new(1, -88, 0, 20)
+        inner.Position        = UDim2.new(0, 80, 0.5, -10)
         inner.BackgroundColor3 = Theme.TrackBg
         inner.BorderSizePixel = 0
         inner.Parent          = f
-        Corner(inner, 3)
+        Corner(inner, 4)
         Stroke(inner, Theme.Border, 1)
 
         local box = Instance.new("TextBox")
@@ -615,9 +788,14 @@ function Library:CreateTab(name, icon)
         box.ClearTextOnFocus = false
         box.Parent          = inner
 
-        box.Focused:Connect(function() Tween(inner, {BackgroundColor3 = Theme.ElementHov}) end)
+        box.Focused:Connect(function() 
+            Tween(inner, {BackgroundColor3 = Theme.ElementHov})
+            f.BackgroundTransparency = 0.92
+            f.BackgroundColor3 = Theme.ElementHov
+        end)
         box.FocusLost:Connect(function(enter)
             Tween(inner, {BackgroundColor3 = Theme.TrackBg})
+            f.BackgroundTransparency = 1
             pcall(callback, box.Text, enter)
         end)
 
@@ -629,11 +807,12 @@ function Library:CreateTab(name, icon)
     end
 
     -- ══════════════════════════════════════════════════════════
-    -- 7. DROPDOWN (с поиском внутри)
+    -- 7. DROPDOWN (БЕЗ фона, с улучшенной анимацией)
     -- ══════════════════════════════════════════════════════════
     function Elem:CreateDropdown(text, list, callback)
         local selected = nil
-        local f = BaseFrame()
+        local f = BaseFrame(nil, true)
+        Stroke(f, Theme.Border, 1)
 
         local lbl = Label(f, text, 11, Theme.TextPri)
         lbl.Size     = UDim2.new(1, -52, 1, 0)
@@ -653,6 +832,14 @@ function Library:CreateTab(name, icon)
         btn.Text   = ""
         btn.Parent = f
 
+        btn.MouseEnter:Connect(function() 
+            f.BackgroundTransparency = 0.92
+            f.BackgroundColor3 = Theme.ElementHov
+        end)
+        btn.MouseLeave:Connect(function() 
+            f.BackgroundTransparency = 1
+        end)
+
         btn.MouseButton1Click:Connect(function()
             local alreadyOpen = PopupLayer:FindFirstChild(text .. "_drop")
             CloseAllPopups()
@@ -660,26 +847,29 @@ function Library:CreateTab(name, icon)
 
             local absPos = f.AbsolutePosition
             local absSize = f.AbsoluteSize
-            local itemH   = 24
-            local maxVis  = 5
-            local menuH   = math.min(#list, maxVis) * itemH + 2
+            local itemH   = 26
+            local maxVis  = 6
+            local menuH   = math.min(#list, maxVis) * itemH + 4
 
             local Menu = Instance.new("Frame")
             Menu.Name            = text .. "_drop"
             Menu.Size            = UDim2.new(0, absSize.X, 0, menuH)
-            Menu.Position        = UDim2.new(0, absPos.X, 0, absPos.Y + absSize.Y + 2)
+            Menu.Position        = UDim2.new(0, absPos.X, 0, absPos.Y + absSize.Y + 4)
             Menu.BackgroundColor3 = Theme.PopupBg
             Menu.BorderSizePixel = 0
             Menu.ZIndex          = 60
+            Menu.BackgroundTransparency = 1
             Menu.Parent          = PopupLayer
-            Corner(Menu, 4)
+            Corner(Menu, 5)
             Stroke(Menu, Theme.Accent, 1)
+            
+            Tween(Menu, {BackgroundTransparency = 0}, 0.15)
 
             local Scroll = Instance.new("ScrollingFrame")
             Scroll.Size               = UDim2.new(1,0,1,0)
             Scroll.BackgroundTransparency = 1
             Scroll.CanvasSize         = UDim2.new(0,0,0,#list*itemH)
-            Scroll.ScrollBarThickness = 2
+            Scroll.ScrollBarThickness = 3
             Scroll.ScrollBarImageColor3 = Theme.Accent
             Scroll.ZIndex             = 61
             Scroll.Parent             = Menu
@@ -699,14 +889,19 @@ function Library:CreateTab(name, icon)
                 ob.ZIndex          = 62
                 ob.Parent          = Scroll
 
-                ob.MouseEnter:Connect(function() Tween(ob, {BackgroundColor3 = Theme.ElementHov, TextColor3 = Theme.TextPri}) end)
+                ob.MouseEnter:Connect(function() 
+                    Tween(ob, {BackgroundColor3 = Theme.ElementHov, TextColor3 = Theme.TextPri}, 0.12) 
+                end)
                 ob.MouseLeave:Connect(function()
-                    if opt ~= selected then Tween(ob, {BackgroundColor3 = Theme.PopupBg, TextColor3 = Theme.TextSec}) end
+                    if opt ~= selected then 
+                        Tween(ob, {BackgroundColor3 = Theme.PopupBg, TextColor3 = Theme.TextSec}, 0.12) 
+                    end
                 end)
                 ob.MouseButton1Click:Connect(function()
                     selected = opt
                     selLbl.Text = tostring(opt)
-                    CloseAllPopups()
+                    Tween(Menu, {BackgroundTransparency = 1}, 0.1)
+                    task.delay(0.12, function() CloseAllPopups() end)
                     pcall(callback, opt)
                 end)
             end
@@ -720,11 +915,12 @@ function Library:CreateTab(name, icon)
     end
 
     -- ══════════════════════════════════════════════════════════
-    -- 8. MULTI-SELECT (выбор нескольких опций)
+    -- 8. MULTI-SELECT (БЕЗ фона)
     -- ══════════════════════════════════════════════════════════
     function Elem:CreateMultiSelect(text, list, callback)
         local selected = {}
-        local f = BaseFrame()
+        local f = BaseFrame(nil, true)
+        Stroke(f, Theme.Border, 1)
 
         local lbl = Label(f, text, 11, Theme.TextPri)
         lbl.Size     = UDim2.new(0.55, -8, 1, 0)
@@ -750,6 +946,14 @@ function Library:CreateTab(name, icon)
         btn.Text   = ""
         btn.Parent = f
 
+        btn.MouseEnter:Connect(function() 
+            f.BackgroundTransparency = 0.92
+            f.BackgroundColor3 = Theme.ElementHov
+        end)
+        btn.MouseLeave:Connect(function() 
+            f.BackgroundTransparency = 1
+        end)
+
         btn.MouseButton1Click:Connect(function()
             local alreadyOpen = PopupLayer:FindFirstChild(text .. "_multi")
             CloseAllPopups()
@@ -757,25 +961,28 @@ function Library:CreateTab(name, icon)
 
             local absPos  = f.AbsolutePosition
             local absSize = f.AbsoluteSize
-            local itemH   = 24
-            local menuH   = math.min(#list, 5) * itemH + 2
+            local itemH   = 26
+            local menuH   = math.min(#list, 6) * itemH + 4
 
             local Menu = Instance.new("Frame")
             Menu.Name            = text .. "_multi"
             Menu.Size            = UDim2.new(0, absSize.X, 0, menuH)
-            Menu.Position        = UDim2.new(0, absPos.X, 0, absPos.Y + absSize.Y + 2)
+            Menu.Position        = UDim2.new(0, absPos.X, 0, absPos.Y + absSize.Y + 4)
             Menu.BackgroundColor3 = Theme.PopupBg
             Menu.BorderSizePixel = 0
             Menu.ZIndex          = 60
+            Menu.BackgroundTransparency = 1
             Menu.Parent          = PopupLayer
-            Corner(Menu, 4)
+            Corner(Menu, 5)
             Stroke(Menu, Theme.Accent, 1)
+            
+            Tween(Menu, {BackgroundTransparency = 0}, 0.15)
 
             local Scroll = Instance.new("ScrollingFrame")
             Scroll.Size               = UDim2.new(1,0,1,0)
             Scroll.BackgroundTransparency = 1
             Scroll.CanvasSize         = UDim2.new(0,0,0,#list*itemH)
-            Scroll.ScrollBarThickness = 2
+            Scroll.ScrollBarThickness = 3
             Scroll.ScrollBarImageColor3 = Theme.Accent
             Scroll.ZIndex             = 61
             Scroll.Parent             = Menu
@@ -792,10 +999,9 @@ function Library:CreateTab(name, icon)
                 ob.ZIndex          = 62
                 ob.Parent          = Scroll
 
-                -- чекбокс 10×10
                 local chk = Instance.new("Frame")
-                chk.Size            = UDim2.new(0, 10, 0, 10)
-                chk.Position        = UDim2.new(0, 8, 0.5, -5)
+                chk.Size            = UDim2.new(0, 11, 0, 11)
+                chk.Position        = UDim2.new(0, 8, 0.5, -5.5)
                 chk.BackgroundColor3 = selected[opt] and Theme.Accent or Theme.TrackBg
                 chk.BorderSizePixel = 0
                 chk.ZIndex          = 63
@@ -804,16 +1010,20 @@ function Library:CreateTab(name, icon)
                 Stroke(chk, Theme.Border, 1)
 
                 local optLbl = Label(ob, tostring(opt), 11, selected[opt] and Theme.TextPri or Theme.TextSec)
-                optLbl.Size     = UDim2.new(1,-26,1,0)
-                optLbl.Position = UDim2.new(0, 24, 0, 0)
+                optLbl.Size     = UDim2.new(1,-28,1,0)
+                optLbl.Position = UDim2.new(0, 26, 0, 0)
                 optLbl.ZIndex   = 63
 
-                ob.MouseEnter:Connect(function() Tween(ob, {BackgroundColor3 = Theme.ElementHov}) end)
-                ob.MouseLeave:Connect(function() Tween(ob, {BackgroundColor3 = Theme.PopupBg}) end)
+                ob.MouseEnter:Connect(function() 
+                    Tween(ob, {BackgroundColor3 = Theme.ElementHov}, 0.12) 
+                end)
+                ob.MouseLeave:Connect(function() 
+                    Tween(ob, {BackgroundColor3 = Theme.PopupBg}, 0.12) 
+                end)
                 ob.MouseButton1Click:Connect(function()
                     selected[opt] = not selected[opt]
-                    Tween(chk, {BackgroundColor3 = selected[opt] and Theme.Accent or Theme.TrackBg})
-                    Tween(optLbl, {TextColor3 = selected[opt] and Theme.TextPri or Theme.TextSec})
+                    Tween(chk, {BackgroundColor3 = selected[opt] and Theme.Accent or Theme.TrackBg}, 0.18)
+                    Tween(optLbl, {TextColor3 = selected[opt] and Theme.TextPri or Theme.TextSec}, 0.18)
                     RefreshLabel()
                     local out = {}
                     for k, v in pairs(selected) do if v then table.insert(out, k) end end
@@ -833,24 +1043,25 @@ function Library:CreateTab(name, icon)
     end
 
     -- ══════════════════════════════════════════════════════════
-    -- 9. COLOR PICKER (HSV + hex preview)
+    -- 9. COLOR PICKER (БЕЗ внешнего фона)
     -- ══════════════════════════════════════════════════════════
     function Elem:CreateColorPicker(text, default, callback)
         default = default or Color3.fromRGB(255,255,255)
         local hue, sat, val_ = Color3.toHSV(default)
-        local f = BaseFrame()
+        local f = BaseFrame(nil, true)
+        Stroke(f, Theme.Border, 1)
 
         local lbl = Label(f, text, 11, Theme.TextPri)
-        lbl.Size     = UDim2.new(1, -38, 1, 0)
+        lbl.Size     = UDim2.new(1, -40, 1, 0)
         lbl.Position = UDim2.new(0, 8, 0, 0)
 
         local preview = Instance.new("Frame")
-        preview.Size            = UDim2.new(0, 14, 0, 14)
-        preview.Position        = UDim2.new(1, -22, 0.5, -7)
+        preview.Size            = UDim2.new(0, 16, 0, 16)
+        preview.Position        = UDim2.new(1, -24, 0.5, -8)
         preview.BackgroundColor3 = default
         preview.BorderSizePixel = 0
         preview.Parent          = f
-        Corner(preview, 3)
+        Corner(preview, 4)
         Stroke(preview, Theme.TextSec, 1)
 
         local btn = Instance.new("TextButton")
@@ -858,6 +1069,14 @@ function Library:CreateTab(name, icon)
         btn.BackgroundTransparency = 1
         btn.Text   = ""
         btn.Parent = f
+
+        btn.MouseEnter:Connect(function() 
+            f.BackgroundTransparency = 0.92
+            f.BackgroundColor3 = Theme.ElementHov
+        end)
+        btn.MouseLeave:Connect(function() 
+            f.BackgroundTransparency = 1
+        end)
 
         local function GetColor() return Color3.fromHSV(hue, sat, val_) end
 
@@ -871,28 +1090,31 @@ function Library:CreateTab(name, icon)
 
             local Menu = Instance.new("Frame")
             Menu.Name            = text .. "_cp"
-            Menu.Size            = UDim2.new(0, absSize.X, 0, 140)
-            Menu.Position        = UDim2.new(0, absPos.X, 0, absPos.Y + absSize.Y + 2)
+            Menu.Size            = UDim2.new(0, absSize.X, 0, 150)
+            Menu.Position        = UDim2.new(0, absPos.X, 0, absPos.Y + absSize.Y + 4)
             Menu.BackgroundColor3 = Theme.PopupBg
             Menu.BorderSizePixel = 0
             Menu.ZIndex          = 60
+            Menu.BackgroundTransparency = 1
             Menu.Parent          = PopupLayer
-            Corner(Menu, 4)
+            Corner(Menu, 5)
             Stroke(Menu, Theme.Accent, 1)
+            
+            Tween(Menu, {BackgroundTransparency = 0}, 0.15)
 
-            -- SV picker квадрат
+            -- SV picker
             local SV = Instance.new("ImageLabel")
-            SV.Size            = UDim2.new(0, 100, 0, 100)
-            SV.Position        = UDim2.new(0, 8, 0, 8)
-            SV.Image           = "rbxassetid://4155801252"   -- S/V gradient
+            SV.Size            = UDim2.new(0, 110, 0, 110)
+            SV.Position        = UDim2.new(0, 10, 0, 10)
+            SV.Image           = "rbxassetid://4155801252"
             SV.BackgroundColor3 = Color3.fromHSV(hue, 1, 1)
             SV.BorderSizePixel = 0
             SV.ZIndex          = 61
             SV.Parent          = Menu
-            Corner(SV, 3)
+            Corner(SV, 4)
 
             local SVcursor = Instance.new("Frame")
-            SVcursor.Size            = UDim2.new(0, 7, 0, 7)
+            SVcursor.Size            = UDim2.new(0, 8, 0, 8)
             SVcursor.AnchorPoint     = Vector2.new(0.5, 0.5)
             SVcursor.Position        = UDim2.new(sat, 0, 1-val_, 0)
             SVcursor.BackgroundColor3 = Color3.fromRGB(255,255,255)
@@ -902,15 +1124,15 @@ function Library:CreateTab(name, icon)
             Corner(SVcursor, 4)
             Stroke(SVcursor, Color3.fromRGB(0,0,0), 1)
 
-            -- Hue slider (вертикальный)
+            -- Hue slider
             local HueTrack = Instance.new("ImageLabel")
-            HueTrack.Size            = UDim2.new(0, 12, 0, 100)
-            HueTrack.Position        = UDim2.new(0, 116, 0, 8)
-            HueTrack.Image           = "rbxassetid://4155805389"   -- hue gradient
+            HueTrack.Size            = UDim2.new(0, 14, 0, 110)
+            HueTrack.Position        = UDim2.new(0, 128, 0, 10)
+            HueTrack.Image           = "rbxassetid://4155805389"
             HueTrack.BorderSizePixel = 0
             HueTrack.ZIndex          = 61
             HueTrack.Parent          = Menu
-            Corner(HueTrack, 3)
+            Corner(HueTrack, 4)
 
             local HueCursor = Instance.new("Frame")
             HueCursor.Size            = UDim2.new(1, 2, 0, 3)
@@ -922,41 +1144,41 @@ function Library:CreateTab(name, icon)
             HueCursor.Parent          = HueTrack
             Stroke(HueCursor, Color3.fromRGB(0,0,0), 1)
 
-            -- Alpha slider (вертикальный)
+            -- Alpha slider
             local AlphaTrack = Instance.new("Frame")
-            AlphaTrack.Size            = UDim2.new(0, 12, 0, 100)
-            AlphaTrack.Position        = UDim2.new(0, 136, 0, 8)
+            AlphaTrack.Size            = UDim2.new(0, 14, 0, 110)
+            AlphaTrack.Position        = UDim2.new(0, 150, 0, 10)
             AlphaTrack.BackgroundColor3 = Color3.fromRGB(255,255,255)
             AlphaTrack.BorderSizePixel = 0
             AlphaTrack.ZIndex          = 61
             AlphaTrack.Parent          = Menu
-            Corner(AlphaTrack, 3)
+            Corner(AlphaTrack, 4)
             Stroke(AlphaTrack, Theme.Border, 1)
 
-            -- hex preview снизу
+            -- Hex preview
             local HexBg = Instance.new("Frame")
-            HexBg.Size            = UDim2.new(0, 100, 0, 18)
-            HexBg.Position        = UDim2.new(0, 8, 0, 114)
+            HexBg.Size            = UDim2.new(0, 110, 0, 20)
+            HexBg.Position        = UDim2.new(0, 10, 0, 124)
             HexBg.BackgroundColor3 = Theme.TrackBg
             HexBg.BorderSizePixel = 0
             HexBg.ZIndex          = 61
             HexBg.Parent          = Menu
-            Corner(HexBg, 3)
+            Corner(HexBg, 4)
 
             local HexLabel = Label(HexBg, "#" .. string.format("%02X%02X%02X",
                 math.floor(default.R*255), math.floor(default.G*255), math.floor(default.B*255)),
-                9, Theme.TextSec, Enum.Font.RobotoMono, Enum.TextXAlignment.Center)
+                10, Theme.TextSec, Enum.Font.RobotoMono, Enum.TextXAlignment.Center)
             HexLabel.Size   = UDim2.new(1,0,1,0)
             HexLabel.ZIndex = 62
 
             local colPreview = Instance.new("Frame")
-            colPreview.Size            = UDim2.new(0, 18, 0, 18)
-            colPreview.Position        = UDim2.new(0, 114, 0, 114)
+            colPreview.Size            = UDim2.new(0, 20, 0, 20)
+            colPreview.Position        = UDim2.new(0, 128, 0, 124)
             colPreview.BackgroundColor3 = GetColor()
             colPreview.BorderSizePixel = 0
             colPreview.ZIndex          = 61
             colPreview.Parent          = Menu
-            Corner(colPreview, 3)
+            Corner(colPreview, 4)
 
             local function UpdateAll()
                 local c = GetColor()
@@ -970,7 +1192,7 @@ function Library:CreateTab(name, icon)
                 pcall(callback, c)
             end
 
-            -- взаимодействие с SV
+            -- SV interaction
             local svDrag = false
             SV.InputBegan:Connect(function(i)
                 if i.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -993,7 +1215,7 @@ function Library:CreateTab(name, icon)
                 end
             end)
 
-            -- взаимодействие с Hue
+            -- Hue interaction
             local hueDrag = false
             HueTrack.InputBegan:Connect(function(i)
                 if i.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -1025,20 +1247,21 @@ function Library:CreateTab(name, icon)
     end
 
     -- ══════════════════════════════════════════════════════════
-    -- 10. KEYBIND
+    -- 10. KEYBIND (БЕЗ фона, FIXED для RightShift)
     -- ══════════════════════════════════════════════════════════
     function Elem:CreateKeybind(text, defaultKey, callback)
         local currentKey = defaultKey or Enum.KeyCode.Unknown
         local listening  = false
-        local f = BaseFrame()
+        local f = BaseFrame(nil, true)
+        Stroke(f, Theme.Border, 1)
 
         local lbl = Label(f, text, 11, Theme.TextPri)
-        lbl.Size     = UDim2.new(1, -80, 1, 0)
+        lbl.Size     = UDim2.new(1, -82, 1, 0)
         lbl.Position = UDim2.new(0, 8, 0, 0)
 
         local keyBtn = Instance.new("TextButton")
-        keyBtn.Size            = UDim2.new(0, 66, 0, 18)
-        keyBtn.Position        = UDim2.new(1, -72, 0.5, -9)
+        keyBtn.Size            = UDim2.new(0, 70, 0, 20)
+        keyBtn.Position        = UDim2.new(1, -76, 0.5, -10)
         keyBtn.BackgroundColor3 = Theme.TrackBg
         keyBtn.Font            = Enum.Font.GothamBold
         keyBtn.Text            = currentKey.Name
@@ -1046,8 +1269,16 @@ function Library:CreateTab(name, icon)
         keyBtn.TextSize        = 10
         keyBtn.AutoButtonColor = false
         keyBtn.Parent          = f
-        Corner(keyBtn, 3)
+        Corner(keyBtn, 4)
         Stroke(keyBtn, Theme.Border, 1)
+
+        f.MouseEnter:Connect(function() 
+            f.BackgroundTransparency = 0.92
+            f.BackgroundColor3 = Theme.ElementHov
+        end)
+        f.MouseLeave:Connect(function() 
+            f.BackgroundTransparency = 1
+        end)
 
         keyBtn.MouseButton1Click:Connect(function()
             CloseAllPopups()
@@ -1061,6 +1292,20 @@ function Library:CreateTab(name, icon)
             conn = UserInputService.InputBegan:Connect(function(i, gp)
                 if gp then return end
                 if i.UserInputType == Enum.UserInputType.Keyboard then
+                    -- Не позволяем бинд на RightShift (он зарезервирован)
+                    if i.KeyCode == Enum.KeyCode.RightShift then
+                        keyBtn.Text = "Reserved"
+                        task.delay(0.8, function()
+                            if not listening then return end
+                            keyBtn.Text = currentKey.Name
+                            keyBtn.TextColor3 = Theme.Accent
+                            Tween(keyBtn, {BackgroundColor3 = Theme.TrackBg})
+                            listening = false
+                            conn:Disconnect()
+                        end)
+                        return
+                    end
+                    
                     currentKey        = i.KeyCode
                     keyBtn.Text       = i.KeyCode.Name
                     keyBtn.TextColor3 = Theme.Accent
@@ -1072,16 +1317,19 @@ function Library:CreateTab(name, icon)
             end)
         end)
 
-        -- глобальное срабатывание при нажатии биндовой клавиши
+        -- Глобальное срабатывание (изолированное от RightShift)
         UserInputService.InputBegan:Connect(function(i, gp)
             if gp or listening then return end
-            if i.KeyCode == currentKey then pcall(callback, currentKey) end
+            if i.KeyCode == currentKey and currentKey ~= Enum.KeyCode.RightShift then 
+                pcall(callback, currentKey) 
+            end
         end)
 
         RegElem(f, text)
         return {
             GetKey = function() return currentKey end,
             SetKey = function(_, k)
+                if k == Enum.KeyCode.RightShift then return end  -- блокируем RightShift
                 currentKey    = k
                 keyBtn.Text   = k.Name
                 pcall(callback, k)
@@ -1090,48 +1338,51 @@ function Library:CreateTab(name, icon)
     end
 
     -- ══════════════════════════════════════════════════════════
-    -- 11. NOTIFICATION (тост сверху)
+    -- 11. NOTIFICATION (улучшенная анимация)
     -- ══════════════════════════════════════════════════════════
     function Library:Notify(title, body, duration)
         duration = duration or 3
         local notif = Instance.new("Frame")
-        notif.Size            = UDim2.new(0, 220, 0, 46)
-        notif.Position        = UDim2.new(1, -228, 0, BAR_H + 4)
+        notif.Size            = UDim2.new(0, 240, 0, 52)
+        notif.Position        = UDim2.new(1, -248, 0, 50)
         notif.BackgroundColor3 = Theme.MainBg
         notif.BorderSizePixel = 0
+        notif.BackgroundTransparency = 1
         notif.ZIndex          = 80
         notif.Parent          = ScreenGui
-        Corner(notif, 5)
+        Corner(notif, 6)
         Stroke(notif, Theme.Accent, 1)
 
-        -- акцент полоска слева
+        -- Левая акцентная полоска
         local LeftLine = Instance.new("Frame")
-        LeftLine.Size            = UDim2.new(0, 2, 1, -8)
-        LeftLine.Position        = UDim2.new(0, 4, 0, 4)
+        LeftLine.Size            = UDim2.new(0, 3, 1, -10)
+        LeftLine.Position        = UDim2.new(0, 5, 0, 5)
         LeftLine.BackgroundColor3 = Theme.Accent
         LeftLine.BorderSizePixel = 0
         LeftLine.ZIndex          = 81
         LeftLine.Parent          = notif
         Corner(LeftLine, 2)
 
-        local t1 = Label(notif, title, 11, Theme.TextPri, Enum.Font.GothamBold)
-        t1.Size     = UDim2.new(1,-14,0,14)
-        t1.Position = UDim2.new(0,12,0,6)
+        local t1 = Label(notif, title, 12, Theme.TextPri, Enum.Font.GothamBold)
+        t1.Size     = UDim2.new(1,-18,0,16)
+        t1.Position = UDim2.new(0,14,0,8)
         t1.ZIndex   = 81
 
         local t2 = Label(notif, body, 10, Theme.TextSec)
-        t2.Size     = UDim2.new(1,-14,0,22)
-        t2.Position = UDim2.new(0,12,0,22)
+        t2.Size     = UDim2.new(1,-18,0,24)
+        t2.Position = UDim2.new(0,14,0,26)
         t2.TextWrapped = true
         t2.ZIndex   = 81
 
-        -- slide in
-        notif.Position = UDim2.new(1, 10, 0, BAR_H + 4)
-        Tween(notif, {Position = UDim2.new(1, -228, 0, BAR_H + 4)}, 0.25, Enum.EasingStyle.Back)
+        -- Slide in animation
+        notif.Position = UDim2.new(1, 20, 0, 50)
+        Tween(notif, {BackgroundTransparency = 0}, 0.2)
+        Tween(notif, {Position = UDim2.new(1, -248, 0, 50)}, 0.3, Enum.EasingStyle.Back)
 
         task.delay(duration, function()
-            Tween(notif, {Position = UDim2.new(1, 10, 0, BAR_H + 4)}, 0.2)
-            task.delay(0.22, function() notif:Destroy() end)
+            Tween(notif, {Position = UDim2.new(1, 20, 0, 50)}, 0.25, Enum.EasingStyle.Quart)
+            Tween(notif, {BackgroundTransparency = 1}, 0.25)
+            task.delay(0.28, function() notif:Destroy() end)
         end)
     end
 
@@ -1148,25 +1399,61 @@ return Library
 
 --[[
 ════════════════════════════════════════════════
-  ПРИМЕР ИСПОЛЬЗОВАНИЯ:
+  ✦ METEOR UI LIBRARY v3.0 — METEOR CLIENT STYLE
+  
+  ОСОБЕННОСТИ:
+  • Loading Screen с анимацией
+  • Вкладки слева (вертикально)
+  • Прозрачные элементы без фона
+  • Фон только у Search Bar
+  • Минималистичный дизайн
+  • Исправлен баг RightShift
+  • Улучшенные анимации
 ════════════════════════════════════════════════
+
+ПРИМЕР ИСПОЛЬЗОВАНИЯ:
 
 local Lib = loadstring(game:HttpGet("..."))()
 
+-- Combat Tab
 local Combat = Lib:CreateTab("Combat", "⚔")
-Combat:CreateButton("Kill Aura", function() print("on") end)
-Combat:CreateToggle("Auto Block", false, function(v) print(v) end)
-Combat:CreateSlider("Reach", 3, 20, 6, 0.5, function(v) print(v) end)
-Combat:CreateDropdown("Target", {"Nearest","Random","Highest HP"}, function(v) print(v) end)
-Combat:CreateMultiSelect("Weapons", {"Sword","Bow","Axe"}, function(t) print(t) end)
-Combat:CreateKeybind("Toggle Aura", Enum.KeyCode.V, function() print("toggled") end)
+Combat:CreateButton("Kill Aura", function() 
+    print("Kill Aura activated") 
+end)
+Combat:CreateToggle("Auto Block", false, function(v) 
+    print("Auto Block:", v) 
+end)
+Combat:CreateSlider("Reach", 3, 20, 6, 0.5, function(v) 
+    print("Reach:", v) 
+end)
+Combat:CreateDropdown("Target Mode", {"Nearest","Random","Highest HP"}, function(v) 
+    print("Target:", v) 
+end)
+Combat:CreateKeybind("Toggle Aura", Enum.KeyCode.V, function(key) 
+    print("Aura toggled with", key.Name) 
+end)
 
+-- Visual Tab
 local Visual = Lib:CreateTab("Visual", "👁")
-Visual:CreateSeparator("ESP")
-Visual:CreateToggle("Player ESP", true, function(v) end)
-Visual:CreateColorPicker("ESP Color", Color3.fromRGB(218,43,172), function(c) end)
-Visual:CreateTextBox("Watermark", "Enter text..", function(t) end)
+Visual:CreateSeparator("ESP Settings")
+Visual:CreateToggle("Player ESP", true, function(v) 
+    print("Player ESP:", v) 
+end)
+Visual:CreateColorPicker("ESP Color", Color3.fromRGB(220,45,175), function(c) 
+    print("ESP Color:", c) 
+end)
+Visual:CreateMultiSelect("ESP Elements", {"Box","Name","Health","Distance"}, function(t) 
+    print("Selected:", table.concat(t, ", ")) 
+end)
 
-Lib:Notify("Meteor Loaded", "Enjoy your session!", 4)
+-- Settings Tab
+local Settings = Lib:CreateTab("Settings", "⚙")
+Settings:CreateTextBox("Username", "Enter name...", function(text, enter) 
+    if enter then print("Saved username:", text) end
+end)
+Settings:CreateLabel("Press RightShift to toggle GUI")
+
+-- Notification
+Lib:Notify("Meteor Loaded", "Welcome! Press RightShift to toggle.", 5)
 
 ]]
