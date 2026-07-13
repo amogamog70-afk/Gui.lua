@@ -1,11 +1,14 @@
--- [[ METEOR PREMIUM SLIM TOP-BAR UI ENGINE ]]
+-- [[ METEOR ADVANCED ULTRA-SLIM UI ENGINE ]]
 local Theme = {
-    MainBg = Color3.fromRGB(13, 13, 18),         -- Глубокий тёмный (70%)
-    ElementBg = Color3.fromRGB(22, 22, 30),      -- Фон кнопок и полей
-    PopupBg = Color3.fromRGB(18, 18, 25),        -- Фон для всплывающих менюшек
-    Accent = Color3.fromRGB(218, 43, 172),       -- Твой неоново-розовый (30%)
+    MainBg = Color3.fromRGB(11, 11, 15),         -- Ультра-тёмный фон плашки
+    ElementBg = Color3.fromRGB(18, 18, 24),      -- Базовый фон кнопок
+    ElementHover = Color3.fromRGB(26, 26, 36),   -- Цвет при наведении
+    PopupBg = Color3.fromRGB(14, 14, 20),        -- Фон выпадающих менюшек
+    Accent = Color3.fromRGB(218, 43, 172),       -- Твой неоново-розовый
+    AccentHover = Color3.fromRGB(240, 60, 195),  -- Яркий розовый для анимаций
     TextPrimary = Color3.fromRGB(255, 255, 255),
-    TextSecondary = Color3.fromRGB(140, 140, 150)
+    TextSecondary = Color3.fromRGB(130, 130, 140),
+    Border = Color3.fromRGB(30, 30, 42)          -- Стильная тёмная обводка
 }
 
 local UserInputService = game:GetService("UserInputService")
@@ -15,12 +18,12 @@ local LocalPlayer = Players.LocalPlayer
 
 -- Инициализация GUI
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "MeteorTopBarGui"
+ScreenGui.Name = "MeteorPremiumGui"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.DisplayOrder = 999
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
--- Контейнер для активных поп-апов (чтобы легко чистить/скрывать)
+-- Папка для оверлеев (Dropdown / ColorPicker)
 local PopupsFolder = Instance.new("Folder")
 PopupsFolder.Name = "ActivePopups"
 PopupsFolder.Parent = ScreenGui
@@ -29,21 +32,36 @@ local function CloseAllPopups()
     PopupsFolder:ClearAllChildren()
 end
 
--- 1. ГЛАВНЫЙ ТОП-БАР (Средний размер, вплотную к верхнему краю экрана)
+-- Функция для быстрых и плавных анимаций
+local function TweenFrame(obj, properties, duration)
+    TweenService:Create(obj, TweenInfo.new(duration or 0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), properties):Play()
+end
+
+-- Функция создания премиум-обводки
+local function AddPremiumBorder(parent, color, thickness)
+    local Stroke = Instance.new("UIStroke")
+    Stroke.Color = color or Theme.Border
+    Stroke.Thickness = thickness or 1
+    Stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    Stroke.Parent = parent
+    return Stroke
+end
+
+-- 1. ГЛАВНЫЙ ТОП-БАР (Прижат вплотную к верхнему краю, Y = 0)
 local TopBar = Instance.new("Frame")
 TopBar.Name = "TopBar"
-TopBar.Size = UDim2.new(0, 520, 0, 38)        -- Идеальный средний размер
-TopBar.Position = UDim2.new(0.5, -260, 0, 0)  -- Вплотную к верхнему краю (Y = 0)
+TopBar.Size = UDim2.new(0, 520, 0, 36)        -- Тонкий, аккуратный размер
+TopBar.Position = UDim2.new(0.5, -260, 0, 0)  -- Идеально по центру в самом верху
 TopBar.BackgroundColor3 = Theme.MainBg
 TopBar.BorderSizePixel = 0
 TopBar.Parent = ScreenGui
 
--- Нижнее скругление для аккуратного вида плашки
 local BarCorner = Instance.new("UICorner")
-BarCorner.CornerRadius = UDim.new(0, 5)
+BarCorner.CornerRadius = UDim.new(0, 4)
 BarCorner.Parent = TopBar
+AddPremiumBorder(TopBar, Theme.Border, 1)
 
--- Розовая линия-акцент на нижней границе
+-- Розовая неоновая линия на нижней границе
 local BottomLine = Instance.new("Frame")
 BottomLine.Size = UDim2.new(1, 0, 0, 2)
 BottomLine.Position = UDim2.new(0, 0, 1, -2)
@@ -51,7 +69,7 @@ BottomLine.BackgroundColor3 = Theme.Accent
 BottomLine.BorderSizePixel = 0
 BottomLine.Parent = TopBar
 
--- Контейнер для вкладок (горизонтальный)
+-- Контейнер для вкладок
 local TabContainer = Instance.new("Frame")
 TabContainer.Size = UDim2.new(0, 340, 1, -2)
 TabContainer.Position = UDim2.new(0, 12, 0, 0)
@@ -61,24 +79,23 @@ TabContainer.Parent = TopBar
 local TabLayout = Instance.new("UIListLayout")
 TabLayout.FillDirection = Enum.FillDirection.Horizontal
 TabLayout.SortOrder = Enum.SortOrder.LayoutOrder
-TabLayout.Padding = UDim.new(0, 12)
+TabLayout.Padding = UDim.new(0, 14)
 TabLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 TabLayout.Parent = TabContainer
 
--- Поисковая строка (справа в баре)
+-- Контейнер Поиска
 local SearchContainer = Instance.new("Frame")
-SearchContainer.Size = UDim2.new(0, 140, 0, 24)
-SearchContainer.Position = UDim2.new(1, -152, 0.5, -12)
+SearchContainer.Size = UDim2.new(0, 135, 0, 22)
+SearchContainer.Position = UDim2.new(1, -147, 0.5, -11)
 SearchContainer.BackgroundColor3 = Theme.ElementBg
 SearchContainer.BorderSizePixel = 0
 SearchContainer.Parent = TopBar
 
-local SearchCorner = Instance.new("UICorner")
-SearchCorner.CornerRadius = UDim.new(0, 4)
-SearchCorner.Parent = SearchContainer
+Instance.new("UICorner", SearchContainer).CornerRadius = UDim.new(0, 4)
+AddPremiumBorder(SearchContainer, Theme.Border, 1)
 
 local SearchInput = Instance.new("TextBox")
-SearchInput.Size = UDim2.new(1, -22, 1, 0)
+SearchInput.Size = UDim2.new(1, -24, 1, 0)
 SearchInput.Position = UDim2.new(0, 6, 0, 0)
 SearchInput.BackgroundTransparency = 1
 SearchInput.Font = Enum.Font.Gotham
@@ -86,31 +103,30 @@ SearchInput.Text = ""
 SearchInput.PlaceholderText = "Search.."
 SearchInput.PlaceholderColor3 = Theme.TextSecondary
 SearchInput.TextColor3 = Theme.TextPrimary
-SearchInput.TextSize = 12
+SearchInput.TextSize = 11
 SearchInput.TextXAlignment = Enum.TextXAlignment.Left
 SearchInput.Parent = SearchContainer
 
--- Твоя кастомная лупа 🔍︎
-local SearchIcon = Instance.new("TextLabel")
-SearchIcon.Size = UDim2.new(0, 18, 1, 0)
-SearchIcon.Position = UDim2.new(1, -20, 0, 0)
+-- НАСТРОЙКА ТВОЕЙ КАСТОМНОЙ ЛУПЫ ИЗ ASSET ID
+local SearchIcon = Instance.new("ImageLabel")
+SearchIcon.Name = "SearchIcon"
+SearchIcon.Size = UDim2.new(0, 14, 0, 14)
+SearchIcon.Position = UDim2.new(1, -20, 0.5, -7)
 SearchIcon.BackgroundTransparency = 1
-SearchIcon.Text = "🔍︎"
-SearchIcon.TextSize = 11
-SearchIcon.TextColor3 = Theme.Accent
+SearchIcon.Image = "rbxassetid://118685771787843" -- Твоя новая лупа без пробела
+SearchIcon.ImageColor3 = Theme.Accent
 SearchIcon.Parent = SearchContainer
 
--- 2. СРЕДНИЙ КОНТЕЙНЕР ДЛЯ ЭЛЕМЕНТОВ (Висит строго под топ-баром)
+-- 2. СРЕДНИЙ КОНТЕЙНЕР (Стык-в-стык под топ-баром, без зазоров)
 local ContainerFrame = Instance.new("Frame")
-ContainerFrame.Size = UDim2.new(0, 520, 0, 180) -- Укоротили до компактного среднего размера
-ContainerFrame.Position = UDim2.new(0.5, -260, 0, 42)
+ContainerFrame.Size = UDim2.new(0, 520, 0, 165) -- Компактный средний размер
+ContainerFrame.Position = UDim2.new(0.5, -260, 0, 36) -- Сразу под топ-баром
 ContainerFrame.BackgroundTransparency = 1
 ContainerFrame.Parent = ScreenGui
 
 local Pages = {}
 local AllElements = {}
 local FirstPage = nil
-
 local Library = {}
 
 function Library:CreateTab(name)
@@ -125,7 +141,7 @@ function Library:CreateTab(name)
     Page.Parent = ContainerFrame
 
     local PageGrid = Instance.new("UIGridLayout")
-    PageGrid.CellSize = UDim2.new(0, 164, 0, 34) -- Элементы в 3 ряда, очень аккуратно
+    PageGrid.CellSize = UDim2.new(0, 166, 0, 32) -- Сетка на 3 ровных ряда
     PageGrid.CellPadding = UDim2.new(0, 10, 0, 10)
     PageGrid.Parent = Page
 
@@ -133,25 +149,33 @@ function Library:CreateTab(name)
         Page.CanvasSize = UDim2.new(0, 0, 0, PageGrid.AbsoluteContentSize.Y)
     end)
 
-    -- Кнопка переключения вкладки
+    -- Кнопка вкладки
     local TabButton = Instance.new("TextButton")
     TabButton.Name = name .. "Tab"
-    TabButton.Size = UDim2.new(0, 65, 0, 24)
+    TabButton.Size = UDim2.new(0, 60, 0, 24)
     TabButton.BackgroundTransparency = 1
     TabButton.Font = Enum.Font.GothamSemibold
     TabButton.Text = name
     TabButton.TextColor3 = Theme.TextSecondary
-    TabButton.TextSize = 13
+    TabButton.TextSize = 12
     TabButton.Parent = TabContainer
+
+    -- Анимация наведения на вкладку
+    TabButton.MouseEnter:Connect(function()
+        if not Page.Visible then TweenFrame(TabButton, {TextColor3 = Theme.TextPrimary}) end
+    end)
+    TabButton.MouseLeave:Connect(function()
+        if not Page.Visible then TweenFrame(TabButton, {TextColor3 = Theme.TextSecondary}) end
+    end)
 
     local function Activate()
         CloseAllPopups()
         for _, p in pairs(Pages) do p.Visible = false end
         for _, btn in pairs(TabContainer:GetChildren()) do
-            if btn:IsA("TextButton") then btn.TextColor3 = Theme.TextSecondary end
+            if btn:IsA("TextButton") then TweenFrame(btn, {TextColor3 = Theme.TextSecondary}) end
         end
         Page.Visible = true
-        TabButton.TextColor3 = Theme.Accent
+        TweenFrame(TabButton, {TextColor3 = Theme.Accent})
     end
 
     TabButton.MouseButton1Click:Connect(Activate)
@@ -159,6 +183,12 @@ function Library:CreateTab(name)
     Pages[name] = Page
 
     local Elements = {}
+
+    -- Вспомогательная функция для эффектов кнопок
+    local function ApplyButtonEffects(button)
+        button.MouseEnter:Connect(function() TweenFrame(button, {BackgroundColor3 = Theme.ElementHover}) end)
+        button.MouseLeave:Connect(function() TweenFrame(button, {BackgroundColor3 = Theme.ElementBg}) end)
+    end
 
     -- [[ 1. КНОПКА ]]
     function Elements:CreateButton(text, callback)
@@ -168,11 +198,20 @@ function Library:CreateTab(name)
         Button.Font = Enum.Font.GothamSemibold
         Button.Text = text
         Button.TextColor3 = Theme.TextPrimary
-        Button.TextSize = 12
+        Button.TextSize = 11
         Button.Parent = Page
+        
         Instance.new("UICorner", Button).CornerRadius = UDim.new(0, 4)
+        AddPremiumBorder(Button, Theme.Border, 1)
+        ApplyButtonEffects(Button)
 
-        Button.MouseButton1Click:Connect(function() CloseAllPopups() pcall(callback) end)
+        Button.MouseButton1Click:Connect(function() 
+            CloseAllPopups() 
+            TweenFrame(Button, {BackgroundColor3 = Theme.Accent}, 0.05)
+            task.wait(0.05)
+            TweenFrame(Button, {BackgroundColor3 = Theme.ElementHover}, 0.1)
+            pcall(callback) 
+        end)
         table.insert(AllElements, {Instance = Button, Name = text:lower(), PageActivate = Activate})
     end
 
@@ -185,22 +224,25 @@ function Library:CreateTab(name)
         Toggle.Font = Enum.Font.Gotham
         Toggle.Text = "  " .. text
         Toggle.TextColor3 = Theme.TextPrimary
-        Toggle.TextSize = 12
+        Toggle.TextSize = 11
         Toggle.TextXAlignment = Enum.TextXAlignment.Left
         Toggle.Parent = Page
+        
         Instance.new("UICorner", Toggle).CornerRadius = UDim.new(0, 4)
+        AddPremiumBorder(Toggle, Theme.Border, 1)
+        ApplyButtonEffects(Toggle)
 
         local Indicator = Instance.new("Frame")
-        Indicator.Size = UDim2.new(0, 12, 0, 12)
-        Indicator.Position = UDim2.new(1, -20, 0.5, -6)
-        Indicator.BackgroundColor3 = state and Theme.Accent or Color3.fromRGB(50, 50, 60)
+        Indicator.Size = UDim2.new(0, 10, 0, 10)
+        Indicator.Position = UDim2.new(1, -18, 0.5, -5)
+        Indicator.BackgroundColor3 = state and Theme.Accent or Color3.fromRGB(45, 45, 55)
         Indicator.Parent = Toggle
-        Instance.new("UICorner", Indicator).CornerRadius = UDim.new(0, 3)
+        Instance.new("UICorner", Indicator).CornerRadius = UDim.new(0, 2)
 
         Toggle.MouseButton1Click:Connect(function()
             CloseAllPopups()
             state = not state
-            TweenService:Create(Indicator, TweenInfo.new(0.12), {BackgroundColor3 = state and Theme.Accent or Color3.fromRGB(50, 50, 60)}):Play()
+            TweenFrame(Indicator, {BackgroundColor3 = state and Theme.Accent or Color3.fromRGB(45, 45, 55)}, 0.12)
             pcall(callback, state)
         end)
         table.insert(AllElements, {Instance = Toggle, Name = text:lower(), PageActivate = Activate})
@@ -212,6 +254,7 @@ function Library:CreateTab(name)
         Slider.BackgroundColor3 = Theme.ElementBg
         Slider.Parent = Page
         Instance.new("UICorner", Slider).CornerRadius = UDim.new(0, 4)
+        AddPremiumBorder(Slider, Theme.Border, 1)
 
         local Title = Instance.new("TextLabel")
         Title.Size = UDim2.new(1, 0, 0, 14)
@@ -238,7 +281,7 @@ function Library:CreateTab(name)
         local Track = Instance.new("TextButton")
         Track.Size = UDim2.new(1, -12, 0, 3)
         Track.Position = UDim2.new(0, 6, 1, -6)
-        Track.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
+        Track.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
         Track.Text = ""
         Track.Parent = Slider
         Instance.new("UICorner", Track)
@@ -277,6 +320,7 @@ function Library:CreateTab(name)
         BoxFrame.BackgroundColor3 = Theme.ElementBg
         BoxFrame.Parent = Page
         Instance.new("UICorner", BoxFrame).CornerRadius = UDim.new(0, 4)
+        AddPremiumBorder(BoxFrame, Theme.Border, 1)
 
         local BoxInput = Instance.new("TextBox")
         BoxInput.Size = UDim2.new(1, -12, 1, -4)
@@ -295,7 +339,7 @@ function Library:CreateTab(name)
         table.insert(AllElements, {Instance = BoxFrame, Name = placeholder:lower(), PageActivate = Activate})
     end
 
-    -- [[ 5. СОВРЕМЕННЫЙ ВЫБОР ОПЦИЙ (DROPDOWN) ]]
+    -- [[ 5. СОВРЕМЕННЫЙ DROPDOWN ]]
     function Elements:CreateDropdown(text, list, callback)
         local Dropdown = Instance.new("TextButton")
         Dropdown.Size = UDim2.new(1, 0, 1, 0)
@@ -306,42 +350,48 @@ function Library:CreateTab(name)
         Dropdown.TextSize = 11
         Dropdown.TextXAlignment = Enum.TextXAlignment.Left
         Dropdown.Parent = Page
+        
         Instance.new("UICorner", Dropdown).CornerRadius = UDim.new(0, 4)
+        AddPremiumBorder(Dropdown, Theme.Border, 1)
+        ApplyButtonEffects(Dropdown)
 
         Dropdown.MouseButton1Click:Connect(function()
             local alreadyOpen = PopupsFolder:FindFirstChild(text .. "Drop")
             CloseAllPopups()
             if alreadyOpen then return end
 
-            -- Создаем выпадающее меню ровно под кнопкой
             local DropMenu = Instance.new("Frame")
             DropMenu.Name = text .. "Drop"
-            DropMenu.Size = UDim2.new(0, Dropdown.AbsoluteSize.X, 0, math.clamp(#list * 28, 28, 140))
+            DropMenu.Size = UDim2.new(0, Dropdown.AbsoluteSize.X, 0, math.clamp(#list * 26, 26, 130))
             DropMenu.Position = UDim2.new(0, Dropdown.AbsolutePosition.X, 0, Dropdown.AbsolutePosition.Y + Dropdown.AbsoluteSize.Y + 2)
             DropMenu.BackgroundColor3 = Theme.PopupBg
             DropMenu.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
             DropMenu.Parent = PopupsFolder
+            
             Instance.new("UICorner", DropMenu).CornerRadius = UDim.new(0, 4)
-            local Stroke = Instance.new("UIStroke", DropMenu)
-            Stroke.Color = Theme.Accent
-            Stroke.Thickness = 1
+            AddPremiumBorder(DropMenu, Theme.Accent, 1)
 
             local Scroll = Instance.new("ScrollingFrame", DropMenu)
             Scroll.Size = UDim2.new(1, 0, 1, 0)
             Scroll.BackgroundTransparency = 1
-            Scroll.CanvasSize = UDim2.new(0, 0, 0, #list * 28)
+            Scroll.CanvasSize = UDim2.new(0, 0, 0, #list * 26)
             Scroll.ScrollBarThickness = 2
+            Scroll.ScrollBarImageColor3 = Theme.Accent
 
-            local ListLayout = Instance.new("UIListLayout", Scroll)
+            Instance.new("UIListLayout", Scroll)
 
             for _, option in pairs(list) do
                 local OptBtn = Instance.new("TextButton", Scroll)
-                OptBtn.Size = UDim2.new(1, 0, 0, 28)
-                OptBtn.BackgroundTransparency = 1
+                OptBtn.Size = UDim2.new(1, 0, 0, 26)
+                OptBtn.BackgroundColor3 = Theme.PopupBg
+                OptBtn.BorderSizePixel = 0
                 OptBtn.Font = Enum.Font.Gotham
                 OptBtn.Text = tostring(option)
-                OptBtn.TextColor3 = Theme.TextPrimary
+                OptBtn.TextColor3 = Theme.TextSecondary
                 OptBtn.TextSize = 11
+
+                OptBtn.MouseEnter:Connect(function() TweenFrame(OptBtn, {TextColor3 = Theme.TextPrimary, BackgroundColor3 = Theme.ElementBg}) end)
+                OptBtn.MouseLeave:Connect(function() TweenFrame(OptBtn, {TextColor3 = Theme.TextSecondary, BackgroundColor3 = Theme.PopupBg}) end)
 
                 OptBtn.MouseButton1Click:Connect(function()
                     Dropdown.Text = "  " .. text .. ": " .. tostring(option)
@@ -353,7 +403,7 @@ function Library:CreateTab(name)
         table.insert(AllElements, {Instance = Dropdown, Name = text:lower(), PageActivate = Activate})
     end
 
-    -- [[ 6. СОВРЕМЕННОЕ МЕНЮ НАСТРОЙКИ ЦВЕТА (COLOR PICKER) ]]
+    -- [[ 6. СОВРЕМЕННЫЙ COLOR PICKER WITH RGB SLIDERS ]]
     function Elements:CreateColorPicker(text, defaultColor, callback)
         local Picker = Instance.new("TextButton")
         Picker.BackgroundColor3 = Theme.ElementBg
@@ -363,14 +413,17 @@ function Library:CreateTab(name)
         Picker.TextSize = 11
         Picker.TextXAlignment = Enum.TextXAlignment.Left
         Picker.Parent = Page
+        
         Instance.new("UICorner", Picker).CornerRadius = UDim.new(0, 4)
+        AddPremiumBorder(Picker, Theme.Border, 1)
+        ApplyButtonEffects(Picker)
 
         local ColorBox = Instance.new("Frame")
-        ColorBox.Size = UDim2.new(0, 16, 0, 16)
-        ColorBox.Position = UDim2.new(1, -22, 0.5, -8)
+        ColorBox.Size = UDim2.new(0, 14, 0, 14)
+        ColorBox.Position = UDim2.new(1, -20, 0.5, -7)
         ColorBox.BackgroundColor3 = defaultColor
         ColorBox.Parent = Picker
-        Instance.new("UICorner", ColorBox).CornerRadius = UDim.new(0, 3)
+        Instance.new("UICorner", ColorBox).CornerRadius = UDim.new(0, 2)
 
         local currentColor = defaultColor
 
@@ -379,63 +432,60 @@ function Library:CreateTab(name)
             CloseAllPopups()
             if alreadyOpen then return end
 
-            -- Создаем полноценное мини-меню настройки цвета
             local PickerMenu = Instance.new("Frame")
             PickerMenu.Name = text .. "Picker"
-            PickerMenu.Size = UDim2.new(0, 180, 0, 110)
+            PickerMenu.Size = UDim2.new(0, 166, 0, 100)
             PickerMenu.Position = UDim2.new(0, Picker.AbsolutePosition.X, 0, Picker.AbsolutePosition.Y + Picker.AbsoluteSize.Y + 2)
             PickerMenu.BackgroundColor3 = Theme.PopupBg
             PickerMenu.Parent = PopupsFolder
-            Instance.new("UICorner", PickerMenu).CornerRadius = UDim.new(0, 5)
-            local Stroke = Instance.new("UIStroke", PickerMenu)
-            Stroke.Color = Theme.Accent
-            Stroke.Thickness = 1
+            
+            Instance.new("UICorner", PickerMenu).CornerRadius = UDim.new(0, 4)
+            AddPremiumBorder(PickerMenu, Theme.Accent, 1)
 
-            local function createChannelSlider(name, yPos, startVal, onChg)
+            local function createChannel(name, yPos, startVal, onChg)
                 local Lab = Instance.new("TextLabel", PickerMenu)
                 Lab.Text = name
-                Lab.Size = UDim2.new(0, 15, 0, 15)
+                Lab.Size = UDim2.new(0, 12, 0, 12)
                 Lab.Position = UDim2.new(0, 8, 0, yPos)
                 Lab.BackgroundTransparency = 1
                 Lab.TextColor3 = Theme.TextSecondary
                 Lab.Font = Enum.Font.GothamBold
-                Lab.TextSize = 10
+                Lab.TextSize = 9
 
-                local SliderTrack = Instance.new("TextButton", PickerMenu)
-                SliderTrack.Size = UDim2.new(1, -40, 0, 4)
-                SliderTrack.Position = UDim2.new(0, 30, 0, yPos + 6)
-                SliderTrack.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
-                SliderTrack.Text = ""
-                Instance.new("UICorner", SliderTrack)
+                local Track = Instance.new("TextButton", PickerMenu)
+                Track.Size = UDim2.new(1, -34, 0, 3)
+                Track.Position = UDim2.new(0, 26, 0, yPos + 5)
+                Track.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+                Track.Text = ""
+                Instance.new("UICorner", Track)
 
-                local SliderFill = Instance.new("Frame", SliderTrack)
-                SliderFill.Size = UDim2.new(startVal / 255, 0, 1, 0)
-                SliderFill.BackgroundColor3 = Theme.Accent
-                Instance.new("UICorner", SliderFill)
+                local Fill = Instance.new("Frame", Track)
+                Fill.Size = UDim2.new(startVal / 255, 0, 1, 0)
+                Fill.BackgroundColor3 = Theme.Accent
+                Instance.new("UICorner", Fill)
 
                 local active = false
                 local function updateCh(input)
-                    local p = math.clamp((input.Position.X - SliderTrack.AbsolutePosition.X) / SliderTrack.AbsoluteSize.X, 0, 1)
-                    SliderFill.Size = UDim2.new(p, 0, 1, 0)
+                    local p = math.clamp((input.Position.X - Track.AbsolutePosition.X) / Track.AbsoluteSize.X, 0, 1)
+                    Fill.Size = UDim2.new(p, 0, 1, 0)
                     onChg(math.floor(p * 255))
                 end
-                SliderTrack.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then active = true updateCh(i) end end)
+                Track.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then active = true updateCh(i) end end)
                 UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then active = false end end)
                 UserInputService.InputChanged:Connect(function(i) if active and i.UserInputType == Enum.UserInputType.MouseMovement then updateCh(i) end end)
             end
 
-            -- Слайдеры каналов R, G, B
-            createChannelSlider("R", 10, currentColor.R * 255, function(v)
+            createChannel("R", 10, currentColor.R * 255, function(v)
                 currentColor = Color3.fromRGB(v, currentColor.G * 255, currentColor.B * 255)
                 ColorBox.BackgroundColor3 = currentColor
                 pcall(callback, currentColor)
             end)
-            createChannelSlider("G", 40, currentColor.G * 255, function(v)
+            createChannel("G", 38, currentColor.G * 255, function(v)
                 currentColor = Color3.fromRGB(currentColor.R * 255, v, currentColor.B * 255)
                 ColorBox.BackgroundColor3 = currentColor
                 pcall(callback, currentColor)
             end)
-            createChannelSlider("B", 70, currentColor.B * 255, function(v)
+            createChannel("B", 66, currentColor.B * 255, function(v)
                 currentColor = Color3.fromRGB(currentColor.R * 255, currentColor.G * 255, v)
                 ColorBox.BackgroundColor3 = currentColor
                 pcall(callback, currentColor)
@@ -447,7 +497,7 @@ function Library:CreateTab(name)
     return Elements
 end
 
--- Скрытие всего GUI на Right Shift
+-- Скрытие/Показ GUI на клавишу Right Shift
 local uiVisible = true
 UserInputService.InputBegan:Connect(function(input, processed)
     if processed then return end
@@ -459,7 +509,7 @@ UserInputService.InputBegan:Connect(function(input, processed)
     end
 end)
 
--- Глобальный поиск элементов
+-- Умная система поиска элементов
 SearchInput:GetPropertyChangedSignal("Text"):Connect(function()
     local query = SearchInput.Text:lower()
     CloseAllPopups()
