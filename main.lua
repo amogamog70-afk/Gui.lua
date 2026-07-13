@@ -1,960 +1,1026 @@
---!strict
--- MeteorClient-style GUI Library for Roblox
--- ModuleScript: ReplicatedStorage/Modules/MeteorGUI
+--[[
+    MeteorGUI Library — Custom Icon Edition
+    Иконки: rbxassetid://83838907325267 (открытое око)
+            rbxassetid://135935519452375 (закрытое око)
+            rbxassetid://75552929277870 (мусорка)
+]]
 
+local MeteorGUI = {}
+MeteorGUI.__index = MeteorGUI
+
+-- Services
+local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
-local Players = game:GetService("Players")
+local TextService = game:GetService("TextService")
 
-local Player = Players.LocalPlayer
-local PlayerGui = Player:WaitForChild("PlayerGui")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- Configuration
-local CONFIG = {
-    Theme = {
-        Background = Color3.fromRGB(20, 20, 20),
-        BackgroundTransparency = 0.15,
-        Accent = Color3.fromRGB(0, 170, 255),
-        Text = Color3.fromRGB(255, 255, 255),
-        TextSecondary = Color3.fromRGB(180, 180, 180),
-        Border = Color3.fromRGB(40, 40, 40),
-        Hover = Color3.fromRGB(35, 35, 35),
-    },
-    Font = Font.fromName("BuilderSans", Enum.FontWeight.Medium, Enum.FontStyle.Normal),
-    FontBold = Font.fromName("BuilderSans", Enum.FontWeight.Bold, Enum.FontStyle.Normal),
-    Icons = {
-        EyeOpen = "rbxassetid://83838907325267",
-        EyeClosed = "rbxassetid://135935519452375",
-        Trash = "rbxassetid://75552929277870",
-    }
+-- Theme
+local Theme = {
+    Background = Color3.fromRGB(20, 20, 20),
+    BackgroundTransparency = 0.15,
+    Secondary = Color3.fromRGB(30, 30, 30),
+    Accent = Color3.fromRGB(0, 170, 255),
+    AccentHover = Color3.fromRGB(0, 200, 255),
+    Text = Color3.fromRGB(255, 255, 255),
+    TextDim = Color3.fromRGB(180, 180, 180),
+    Border = Color3.fromRGB(40, 40, 40),
+    Error = Color3.fromRGB(255, 80, 80),
+    Success = Color3.fromRGB(80, 255, 120),
+    Font = Enum.Font.BuilderSans,
+    CornerRadius = UDim.new(0, 6),
+    AnimationSpeed = 0.25
 }
 
--- Utility Functions
-local function createTween(instance, properties, duration, style, direction)
-    local tweenInfo = TweenInfo.new(
-        duration or 0.2,
-        style or Enum.EasingStyle.Quad,
-        direction or Enum.EasingDirection.Out
+-- Asset IDs
+local Assets = {
+    EyeOpen = "rbxassetid://83838907325267",
+    EyeClosed = "rbxassetid://135935519452375",
+    Trash = "rbxassetid://75552929277870"
+}
+
+-- Utility
+local function Tween(instance, properties, duration, easingStyle, easingDirection)
+    local tween = TweenService:Create(
+        instance,
+        TweenInfo.new(
+            duration or Theme.AnimationSpeed,
+            easingStyle or Enum.EasingStyle.Quart,
+            easingDirection or Enum.EasingDirection.Out
+        ),
+        properties
     )
-    return TweenService:Create(instance, tweenInfo, properties)
+    tween:Play()
+    return tween
 end
 
-local function createInstance(className, properties, parent)
+local function Create(className, properties)
     local instance = Instance.new(className)
-    for prop, value in pairs(properties) do
+    for prop, value in pairs(properties or {}) do
         instance[prop] = value
-    end
-    if parent then
-        instance.Parent = parent
     end
     return instance
 end
 
--- Main UI Library Class
-local MeteorGUI = {}
-MeteorGUI.__index = MeteorGUI
-
-function MeteorGUI.new(title: string)
-    local self = setmetatable({}, MeteorGUI)
-    
-    self.Title = title
-    self.Categories = {}
-    self.Windows = {}
-    self.ActiveCategory = nil
-    self.SearchQuery = ""
-    
-    -- Create ScreenGui
-    self.ScreenGui = createInstance("ScreenGui", {
-        Name = "MeteorGUI",
-        ResetOnSpawn = false,
-        ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-    }, PlayerGui)
-    
-    -- Create main frame
-    self.MainFrame = createInstance("Frame", {
-        Name = "MainFrame",
-        Size = UDim2.fromScale(1, 1),
+-- Helper: создаёт ImageButton-иконку
+local function CreateIcon(parent, assetId, position, size, color)
+    local btn = Create("ImageButton", {
+        Parent = parent,
+        Size = size or UDim2.new(0, 20, 0, 20),
+        Position = position or UDim2.new(1, -24, 0.5, -10),
         BackgroundTransparency = 1,
-    }, self.ScreenGui)
-    
-    -- Create top navigation bar
-    self:CreateTopBar()
-    
-    -- Create modal container
-    self.ModalContainer = createInstance("Frame", {
-        Name = "ModalContainer",
-        Size = UDim2.fromScale(1, 1),
-        BackgroundColor3 = Color3.fromRGB(0, 0, 0),
-        BackgroundTransparency = 0.7,
-        Visible = false,
-        ZIndex = 100,
-    }, self.MainFrame)
-    
-    return self
-end
-
-function MeteorGUI:CreateTopBar()
-    -- Top bar background
-    local topBar = createInstance("Frame", {
-        Name = "TopBar",
-        Size = UDim2.new(1, 0, 0, 50),
-        BackgroundColor3 = CONFIG.Theme.Background,
-        BackgroundTransparency = CONFIG.Theme.BackgroundTransparency,
-        BorderColor3 = CONFIG.Theme.Border,
-        BorderSizePixel = 1,
-    }, self.MainFrame)
-    
-    -- Title
-    createInstance("TextLabel", {
-        Name = "Title",
-        Size = UDim2.new(0, 150, 1, 0),
-        Position = UDim2.new(0, 10, 0, 0),
-        BackgroundTransparency = 1,
-        Text = self.Title,
-        TextColor3 = CONFIG.Theme.Accent,
-        FontFace = CONFIG.FontBold,
-        TextSize = 18,
-        TextXAlignment = Enum.TextXAlignment.Left,
-    }, topBar)
-    
-    -- Search bar container
-    local searchContainer = createInstance("Frame", {
-        Name = "SearchContainer",
-        Size = UDim2.new(0, 250, 0, 30),
-        Position = UDim2.new(1, -260, 0.5, 0),
-        AnchorPoint = Vector2.new(0, 0.5),
-        BackgroundColor3 = CONFIG.Theme.Background,
-        BackgroundTransparency = 0.5,
-        BorderColor3 = CONFIG.Theme.Border,
-        BorderSizePixel = 1,
-    }, topBar)
-    
-    -- Search icon
-    createInstance("TextLabel", {
-        Name = "SearchIcon",
-        Size = UDim2.new(0, 25, 1, 0),
-        BackgroundTransparency = 1,
-        Text = "🔍",
-        TextSize = 14,
-    }, searchContainer)
-    
-    -- Search TextBox
-    local searchBox = createInstance("TextBox", {
-        Name = "SearchBox",
-        Size = UDim2.new(1, -30, 1, 0),
-        Position = UDim2.new(0, 25, 0, 0),
-        BackgroundTransparency = 1,
-        PlaceholderText = "Search features...",
-        PlaceholderColor3 = CONFIG.Theme.TextSecondary,
-        Text = "",
-        TextColor3 = CONFIG.Theme.Text,
-        FontFace = CONFIG.Font,
-        TextSize = 13,
-        TextXAlignment = Enum.TextXAlignment.Left,
-    }, searchContainer)
-    
-    searchBox:GetPropertyChangedSignal("Text"):Connect(function()
-        self.SearchQuery = searchBox.Text:lower()
-        self:FilterCategories()
-    end)
-    
-    -- Category tabs container
-    local tabsContainer = createInstance("Frame", {
-        Name = "TabsContainer",
-        Size = UDim2.new(1, -520, 1, 0),
-        Position = UDim2.new(0, 160, 0, 0),
-        BackgroundTransparency = 1,
-    }, topBar)
-    
-    local tabsList = createInstance("UIListLayout", {
-        FillDirection = Enum.FillDirection.Horizontal,
-        HorizontalAlignment = Enum.HorizontalAlignment.Left,
-        VerticalAlignment = Enum.VerticalAlignment.Center,
-        Padding = UDim.new(0, 5),
-    }, tabsContainer)
-    
-    self.TabsContainer = tabsContainer
-    self.TabsList = tabsList
-end
-
-function MeteorGUI:AddCategory(name: string, icon: string?)
-    local category = {
-        Name = name,
-        Icon = icon or "",
-        Features = {},
-        Visible = true,
-        Window = nil,
-    }
-    
-    table.insert(self.Categories, category)
-    self:CreateCategoryTab(category)
-    
-    return category
-end
-
-function MeteorGUI:CreateCategoryTab(category)
-    local tabButton = createInstance("Frame", {
-        Name = category.Name .. "_Tab",
-        Size = UDim2.new(0, 140, 0, 35),
-        BackgroundColor3 = CONFIG.Theme.Background,
-        BackgroundTransparency = 0.7,
-        BorderColor3 = CONFIG.Theme.Border,
-        BorderSizePixel = 1,
-        ClipsDescendants = true,
-    }, self.TabsContainer)
-    
-    -- Category name
-    local nameLabel = createInstance("TextLabel", {
-        Name = "NameLabel",
-        Size = UDim2.new(1, -60, 1, 0),
-        Position = UDim2.new(0, 5, 0, 0),
-        BackgroundTransparency = 1,
-        Text = category.Icon .. " " .. category.Name,
-        TextColor3 = CONFIG.Theme.Text,
-        FontFace = CONFIG.Font,
-        TextSize = 13,
-        TextXAlignment = Enum.TextXAlignment.Left,
-    }, tabButton)
-    
-    -- Eye toggle button (ImageLabel)
-    local eyeButton = createInstance("ImageButton", {
-        Name = "EyeButton",
-        Size = UDim2.new(0, 25, 0, 25),
-        Position = UDim2.new(1, -50, 0.5, 0),
-        AnchorPoint = Vector2.new(0, 0.5),
-        BackgroundColor3 = CONFIG.Theme.Background,
-        BackgroundTransparency = 0.8,
-        Image = CONFIG.Icons.EyeOpen,
-        ImageColor3 = CONFIG.Theme.Text,
+        Image = assetId,
+        ImageColor3 = color or Theme.Text,
         ScaleType = Enum.ScaleType.Fit,
-        AutoButtonColor = false,
-    }, tabButton)
-    
-    -- Trash button (ImageLabel)
-    local trashButton = createInstance("ImageButton", {
-        Name = "TrashButton",
-        Size = UDim2.new(0, 25, 0, 25),
-        Position = UDim2.new(1, -22, 0.5, 0),
-        AnchorPoint = Vector2.new(0, 0.5),
-        BackgroundColor3 = CONFIG.Theme.Background,
-        BackgroundTransparency = 0.8,
-        Image = CONFIG.Icons.Trash,
-        ImageColor3 = Color3.fromRGB(255, 100, 100),
-        ScaleType = Enum.ScaleType.Fit,
-        AutoButtonColor = false,
-    }, tabButton)
-    
-    -- Hover effects
-    local function setupHover(button, hoverColor)
-        button.MouseEnter:Connect(function()
-            createTween(button, {BackgroundColor3 = hoverColor}, 0.15):Play()
-        end)
-        button.MouseLeave:Connect(function()
-            createTween(button, {BackgroundColor3 = CONFIG.Theme.Background}, 0.15):Play()
-        end)
-    end
-    
-    setupHover(eyeButton, CONFIG.Theme.Hover)
-    setupHover(trashButton, CONFIG.Theme.Hover)
-    
-    -- Eye toggle functionality
-    eyeButton.MouseButton1Click:Connect(function()
-        category.Visible = not category.Visible
-        eyeButton.Image = category.Visible and CONFIG.Icons.EyeOpen or CONFIG.Icons.EyeClosed
-        eyeButton.ImageColor3 = category.Visible and CONFIG.Theme.Text or Color3.fromRGB(150, 150, 150)
-        
-        if category.Window then
-            category.Window.Visible = category.Visible
-        end
-    end)
-    
-    -- Trash button functionality
-    trashButton.MouseButton1Click:Connect(function()
-        self:ShowDeleteConfirmation(category, tabButton)
-    end)
-    
-    -- Click to open window
-    tabButton.MouseButton1Click:Connect(function()
-        if category.Visible then
-            self:OpenCategoryWindow(category)
-        end
-    end)
-    
-    category.TabButton = tabButton
+        BorderSizePixel = 0
+    })
+    return btn
 end
 
-function MeteorGUI:OpenCategoryWindow(category)
-    -- Close existing window if any
-    if self.ActiveCategory and self.ActiveCategory ~= category then
-        if self.ActiveCategory.Window then
-            self.ActiveCategory.Window.Visible = false
-        end
-    end
-    
-    self.ActiveCategory = category
-    
-    if not category.Window then
-        self:CreateCategoryWindow(category)
-    end
-    
-    category.Window.Visible = true
-end
-
-function MeteorGUI:CreateCategoryWindow(category)
-    local window = createInstance("Frame", {
-        Name = category.Name .. "_Window",
-        Size = UDim2.new(0, 300, 0, 400),
-        Position = UDim2.new(0.5, -150, 0.5, -200),
-        BackgroundColor3 = CONFIG.Theme.Background,
-        BackgroundTransparency = CONFIG.Theme.BackgroundTransparency,
-        BorderColor3 = CONFIG.Theme.Border,
-        BorderSizePixel = 1,
-        Visible = false,
-        ClipsDescendants = true,
-    }, self.MainFrame)
-    
-    -- Window header
-    local header = createInstance("Frame", {
-        Name = "Header",
-        Size = UDim2.new(1, 0, 0, 35),
-        BackgroundColor3 = CONFIG.Theme.Accent,
-        BackgroundTransparency = 0.8,
-    }, window)
-    
-    createInstance("TextLabel", {
-        Name = "Title",
-        Size = UDim2.new(1, -30, 1, 0),
-        Position = UDim2.new(0, 10, 0, 0),
-        BackgroundTransparency = 1,
-        Text = category.Icon .. " " .. category.Name,
-        TextColor3 = CONFIG.Theme.Text,
-        FontFace = CONFIG.FontBold,
-        TextSize = 14,
-        TextXAlignment = Enum.TextXAlignment.Left,
-    }, header)
-    
-    -- Close button
-    local closeButton = createInstance("TextButton", {
-        Name = "CloseButton",
-        Size = UDim2.new(0, 25, 0, 25),
-        Position = UDim2.new(1, -27, 0.5, 0),
-        AnchorPoint = Vector2.new(0, 0.5),
-        BackgroundTransparency = 1,
-        Text = "✕",
-        TextColor3 = CONFIG.Theme.Text,
-        TextSize = 16,
-        AutoButtonColor = false,
-    }, header)
-    
-    closeButton.MouseButton1Click:Connect(function()
-        window.Visible = false
-    end)
-    
-    -- Features list container
-    local featuresContainer = createInstance("ScrollingFrame", {
-        Name = "FeaturesContainer",
-        Size = UDim2.new(1, 0, 1, -35),
-        Position = UDim2.new(0, 0, 0, 35),
-        BackgroundTransparency = 1,
-        CanvasSize = UDim2.new(0, 0, 0, 0),
-        ScrollBarThickness = 4,
-        ScrollBarImageColor3 = CONFIG.Theme.Accent,
-        BorderSizePixel = 0,
-    }, window)
-    
-    local featuresList = createInstance("UIListLayout", {
-        FillDirection = Enum.FillDirection.Vertical,
-        HorizontalAlignment = Enum.HorizontalAlignment.Center,
-        VerticalAlignment = Enum.VerticalAlignment.Top,
-        Padding = UDim.new(0, 2),
-    }, featuresContainer)
-    
-    -- Make window draggable
-    self:MakeDraggable(window, header)
-    
-    category.Window = window
-    category.FeaturesContainer = featuresContainer
-end
-
-function MeteorGUI:MakeDraggable(window, dragFrame)
+-- Dragging
+local function MakeDraggable(frame, dragHandle)
     local dragging = false
-    local dragStart = nil
-    local startPos = nil
-    
-    dragFrame.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or 
-           input.UserInputType == Enum.UserInputType.Touch then
+    local dragStart, startPos = nil, nil
+    dragHandle = dragHandle or frame
+
+    dragHandle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
             dragStart = input.Position
-            startPos = window.Position
-            
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    dragging = false
-                end
-            end)
+            startPos = frame.Position
+            Tween(frame, {BackgroundTransparency = 0.05}, 0.1)
         end
     end)
-    
+
     UserInputService.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or 
-                        input.UserInputType == Enum.UserInputType.Touch) then
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
             local delta = input.Position - dragStart
-            window.Position = UDim2.new(
-                startPos.X.Scale,
-                startPos.X.Offset + delta.X,
-                startPos.Y.Scale,
-                startPos.Y.Offset + delta.Y
+            frame.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + delta.X,
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y
             )
         end
     end)
-end
 
-function MeteorGUI:AddFeature(category, name: string, settings: table?)
-    local feature = {
-        Name = name,
-        Category = category,
-        Enabled = false,
-        Settings = settings or {},
-        Visible = true,
-    }
-    
-    table.insert(category.Features, feature)
-    self:CreateFeatureItem(category, feature)
-    
-    return feature
-end
-
-function MeteorGUI:CreateFeatureItem(category, feature)
-    local featureButton = createInstance("Frame", {
-        Name = feature.Name .. "_Feature",
-        Size = UDim2.new(1, -10, 0, 35),
-        BackgroundColor3 = CONFIG.Theme.Background,
-        BackgroundTransparency = 0.8,
-        BorderColor3 = CONFIG.Theme.Border,
-        BorderSizePixel = 1,
-    }, category.FeaturesContainer)
-    
-    -- Feature name
-    local nameLabel = createInstance("TextLabel", {
-        Name = "NameLabel",
-        Size = UDim2.new(1, -35, 1, 0),
-        Position = UDim2.new(0, 5, 0, 0),
-        BackgroundTransparency = 1,
-        Text = feature.Name,
-        TextColor3 = CONFIG.Theme.Text,
-        FontFace = CONFIG.Font,
-        TextSize = 13,
-        TextXAlignment = Enum.TextXAlignment.Left,
-    }, featureButton)
-    
-    -- Eye toggle button (ImageLabel)
-    local eyeButton = createInstance("ImageButton", {
-        Name = "EyeButton",
-        Size = UDim2.new(0, 25, 0, 25),
-        Position = UDim2.new(1, -27, 0.5, 0),
-        AnchorPoint = Vector2.new(0, 0.5),
-        BackgroundColor3 = CONFIG.Theme.Background,
-        BackgroundTransparency = 0.8,
-        Image = CONFIG.Icons.EyeOpen,
-        ImageColor3 = CONFIG.Theme.Text,
-        ScaleType = Enum.ScaleType.Fit,
-        AutoButtonColor = false,
-    }, featureButton)
-    
-    -- Hover effect
-    eyeButton.MouseEnter:Connect(function()
-        createTween(eyeButton, {BackgroundColor3 = CONFIG.Theme.Hover}, 0.15):Play()
-    end)
-    eyeButton.MouseLeave:Connect(function()
-        createTween(eyeButton, {BackgroundColor3 = CONFIG.Theme.Background}, 0.15):Play()
-    end)
-    
-    -- Toggle visibility
-    eyeButton.MouseButton1Click:Connect(function()
-        feature.Visible = not feature.Visible
-        eyeButton.Image = feature.Visible and CONFIG.Icons.EyeOpen or CONFIG.Icons.EyeClosed
-        eyeButton.ImageColor3 = feature.Visible and CONFIG.Theme.Text or Color3.fromRGB(150, 150, 150)
-        
-        if feature.SettingsWindow then
-            feature.SettingsWindow.Visible = feature.Visible
-        end
-    end)
-    
-    -- Click to open settings
-    featureButton.MouseButton1Click:Connect(function()
-        if feature.Visible then
-            self:OpenFeatureSettings(category, feature)
-        end
-    end)
-    
-    feature.FeatureButton = featureButton
-    
-    -- Update canvas size
-    self:UpdateCanvasSize(category.FeaturesContainer)
-end
-
-function MeteorGUI:OpenFeatureSettings(category, feature)
-    if not feature.SettingsWindow then
-        self:CreateFeatureSettingsWindow(category, feature)
-    end
-    
-    feature.SettingsWindow.Visible = true
-end
-
-function MeteorGUI:CreateFeatureSettingsWindow(category, feature)
-    local settingsWindow = createInstance("Frame", {
-        Name = feature.Name .. "_Settings",
-        Size = UDim2.new(0, 250, 0, 300),
-        Position = UDim2.new(0.5, 50, 0.5, -150),
-        BackgroundColor3 = CONFIG.Theme.Background,
-        BackgroundTransparency = CONFIG.Theme.BackgroundTransparency,
-        BorderColor3 = CONFIG.Theme.Border,
-        BorderSizePixel = 1,
-        Visible = false,
-        ClipsDescendants = true,
-        ZIndex = 50,
-    }, self.MainFrame)
-    
-    -- Header
-    local header = createInstance("Frame", {
-        Name = "Header",
-        Size = UDim2.new(1, 0, 0, 30),
-        BackgroundColor3 = CONFIG.Theme.Accent,
-        BackgroundTransparency = 0.8,
-    }, settingsWindow)
-    
-    createInstance("TextLabel", {
-        Name = "Title",
-        Size = UDim2.new(1, -30, 1, 0),
-        Position = UDim2.new(0, 10, 0, 0),
-        BackgroundTransparency = 1,
-        Text = feature.Name .. " Settings",
-        TextColor3 = CONFIG.Theme.Text,
-        FontFace = CONFIG.FontBold,
-        TextSize = 13,
-        TextXAlignment = Enum.TextXAlignment.Left,
-    }, header)
-    
-    -- Close button
-    local closeButton = createInstance("TextButton", {
-        Name = "CloseButton",
-        Size = UDim2.new(0, 25, 0, 25),
-        Position = UDim2.new(1, -27, 0.5, 0),
-        AnchorPoint = Vector2.new(0, 0.5),
-        BackgroundTransparency = 1,
-        Text = "",
-        TextColor3 = CONFIG.Theme.Text,
-        TextSize = 14,
-        AutoButtonColor = false,
-    }, header)
-    
-    closeButton.MouseButton1Click:Connect(function()
-        settingsWindow.Visible = false
-    end)
-    
-    -- Settings container
-    local settingsContainer = createInstance("ScrollingFrame", {
-        Name = "SettingsContainer",
-        Size = UDim2.new(1, 0, 1, -30),
-        Position = UDim2.new(0, 0, 0, 30),
-        BackgroundTransparency = 1,
-        CanvasSize = UDim2.new(0, 0, 0, 0),
-        ScrollBarThickness = 4,
-        ScrollBarImageColor3 = CONFIG.Theme.Accent,
-        BorderSizePixel = 0,
-    }, settingsWindow)
-    
-    local settingsList = createInstance("UIListLayout", {
-        FillDirection = Enum.FillDirection.Vertical,
-        HorizontalAlignment = Enum.HorizontalAlignment.Center,
-        VerticalAlignment = Enum.VerticalAlignment.Top,
-        Padding = UDim.new(0, 5),
-    }, settingsContainer)
-    
-    -- Add settings based on feature configuration
-    for settingName, settingConfig in pairs(feature.Settings) do
-        self:CreateSettingControl(settingsContainer, settingName, settingConfig)
-    end
-    
-    self:MakeDraggable(settingsWindow, header)
-    self:UpdateCanvasSize(settingsContainer)
-    
-    feature.SettingsWindow = settingsWindow
-end
-
-function MeteorGUI:CreateSettingControl(container, name, config)
-    if config.Type == "Toggle" then
-        self:CreateToggle(container, name, config)
-    elseif config.Type == "Slider" then
-        self:CreateSlider(container, name, config)
-    elseif config.Type == "Dropdown" then
-        self:CreateDropdown(container, name, config)
-    end
-end
-
-function MeteorGUI:CreateToggle(container, name, config)
-    local toggleFrame = createInstance("Frame", {
-        Name = name .. "_Toggle",
-        Size = UDim2.new(1, -10, 0, 30),
-        BackgroundColor3 = CONFIG.Theme.Background,
-        BackgroundTransparency = 0.8,
-        BorderColor3 = CONFIG.Theme.Border,
-        BorderSizePixel = 1,
-    }, container)
-    
-    createInstance("TextLabel", {
-        Name = "Label",
-        Size = UDim2.new(1, -50, 1, 0),
-        Position = UDim2.new(0, 5, 0, 0),
-        BackgroundTransparency = 1,
-        Text = name,
-        TextColor3 = CONFIG.Theme.Text,
-        FontFace = CONFIG.Font,
-        TextSize = 12,
-        TextXAlignment = Enum.TextXAlignment.Left,
-    }, toggleFrame)
-    
-    local toggleButton = createInstance("TextButton", {
-        Name = "ToggleButton",
-        Size = UDim2.new(0, 40, 0, 20),
-        Position = UDim2.new(1, -45, 0.5, 0),
-        AnchorPoint = Vector2.new(0, 0.5),
-        BackgroundColor3 = config.Default and CONFIG.Theme.Accent or CONFIG.Theme.Border,
-        BorderSizePixel = 0,
-        Text = "",
-        AutoButtonColor = false,
-    }, toggleFrame)
-    
-    local toggleIndicator = createInstance("Frame", {
-        Name = "Indicator",
-        Size = UDim2.new(0, 16, 0, 16),
-        Position = config.Default and UDim2.new(1, -18, 0.5, 0) or UDim2.new(0, 2, 0.5, 0),
-        AnchorPoint = Vector2.new(0, 0.5),
-        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-        BorderSizePixel = 0,
-    }, toggleButton)
-    
-    local enabled = config.Default or false
-    
-    toggleButton.MouseButton1Click:Connect(function()
-        enabled = not enabled
-        createTween(toggleButton, {BackgroundColor3 = enabled and CONFIG.Theme.Accent or CONFIG.Theme.Border}, 0.2):Play()
-        createTween(toggleIndicator, {Position = enabled and UDim2.new(1, -18, 0.5, 0) or UDim2.new(0, 2, 0.5, 0)}, 0.2):Play()
-        
-        if config.Callback then
-            config.Callback(enabled)
-        end
-    end)
-    
-    self:UpdateCanvasSize(container)
-end
-
-function MeteorGUI:CreateSlider(container, name, config)
-    local sliderFrame = createInstance("Frame", {
-        Name = name .. "_Slider",
-        Size = UDim2.new(1, -10, 0, 40),
-        BackgroundColor3 = CONFIG.Theme.Background,
-        BackgroundTransparency = 0.8,
-        BorderColor3 = CONFIG.Theme.Border,
-        BorderSizePixel = 1,
-    }, container)
-    
-    createInstance("TextLabel", {
-        Name = "Label",
-        Size = UDim2.new(1, -60, 0, 15),
-        Position = UDim2.new(0, 5, 0, 2),
-        BackgroundTransparency = 1,
-        Text = name,
-        TextColor3 = CONFIG.Theme.Text,
-        FontFace = CONFIG.Font,
-        TextSize = 12,
-        TextXAlignment = Enum.TextXAlignment.Left,
-    }, sliderFrame)
-    
-    local valueLabel = createInstance("TextLabel", {
-        Name = "ValueLabel",
-        Size = UDim2.new(0, 55, 0, 15),
-        Position = UDim2.new(1, -60, 0, 2),
-        BackgroundTransparency = 1,
-        Text = tostring(config.Default or config.Min),
-        TextColor3 = CONFIG.Theme.Accent,
-        FontFace = CONFIG.FontBold,
-        TextSize = 12,
-        TextXAlignment = Enum.TextXAlignment.Right,
-    }, sliderFrame)
-    
-    local sliderTrack = createInstance("Frame", {
-        Name = "Track",
-        Size = UDim2.new(1, -10, 0, 4),
-        Position = UDim2.new(0, 5, 0, 22),
-        BackgroundColor3 = CONFIG.Theme.Border,
-        BorderSizePixel = 0,
-    }, sliderFrame)
-    
-    local sliderFill = createInstance("Frame", {
-        Name = "Fill",
-        Size = UDim2.new((config.Default - config.Min) / (config.Max - config.Min), 0, 1, 0),
-        BackgroundColor3 = CONFIG.Theme.Accent,
-        BorderSizePixel = 0,
-    }, sliderTrack)
-    
-    local sliderThumb = createInstance("Frame", {
-        Name = "Thumb",
-        Size = UDim2.new(0, 12, 0, 12),
-        Position = UDim2.new((config.Default - config.Min) / (config.Max - config.Min), -6, 0.5, 0),
-        AnchorPoint = Vector2.new(0, 0.5),
-        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-        BorderSizePixel = 0,
-    }, sliderTrack)
-    
-    local dragging = false
-    local currentValue = config.Default or config.Min
-    
-    sliderThumb.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or 
-           input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-        end
-    end)
-    
     UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or 
-           input.UserInputType == Enum.UserInputType.Touch then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+            Tween(frame, {BackgroundTransparency = Theme.BackgroundTransparency}, 0.1)
+        end
+    end)
+end
+
+-- Confirmation Modal
+local function ShowConfirmationModal(text, onConfirm, onCancel)
+    local screenGui = PlayerGui:FindFirstChild("MeteorGUI")
+    if not screenGui then return end
+
+    local backdrop = Create("Frame", {
+        Parent = screenGui,
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundColor3 = Color3.new(0, 0, 0),
+        BackgroundTransparency = 0.5,
+        ZIndex = 99
+    })
+
+    local modal = Create("Frame", {
+        Name = "ConfirmationModal",
+        Parent = screenGui,
+        Size = UDim2.new(0, 320, 0, 140),
+        Position = UDim2.new(0.5, -160, 0.5, -70),
+        BackgroundColor3 = Theme.Secondary,
+        BackgroundTransparency = 0.05,
+        BorderSizePixel = 0,
+        ZIndex = 100,
+        ClipsDescendants = true
+    })
+    Create("UICorner", {CornerRadius = Theme.CornerRadius, Parent = modal})
+    Create("UIStroke", {Color = Theme.Border, Thickness = 1, Parent = modal})
+
+    local title = Create("TextLabel", {
+        Parent = modal,
+        Size = UDim2.new(1, -20, 0, 30),
+        Position = UDim2.new(0, 10, 0, 10),
+        BackgroundTransparency = 1,
+        Text = "Confirm Action",
+        TextColor3 = Theme.Text,
+        Font = Theme.Font,
+        TextSize = 18,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        ZIndex = 101
+    })
+
+    local message = Create("TextLabel", {
+        Parent = modal,
+        Size = UDim2.new(1, -20, 0, 40),
+        Position = UDim2.new(0, 10, 0, 45),
+        BackgroundTransparency = 1,
+        Text = text,
+        TextColor3 = Theme.TextDim,
+        Font = Theme.Font,
+        TextSize = 14,
+        TextWrapped = true,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        ZIndex = 101
+    })
+
+    local buttonLayout = Create("Frame", {
+        Parent = modal,
+        Size = UDim2.new(1, -20, 0, 32),
+        Position = UDim2.new(0, 10, 1, -42),
+        BackgroundTransparency = 1,
+        ZIndex = 101
+    })
+
+    Create("UIListLayout", {
+        Parent = buttonLayout,
+        FillDirection = Enum.FillDirection.Horizontal,
+        HorizontalAlignment = Enum.HorizontalAlignment.Right,
+        Padding = UDim.new(0, 8)
+    })
+
+    local function closeModal()
+        Tween(modal, {Size = UDim2.new(0, 320, 0, 0)}, 0.2)
+        Tween(backdrop, {BackgroundTransparency = 1}, 0.2)
+        task.wait(0.2)
+        modal:Destroy()
+        backdrop:Destroy()
+    end
+
+    local cancelBtn = Create("TextButton", {
+        Parent = buttonLayout,
+        Size = UDim2.new(0, 80, 1, 0),
+        BackgroundColor3 = Theme.Background,
+        Text = "Cancel",
+        TextColor3 = Theme.TextDim,
+        Font = Theme.Font,
+        TextSize = 14,
+        BorderSizePixel = 0,
+        ZIndex = 102
+    })
+    Create("UICorner", {CornerRadius = UDim.new(0, 4), Parent = cancelBtn})
+
+    cancelBtn.MouseEnter:Connect(function() Tween(cancelBtn, {BackgroundColor3 = Theme.Secondary}, 0.15) end)
+    cancelBtn.MouseLeave:Connect(function() Tween(cancelBtn, {BackgroundColor3 = Theme.Background}, 0.15) end)
+    cancelBtn.MouseButton1Click:Connect(function()
+        closeModal()
+        if onCancel then onCancel() end
+    end)
+
+    local yesBtn = Create("TextButton", {
+        Parent = buttonLayout,
+        Size = UDim2.new(0, 80, 1, 0),
+        BackgroundColor3 = Theme.Error,
+        Text = "Yes",
+        TextColor3 = Theme.Text,
+        Font = Theme.Font,
+        TextSize = 14,
+        BorderSizePixel = 0,
+        ZIndex = 102
+    })
+    Create("UICorner", {CornerRadius = UDim.new(0, 4), Parent = yesBtn})
+
+    yesBtn.MouseEnter:Connect(function() Tween(yesBtn, {BackgroundColor3 = Color3.fromRGB(255, 100, 100)}, 0.15) end)
+    yesBtn.MouseLeave:Connect(function() Tween(yesBtn, {BackgroundColor3 = Theme.Error}, 0.15) end)
+    yesBtn.MouseButton1Click:Connect(function()
+        closeModal()
+        if onConfirm then onConfirm() end
+    end)
+
+    modal.Size = UDim2.new(0, 320, 0, 0)
+    Tween(modal, {Size = UDim2.new(0, 320, 0, 140)}, 0.3, Enum.EasingStyle.Back)
+end
+
+-- ==========================================
+-- SETTINGS PANEL
+-- ==========================================
+local SettingsPanel = {}
+SettingsPanel.__index = SettingsPanel
+
+function SettingsPanel.new(parentFeature, featureName)
+    local self = setmetatable({}, SettingsPanel)
+    self.Feature = parentFeature
+    self.Elements = {}
+    self.Visible = false
+
+    self.Frame = Create("Frame", {
+        Name = featureName .. "_Settings",
+        Parent = parentFeature.Category.Window.Frame,
+        Size = UDim2.new(0, 220, 0, 0),
+        Position = UDim2.new(1, 10, 0, parentFeature.Button.AbsolutePosition.Y - parentFeature.Category.Window.Frame.AbsolutePosition.Y),
+        BackgroundColor3 = Theme.Secondary,
+        BackgroundTransparency = 0.05,
+        BorderSizePixel = 0,
+        ClipsDescendants = true,
+        Visible = false,
+        ZIndex = 50
+    })
+
+    Create("UICorner", {CornerRadius = Theme.CornerRadius, Parent = self.Frame})
+    Create("UIStroke", {Color = Theme.Border, Thickness = 1, Parent = self.Frame})
+
+    Create("UIPadding", {
+        Parent = self.Frame,
+        PaddingLeft = UDim.new(0, 10),
+        PaddingRight = UDim.new(0, 10),
+        PaddingTop = UDim.new(0, 10),
+        PaddingBottom = UDim.new(0, 10)
+    })
+
+    Create("UIListLayout", {
+        Parent = self.Frame,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 6)
+    })
+
+    local title = Create("TextLabel", {
+        Parent = self.Frame,
+        Size = UDim2.new(1, 0, 0, 24),
+        BackgroundTransparency = 1,
+        Text = featureName .. " Settings",
+        TextColor3 = Theme.Text,
+        Font = Theme.Font,
+        TextSize = 14,
+        TextXAlignment = Enum.TextXAlignment.Left
+    })
+
+    Create("Frame", {
+        Parent = self.Frame,
+        Size = UDim2.new(1, 0, 0, 1),
+        BackgroundColor3 = Theme.Border,
+        BorderSizePixel = 0
+    })
+
+    return self
+end
+
+function SettingsPanel:AddToggle(name, default, callback)
+    local toggleFrame = Create("Frame", {
+        Parent = self.Frame,
+        Size = UDim2.new(1, 0, 0, 28),
+        BackgroundTransparency = 1
+    })
+
+    local label = Create("TextLabel", {
+        Parent = toggleFrame,
+        Size = UDim2.new(1, -50, 1, 0),
+        BackgroundTransparency = 1,
+        Text = name,
+        TextColor3 = Theme.TextDim,
+        Font = Theme.Font,
+        TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Left
+    })
+
+    local switch = Create("Frame", {
+        Parent = toggleFrame,
+        Size = UDim2.new(0, 40, 0, 20),
+        Position = UDim2.new(1, -40, 0.5, -10),
+        BackgroundColor3 = Theme.Background,
+        BorderSizePixel = 0
+    })
+    Create("UICorner", {CornerRadius = UDim.new(1, 0), Parent = switch})
+
+    local knob = Create("Frame", {
+        Parent = switch,
+        Size = UDim2.new(0, 16, 0, 16),
+        Position = UDim2.new(0, 2, 0.5, -8),
+        BackgroundColor3 = Theme.TextDim,
+        BorderSizePixel = 0
+    })
+    Create("UICorner", {CornerRadius = UDim.new(1, 0), Parent = knob})
+
+    local enabled = default or false
+
+    local function updateToggle()
+        if enabled then
+            Tween(switch, {BackgroundColor3 = Theme.Accent}, 0.2)
+            Tween(knob, {Position = UDim2.new(1, -18, 0.5, -8), BackgroundColor3 = Theme.Text}, 0.2)
+        else
+            Tween(switch, {BackgroundColor3 = Theme.Background}, 0.2)
+            Tween(knob, {Position = UDim2.new(0, 2, 0.5, -8), BackgroundColor3 = Theme.TextDim}, 0.2)
+        end
+        if callback then callback(enabled) end
+    end
+
+    if enabled then
+        switch.BackgroundColor3 = Theme.Accent
+        knob.Position = UDim2.new(1, -18, 0.5, -8)
+        knob.BackgroundColor3 = Theme.Text
+    end
+
+    local clickArea = Create("TextButton", {
+        Parent = toggleFrame,
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1,
+        Text = ""
+    })
+
+    clickArea.MouseButton1Click:Connect(function()
+        enabled = not enabled
+        updateToggle()
+    end)
+
+    table.insert(self.Elements, toggleFrame)
+    return self
+end
+
+function SettingsPanel:AddSlider(name, min, max, default, callback)
+    local sliderFrame = Create("Frame", {
+        Parent = self.Frame,
+        Size = UDim2.new(1, 0, 0, 40),
+        BackgroundTransparency = 1
+    })
+
+    local label = Create("TextLabel", {
+        Parent = sliderFrame,
+        Size = UDim2.new(1, -40, 0, 18),
+        BackgroundTransparency = 1,
+        Text = name,
+        TextColor3 = Theme.TextDim,
+        Font = Theme.Font,
+        TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Left
+    })
+
+    local valueLabel = Create("TextLabel", {
+        Parent = sliderFrame,
+        Size = UDim2.new(0, 40, 0, 18),
+        Position = UDim2.new(1, -40, 0, 0),
+        BackgroundTransparency = 1,
+        Text = tostring(default),
+        TextColor3 = Theme.Accent,
+        Font = Theme.Font,
+        TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Right
+    })
+
+    local track = Create("Frame", {
+        Parent = sliderFrame,
+        Size = UDim2.new(1, 0, 0, 4),
+        Position = UDim2.new(0, 0, 0, 26),
+        BackgroundColor3 = Theme.Background,
+        BorderSizePixel = 0
+    })
+    Create("UICorner", {CornerRadius = UDim.new(1, 0), Parent = track})
+
+    local fill = Create("Frame", {
+        Parent = track,
+        Size = UDim2.new((default - min) / (max - min), 0, 1, 0),
+        BackgroundColor3 = Theme.Accent,
+        BorderSizePixel = 0
+    })
+    Create("UICorner", {CornerRadius = UDim.new(1, 0), Parent = fill})
+
+    local dragging = false
+
+    local function updateSlider(input)
+        local pos = math.clamp((input.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
+        local value = math.floor(min + (pos * (max - min)))
+        fill.Size = UDim2.new(pos, 0, 1, 0)
+        valueLabel.Text = tostring(value)
+        if callback then callback(value) end
+    end
+
+    track.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            updateSlider(input)
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            updateSlider(input)
+        end
+    end)
+
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = false
         end
     end)
-    
-    UserInputService.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or 
-                        input.UserInputType == Enum.UserInputType.Touch) then
-            local trackPosition = sliderTrack.AbsolutePosition.X
-            local trackSize = sliderTrack.AbsoluteSize.X
-            local mousePosition = input.Position.X
-            
-            local percent = math.clamp((mousePosition - trackPosition) / trackSize, 0, 1)
-            currentValue = config.Min + (config.Max - config.Min) * percent
-            
-            sliderFill.Size = UDim2.new(percent, 0, 1, 0)
-            sliderThumb.Position = UDim2.new(percent, -6, 0.5, 0)
-            valueLabel.Text = string.format("%.1f", currentValue)
-            
-            if config.Callback then
-                config.Callback(currentValue)
-            end
-        end
-    end)
-    
-    self:UpdateCanvasSize(container)
+
+    table.insert(self.Elements, sliderFrame)
+    return self
 end
 
-function MeteorGUI:CreateDropdown(container, name, config)
-    local dropdownFrame = createInstance("Frame", {
-        Name = name .. "_Dropdown",
-        Size = UDim2.new(1, -10, 0, 30),
-        BackgroundColor3 = CONFIG.Theme.Background,
-        BackgroundTransparency = 0.8,
-        BorderColor3 = CONFIG.Theme.Border,
-        BorderSizePixel = 1,
-    }, container)
-    
-    createInstance("TextLabel", {
-        Name = "Label",
-        Size = UDim2.new(0.4, 0, 1, 0),
-        Position = UDim2.new(0, 5, 0, 0),
+function SettingsPanel:AddDropdown(name, options, default, callback)
+    local dropdownFrame = Create("Frame", {
+        Parent = self.Frame,
+        Size = UDim2.new(1, 0, 0, 30),
+        BackgroundTransparency = 1
+    })
+
+    local label = Create("TextLabel", {
+        Parent = dropdownFrame,
+        Size = UDim2.new(1, 0, 0, 18),
         BackgroundTransparency = 1,
-        Text = name .. ":",
-        TextColor3 = CONFIG.Theme.Text,
-        FontFace = CONFIG.Font,
-        TextSize = 12,
+        Text = name,
+        TextColor3 = Theme.TextDim,
+        Font = Theme.Font,
+        TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Left
+    })
+
+    local button = Create("TextButton", {
+        Parent = dropdownFrame,
+        Size = UDim2.new(1, 0, 0, 24),
+        Position = UDim2.new(0, 0, 0, 18),
+        BackgroundColor3 = Theme.Background,
+        Text = "  " .. (default or options[1]),
+        TextColor3 = Theme.Text,
+        Font = Theme.Font,
+        TextSize = 13,
         TextXAlignment = Enum.TextXAlignment.Left,
-    }, dropdownFrame)
-    
-    local dropdownButton = createInstance("TextButton", {
-        Name = "DropdownButton",
-        Size = UDim2.new(0.55, 0, 0, 22),
-        Position = UDim2.new(0.42, 0, 0.5, 0),
-        AnchorPoint = Vector2.new(0, 0.5),
-        BackgroundColor3 = CONFIG.Theme.Hover,
-        BorderSizePixel = 0,
-        Text = config.Default or config.Options[1],
-        TextColor3 = CONFIG.Theme.Text,
-        FontFace = CONFIG.Font,
-        TextSize = 11,
-        AutoButtonColor = false,
-    }, dropdownFrame)
-    
-    local optionsFrame = createInstance("Frame", {
-        Name = "OptionsFrame",
-        Size = UDim2.new(0.55, 0, 0, 0),
-        Position = UDim2.new(0.42, 0, 1, 2),
-        BackgroundColor3 = CONFIG.Theme.Background,
-        BackgroundTransparency = 0.1,
-        BorderColor3 = CONFIG.Theme.Border,
-        BorderSizePixel = 1,
-        Visible = false,
-        ZIndex = 60,
-        ClipsDescendants = true,
-    }, dropdownFrame)
-    
-    local optionsList = createInstance("UIListLayout", {
-        FillDirection = Enum.FillDirection.Vertical,
-    }, optionsFrame)
-    
-    for _, option in ipairs(config.Options) do
-        local optionButton = createInstance("TextButton", {
-            Name = "Option_" .. option,
+        BorderSizePixel = 0
+    })
+    Create("UICorner", {CornerRadius = UDim.new(0, 4), Parent = button})
+
+    local arrow = Create("TextLabel", {
+        Parent = button,
+        Size = UDim2.new(0, 20, 1, 0),
+        Position = UDim2.new(1, -20, 0, 0),
+        BackgroundTransparency = 1,
+        Text = "›",
+        TextColor3 = Theme.TextDim,
+        Font = Theme.Font,
+        TextSize = 14
+    })
+
+    local expanded = false
+    local optionFrames = {}
+
+    button.MouseButton1Click:Connect(function()
+        expanded = not expanded
+        for _, opt in ipairs(optionFrames) do
+            opt.Visible = expanded
+        end
+        arrow.Text = expanded and "⌄" or "›"
+    end)
+
+    for i, option in ipairs(options) do
+        local optBtn = Create("TextButton", {
+            Parent = dropdownFrame,
             Size = UDim2.new(1, 0, 0, 22),
-            BackgroundColor3 = CONFIG.Theme.Background,
-            BackgroundTransparency = 0.9,
-            Text = option,
-            TextColor3 = CONFIG.Theme.Text,
-            FontFace = CONFIG.Font,
-            TextSize = 11,
-            AutoButtonColor = false,
-        }, optionsFrame)
-        
-        optionButton.MouseButton1Click:Connect(function()
-            dropdownButton.Text = option
-            optionsFrame.Visible = false
-            
-            if config.Callback then
-                config.Callback(option)
-            end
+            Position = UDim2.new(0, 0, 0, 42 + ((i-1) * 24)),
+            BackgroundColor3 = Theme.Secondary,
+            Text = "  " .. option,
+            TextColor3 = Theme.TextDim,
+            Font = Theme.Font,
+            TextSize = 12,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            BorderSizePixel = 0,
+            Visible = false,
+            ZIndex = 55
+        })
+        Create("UICorner", {CornerRadius = UDim.new(0, 4), Parent = optBtn})
+
+        optBtn.MouseEnter:Connect(function() Tween(optBtn, {BackgroundColor3 = Theme.Background}, 0.1) end)
+        optBtn.MouseLeave:Connect(function() Tween(optBtn, {BackgroundColor3 = Theme.Secondary}, 0.1) end)
+
+        optBtn.MouseButton1Click:Connect(function()
+            button.Text = "  " .. option
+            expanded = false
+            for _, opt in ipairs(optionFrames) do opt.Visible = false end
+            arrow.Text = "›"
+            if callback then callback(option) end
         end)
+
+        table.insert(optionFrames, optBtn)
     end
-    
-    dropdownButton.MouseButton1Click:Connect(function()
-        optionsFrame.Visible = not optionsFrame.Visible
-    end)
-    
-    self:UpdateCanvasSize(container)
+
+    table.insert(self.Elements, dropdownFrame)
+    return self
 end
 
-function MeteorGUI:UpdateCanvasSize(container)
-    local totalHeight = 0
-    for _, child in ipairs(container:GetChildren()) do
-        if child:IsA("GuiObject") and child.Size.Y.Offset > 0 then
-            totalHeight = totalHeight + child.Size.Y.Offset + 2
+function SettingsPanel:Toggle()
+    self.Visible = not self.Visible
+    self.Frame.Visible = true
+
+    if self.Visible then
+        local height = 0
+        for _, child in ipairs(self.Frame:GetChildren()) do
+            if child:IsA("GuiObject") and child.Name ~= "UIListLayout" and child.Name ~= "UIPadding" then
+                height = height + child.AbsoluteSize.Y + 6
+            end
         end
+        height = math.max(height + 20, 100)
+        Tween(self.Frame, {Size = UDim2.new(0, 220, 0, height)}, 0.3, Enum.EasingStyle.Quart)
+    else
+        Tween(self.Frame, {Size = UDim2.new(0, 220, 0, 0)}, 0.2)
+        task.wait(0.2)
+        self.Frame.Visible = false
     end
-    container.CanvasSize = UDim2.new(0, 0, 0, totalHeight + 10)
 end
 
-function MeteorGUI:ShowDeleteConfirmation(category, tabButton)
-    self.ModalContainer.Visible = true
-    
-    local modal = createInstance("Frame", {
-        Name = "DeleteModal",
-        Size = UDim2.new(0, 300, 0, 120),
-        Position = UDim2.new(0.5, 0, 0.5, 0),
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        BackgroundColor3 = CONFIG.Theme.Background,
-        BackgroundTransparency = 0.1,
-        BorderColor3 = CONFIG.Theme.Accent,
-        BorderSizePixel = 2,
-        ZIndex = 101,
-    }, self.ModalContainer)
-    
-    createInstance("TextLabel", {
-        Name = "Question",
-        Size = UDim2.new(1, 0, 0, 60),
-        Position = UDim2.new(0, 0, 0, 10),
+function SettingsPanel:Destroy()
+    self.Frame:Destroy()
+end
+
+-- ==========================================
+-- FEATURE
+-- ==========================================
+local Feature = {}
+Feature.__index = Feature
+
+function Feature.new(category, name)
+    local self = setmetatable({}, Feature)
+    self.Name = name
+    self.Category = category
+    self.Visible = true
+    self.Settings = nil
+
+    self.Button = Create("TextButton", {
+        Name = name,
+        Parent = category.FeatureList,
+        Size = UDim2.new(1, -10, 0, 32),
+        BackgroundColor3 = Theme.Background,
+        Text = "",
+        BorderSizePixel = 0,
+        AutoButtonColor = false
+    })
+    Create("UICorner", {CornerRadius = UDim.new(0, 4), Parent = self.Button})
+
+    Create("UIPadding", {
+        Parent = self.Button,
+        PaddingLeft = UDim.new(0, 10),
+        PaddingRight = UDim.new(0, 10)
+    })
+
+    self.Label = Create("TextLabel", {
+        Parent = self.Button,
+        Size = UDim2.new(1, -30, 1, 0),
         BackgroundTransparency = 1,
-        Text = "Are you sure you want to delete this tab?",
-        TextColor3 = CONFIG.Theme.Text,
-        FontFace = CONFIG.Font,
+        Text = name,
+        TextColor3 = Theme.Text,
+        Font = Theme.Font,
         TextSize = 14,
-        TextWrapped = true,
-    }, modal)
-    
-    local buttonsContainer = createInstance("Frame", {
-        Name = "ButtonsContainer",
-        Size = UDim2.new(1, 0, 0, 40),
-        Position = UDim2.new(0, 0, 1, -50),
-        BackgroundTransparency = 1,
-    }, modal)
-    
-    local yesButton = createInstance("TextButton", {
-        Name = "YesButton",
-        Size = UDim2.new(0, 100, 0, 30),
-        Position = UDim2.new(0.25, 0, 0.5, 0),
-        AnchorPoint = Vector2.new(0, 0.5),
-        BackgroundColor3 = Color3.fromRGB(255, 100, 100),
-        BorderSizePixel = 0,
-        Text = "Yes",
-        TextColor3 = Color3.fromRGB(255, 255, 255),
-        FontFace = CONFIG.FontBold,
-        TextSize = 13,
-        AutoButtonColor = false,
-    }, buttonsContainer)
-    
-    local cancelButton = createInstance("TextButton", {
-        Name = "CancelButton",
-        Size = UDim2.new(0, 100, 0, 30),
-        Position = UDim2.new(0.75, 0, 0.5, 0),
-        AnchorPoint = Vector2.new(0, 0.5),
-        BackgroundColor3 = CONFIG.Theme.Border,
-        BorderSizePixel = 0,
-        Text = "Cancel",
-        TextColor3 = CONFIG.Theme.Text,
-        FontFace = CONFIG.FontBold,
-        TextSize = 13,
-        AutoButtonColor = false,
-    }, buttonsContainer)
-    
-    yesButton.MouseButton1Click:Connect(function()
-        -- Delete category
-        for i, cat in ipairs(self.Categories) do
-            if cat == category then
-                table.remove(self.Categories, i)
-                break
-            end
+        TextXAlignment = Enum.TextXAlignment.Left
+    })
+
+    -- Кастомная иконка глаза (открыто/закрыто) для фичи
+    self.EyeButton = CreateIcon(self.Button, Assets.EyeOpen, UDim2.new(1, -24, 0.5, -10), UDim2.new(0, 20, 0, 20), Theme.Text)
+
+    self.Button.MouseEnter:Connect(function() Tween(self.Button, {BackgroundColor3 = Theme.Secondary}, 0.15) end)
+    self.Button.MouseLeave:Connect(function() Tween(self.Button, {BackgroundColor3 = Theme.Background}, 0.15) end)
+
+    self.Button.MouseButton1Click:Connect(function()
+        if not self.Settings then
+            self.Settings = SettingsPanel.new(self, name)
         end
-        
-        if category.Window then
-            category.Window:Destroy()
-        end
-        if tabButton then
-            tabButton:Destroy()
-        end
-        
-        self.ModalContainer:ClearAllChildren()
-        self.ModalContainer.Visible = false
+        self.Settings:Toggle()
     end)
-    
-    cancelButton.MouseButton1Click:Connect(function()
-        self.ModalContainer:ClearAllChildren()
-        self.ModalContainer.Visible = false
+
+    self.EyeButton.MouseButton1Click:Connect(function()
+        self.Visible = not self.Visible
+        self.EyeButton.Image = self.Visible and Assets.EyeOpen or Assets.EyeClosed
+        self.EyeButton.ImageColor3 = self.Visible and Theme.Text or Theme.TextDim
+
+        if self.Settings then
+            self.Settings.Frame.Visible = self.Visible
+            if not self.Visible then self.Settings.Visible = false end
+        end
     end)
+
+    return self
 end
 
-function MeteorGUI:FilterCategories()
-    for _, category in ipairs(self.Categories) do
-        if category.TabButton then
-            local matchesSearch = self.SearchQuery == "" or 
-                                 category.Name:lower():find(self.SearchQuery)
-            
-            -- Also check features
-            if not matchesSearch then
-                for _, feature in ipairs(category.Features) do
-                    if feature.Name:lower():find(self.SearchQuery) then
-                        matchesSearch = true
-                        break
-                    end
-                end
+function Feature:AddToggle(name, default, callback)
+    if not self.Settings then self.Settings = SettingsPanel.new(self, self.Name) end
+    self.Settings:AddToggle(name, default, callback)
+    return self
+end
+
+function Feature:AddSlider(name, min, max, default, callback)
+    if not self.Settings then self.Settings = SettingsPanel.new(self, self.Name) end
+    self.Settings:AddSlider(name, min, max, default, callback)
+    return self
+end
+
+function Feature:AddDropdown(name, options, default, callback)
+    if not self.Settings then self.Settings = SettingsPanel.new(self, self.Name) end
+    self.Settings:AddDropdown(name, options, default, callback)
+    return self
+end
+
+function Feature:Destroy()
+    if self.Settings then self.Settings:Destroy() end
+    self.Button:Destroy()
+end
+
+-- ==========================================
+-- CATEGORY WINDOW
+-- ==========================================
+local CategoryWindow = {}
+CategoryWindow.__index = CategoryWindow
+
+function CategoryWindow.new(category, name)
+    local self = setmetatable({}, CategoryWindow)
+    self.Name = name
+    self.Category = category
+    self.Visible = true
+    self.Position = UDim2.new(0.1, 0, 0.2, 0)
+
+    self.Frame = Create("Frame", {
+        Name = name .. "Window",
+        Parent = category.GUI.ScreenGui,
+        Size = UDim2.new(0, 240, 0, 320),
+        Position = self.Position,
+        BackgroundColor3 = Theme.Background,
+        BackgroundTransparency = Theme.BackgroundTransparency,
+        BorderSizePixel = 0,
+        ClipsDescendants = true
+    })
+
+    Create("UICorner", {CornerRadius = Theme.CornerRadius, Parent = self.Frame})
+    Create("UIStroke", {Color = Theme.Border, Thickness = 1, Parent = self.Frame})
+
+    self.TitleBar = Create("Frame", {
+        Name = "TitleBar",
+        Parent = self.Frame,
+        Size = UDim2.new(1, 0, 0, 32),
+        BackgroundColor3 = Theme.Secondary,
+        BackgroundTransparency = 0.3,
+        BorderSizePixel = 0
+    })
+
+    Create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = self.TitleBar})
+    Create("Frame", {
+        Parent = self.TitleBar,
+        Size = UDim2.new(1, 0, 0.5, 0),
+        Position = UDim2.new(0, 0, 0.5, 0),
+        BackgroundColor3 = Theme.Secondary,
+        BackgroundTransparency = 0.3,
+        BorderSizePixel = 0
+    })
+
+    Create("TextLabel", {
+        Parent = self.TitleBar,
+        Size = UDim2.new(1, -40, 1, 0),
+        Position = UDim2.new(0, 10, 0, 0),
+        BackgroundTransparency = 1,
+        Text = name,
+        TextColor3 = Theme.Text,
+        Font = Theme.Font,
+        TextSize = 14,
+        TextXAlignment = Enum.TextXAlignment.Left
+    })
+
+    local closeBtn = Create("TextButton", {
+        Parent = self.TitleBar,
+        Size = UDim2.new(0, 24, 0, 24),
+        Position = UDim2.new(1, -28, 0.5, -12),
+        BackgroundTransparency = 1,
+        Text = "✕",
+        TextColor3 = Theme.TextDim,
+        Font = Theme.Font,
+        TextSize = 14
+    })
+
+    closeBtn.MouseEnter:Connect(function() Tween(closeBtn, {TextColor3 = Theme.Error}, 0.15) end)
+    closeBtn.MouseLeave:Connect(function() Tween(closeBtn, {TextColor3 = Theme.TextDim}, 0.15) end)
+    closeBtn.MouseButton1Click:Connect(function() self:Toggle() end)
+
+    self.FeatureList = Create("ScrollingFrame", {
+        Name = "FeatureList",
+        Parent = self.Frame,
+        Size = UDim2.new(1, -10, 1, -42),
+        Position = UDim2.new(0, 5, 0, 37),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        ScrollBarThickness = 2,
+        ScrollBarImageColor3 = Theme.Accent,
+        CanvasSize = UDim2.new(0, 0, 0, 0)
+    })
+
+    local listLayout = Create("UIListLayout", {
+        Parent = self.FeatureList,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 4)
+    })
+
+    listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        self.FeatureList.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 10)
+    end)
+
+    MakeDraggable(self.Frame, self.TitleBar)
+
+    self.Frame.Size = UDim2.new(0, 240, 0, 0)
+    Tween(self.Frame, {Size = UDim2.new(0, 240, 0, 320)}, 0.4, Enum.EasingStyle.Back)
+
+    return self
+end
+
+function CategoryWindow:Toggle()
+    self.Visible = not self.Visible
+    if self.Visible then
+        self.Frame.Visible = true
+        Tween(self.Frame, {Size = UDim2.new(0, 240, 0, 320)}, 0.3, Enum.EasingStyle.Back)
+    else
+        Tween(self.Frame, {Size = UDim2.new(0, 240, 0, 0)}, 0.2)
+        task.wait(0.2)
+        self.Frame.Visible = false
+    end
+end
+
+function CategoryWindow:Destroy()
+    Tween(self.Frame, {Size = UDim2.new(0, 240, 0, 0)}, 0.2)
+    task.wait(0.2)
+    self.Frame:Destroy()
+end
+
+-- ==========================================
+-- CATEGORY TAB
+-- ==========================================
+local Category = {}
+Category.__index = Category
+
+function Category.new(gui, name)
+    local self = setmetatable({}, Category)
+    self.GUI = gui
+    self.Name = name
+    self.Visible = true
+    self.Features = {}
+
+    self.Tab = Create("Frame", {
+        Name = name .. "Tab",
+        Parent = gui.TabContainer,
+        Size = UDim2.new(0, 160, 1, -10),
+        BackgroundColor3 = Theme.Secondary,
+        BackgroundTransparency = 0.3,
+        BorderSizePixel = 0
+    })
+    Create("UICorner", {CornerRadius = UDim.new(0, 4), Parent = self.Tab})
+
+    Create("UIPadding", {
+        Parent = self.Tab,
+        PaddingLeft = UDim.new(0, 8),
+        PaddingRight = UDim.new(0, 8)
+    })
+
+    self.Label = Create("TextLabel", {
+        Parent = self.Tab,
+        Size = UDim2.new(1, -60, 1, 0),
+        BackgroundTransparency = 1,
+        Text = name,
+        TextColor3 = Theme.Text,
+        Font = Theme.Font,
+        TextSize = 14,
+        TextXAlignment = Enum.TextXAlignment.Left
+    })
+
+    -- Иконка глаза (открыто/закрыто) в табе
+    self.EyeButton = CreateIcon(self.Tab, Assets.EyeOpen, UDim2.new(1, -52, 0.5, -10), UDim2.new(0, 20, 0, 20), Theme.Text)
+
+    -- Иконка мусорки в табе
+    self.TrashButton = CreateIcon(self.Tab, Assets.Trash, UDim2.new(1, -28, 0.5, -10), UDim2.new(0, 20, 0, 20), Theme.TextDim)
+
+    self.Tab.MouseEnter:Connect(function() Tween(self.Tab, {BackgroundColor3 = Color3.fromRGB(45, 45, 45)}, 0.15) end)
+    self.Tab.MouseLeave:Connect(function() Tween(self.Tab, {BackgroundColor3 = Theme.Secondary}, 0.15) end)
+
+    self.Tab.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            local pos = Vector2.new(input.Position.X, input.Position.Y)
+            local eyePos = self.EyeButton.AbsolutePosition
+            local eyeSize = self.EyeButton.AbsoluteSize
+            local trashPos = self.TrashButton.AbsolutePosition
+            local trashSize = self.TrashButton.AbsoluteSize
+
+            if not (pos.X >= eyePos.X and pos.X <= eyePos.X + eyeSize.X and pos.Y >= eyePos.Y and pos.Y <= eyePos.Y + eyeSize.Y) and
+               not (pos.X >= trashPos.X and pos.X <= trashPos.X + trashSize.X and pos.Y >= trashPos.Y and pos.Y <= trashPos.Y + trashSize.Y) then
+                self.Window:Toggle()
+                if not self.Window.Visible then self.Window:Toggle() end
+                self.Window.Frame.Position = UDim2.new(0.1 + (#gui.Categories * 0.05), 0, 0.2, 0)
             end
-            
-            category.TabButton.Visible = matchesSearch
+        end
+    end)
+
+    self.EyeButton.MouseButton1Click:Connect(function()
+        self.Visible = not self.Visible
+        self.EyeButton.Image = self.Visible and Assets.EyeOpen or Assets.EyeClosed
+        self.EyeButton.ImageColor3 = self.Visible and Theme.Text or Theme.TextDim
+
+        if self.Window then
+            if self.Visible then
+                self.Window.Frame.Visible = true
+                Tween(self.Window.Frame, {Size = UDim2.new(0, 240, 0, 320)}, 0.3, Enum.EasingStyle.Back)
+            else
+                Tween(self.Window.Frame, {Size = UDim2.new(0, 240, 0, 0)}, 0.2)
+                task.wait(0.2)
+                self.Window.Frame.Visible = false
+            end
+        end
+    end)
+
+    self.TrashButton.MouseEnter:Connect(function() Tween(self.TrashButton, {ImageColor3 = Theme.Error}, 0.15) end)
+    self.TrashButton.MouseLeave:Connect(function() Tween(self.TrashButton, {ImageColor3 = Theme.TextDim}, 0.15) end)
+
+    self.TrashButton.MouseButton1Click:Connect(function()
+        ShowConfirmationModal("Are you sure you want to delete this tab?", function()
+            self:Destroy()
+        end)
+    end)
+
+    self.Window = CategoryWindow.new(self, name)
+    return self
+end
+
+function Category:AddFeature(name)
+    local feature = Feature.new(self, name)
+    table.insert(self.Features, feature)
+    return feature
+end
+
+function Category:Destroy()
+    for _, feature in ipairs(self.Features) do feature:Destroy() end
+    if self.Window then self.Window:Destroy() end
+
+    Tween(self.Tab, {Size = UDim2.new(0, 0, 1, -10)}, 0.2)
+    task.wait(0.2)
+    self.Tab:Destroy()
+
+    for i, cat in ipairs(self.GUI.Categories) do
+        if cat == self then
+            table.remove(self.GUI.Categories, i)
+            break
+        end
+    end
+end
+
+-- ==========================================
+-- MAIN GUI
+-- ==========================================
+function MeteorGUI.new()
+    local self = setmetatable({}, MeteorGUI)
+    self.Categories = {}
+
+    self.ScreenGui = Create("ScreenGui", {
+        Name = "MeteorGUI",
+        Parent = PlayerGui,
+        ResetOnSpawn = false,
+        ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    })
+
+    self.TopBar = Create("Frame", {
+        Name = "TopBar",
+        Parent = self.ScreenGui,
+        Size = UDim2.new(1, 0, 0, 44),
+        Position = UDim2.new(0, 0, 0, 0),
+        BackgroundColor3 = Theme.Background,
+        BackgroundTransparency = 0.1,
+        BorderSizePixel = 0
+    })
+
+    Create("UICorner", {CornerRadius = UDim.new(0, 0), Parent = self.TopBar})
+    Create("Frame", {
+        Parent = self.TopBar,
+        Size = UDim2.new(1, 0, 0, 1),
+        Position = UDim2.new(0, 0, 1, -1),
+        BackgroundColor3 = Theme.Border,
+        BorderSizePixel = 0
+    })
+
+    self.SearchContainer = Create("Frame", {
+        Name = "SearchContainer",
+        Parent = self.TopBar,
+        Size = UDim2.new(0, 200, 0, 30),
+        Position = UDim2.new(1, -210, 0.5, -15),
+        BackgroundColor3 = Theme.Secondary,
+        BackgroundTransparency = 0.2,
+        BorderSizePixel = 0
+    })
+    Create("UICorner", {CornerRadius = UDim.new(0, 4), Parent = self.SearchContainer})
+
+    local searchIcon = Create("TextLabel", {
+        Parent = self.SearchContainer,
+        Size = UDim2.new(0, 24, 0, 24),
+        Position = UDim2.new(0, 6, 0.5, -12),
+        BackgroundTransparency = 1,
+        Text = "🔍",
+        TextColor3 = Theme.TextDim,
+        Font = Theme.Font,
+        TextSize = 12
+    })
+
+    self.SearchBox = Create("TextBox", {
+        Parent = self.SearchContainer,
+        Size = UDim2.new(1, -36, 1, 0),
+        Position = UDim2.new(0, 30, 0, 0),
+        BackgroundTransparency = 1,
+        Text = "",
+        PlaceholderText = "Search features...",
+        TextColor3 = Theme.Text,
+        PlaceholderColor3 = Theme.TextDim,
+        Font = Theme.Font,
+        TextSize = 13,
+        ClearTextOnFocus = false
+    })
+
+    self.SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
+        self:FilterTabs(self.SearchBox.Text)
+    end)
+
+    self.TabContainer = Create("Frame", {
+        Name = "TabContainer",
+        Parent = self.TopBar,
+        Size = UDim2.new(1, -220, 0, 34),
+        Position = UDim2.new(0, 10, 0.5, -17),
+        BackgroundTransparency = 1
+    })
+
+    Create("UIListLayout", {
+        Parent = self.TabContainer,
+        FillDirection = Enum.FillDirection.Horizontal,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 6),
+        VerticalAlignment = Enum.VerticalAlignment.Center
+    })
+
+    self.TopBar.Position = UDim2.new(0, 0, 0, -44)
+    Tween(self.TopBar, {Position = UDim2.new(0, 0, 0, 0)}, 0.5, Enum.EasingStyle.Quart)
+
+    return self
+end
+
+function MeteorGUI:AddCategory(name)
+    local category = Category.new(self, name)
+    table.insert(self.Categories, category)
+    return category
+end
+
+function MeteorGUI:FilterTabs(query)
+    query = query:lower()
+    for _, category in ipairs(self.Categories) do
+        local tabVisible = true
+        if query ~= "" and not category.Name:lower():find(query) then
+            tabVisible = false
+        end
+
+        if tabVisible then
+            category.Tab.Visible = true
+            Tween(category.Tab, {Size = UDim2.new(0, 160, 1, -10)}, 0.2)
+        else
+            Tween(category.Tab, {Size = UDim2.new(0, 0, 1, -10)}, 0.2)
+            task.wait(0.1)
+            category.Tab.Visible = false
+        end
+
+        for _, feature in ipairs(category.Features) do
+            if query == "" or feature.Name:lower():find(query) then
+                feature.Button.Visible = true
+            else
+                feature.Button.Visible = false
+            end
         end
     end
 end
 
 function MeteorGUI:Destroy()
-    if self.ScreenGui then
-        self.ScreenGui:Destroy()
-    end
+    for _, category in ipairs(self.Categories) do category:Destroy() end
+    self.ScreenGui:Destroy()
 end
 
 return MeteorGUI
