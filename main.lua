@@ -1,317 +1,121 @@
--- [[ METEOR ADVANCED UTILITY ENGINE - LINORIA DIRECT STYLE ]]
+-- =============================================================================
+-- METEOR UI ENGINE (TRADITIONAL VERTICAL SIDEBAR EDITION)
+-- =============================================================================
 local InputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
 local Theme = {
-    MainBg = Color3.fromRGB(12, 12, 12),
-    GroupBg = Color3.fromRGB(16, 16, 16),
-    ElementBg = Color3.fromRGB(22, 22, 22),
-    Accent = Color3.fromRGB(218, 43, 172), -- Твой фирменный неоново-розовый
-    AccentSecondary = Color3.fromRGB(30, 120, 255), -- Синий для системных штук из скринов
-    BorderDark = Color3.fromRGB(5, 5, 5),
-    BorderLight = Color3.fromRGB(35, 35, 35),
+    MainBg = Color3.fromRGB(10, 10, 10),
+    GroupBg = Color3.fromRGB(15, 15, 15),
+    ElementBg = Color3.fromRGB(20, 20, 20),
+    Accent = Color3.fromRGB(218, 43, 172),          -- Фирменный неоновый Meteor
+    AccentSecondary = Color3.fromRGB(30, 120, 255),
+    BorderDark = Color3.fromRGB(0, 0, 0),
+    BorderLight = Color3.fromRGB(30, 30, 30),
     TextPrimary = Color3.fromRGB(255, 255, 255),
-    TextSecondary = Color3.fromRGB(145, 145, 145)
+    TextSecondary = Color3.fromRGB(130, 130, 130)
 }
 
-local RenderFont = Enum.Font.Code -- Фирменный строгий шрифт читов
+local RenderFont = Enum.Font.Code
+local Library = { Registry = {}, Unloaded = false, Watermark = nil, KeybindsFrame = nil, ActivePopups = {} }
 
-local Library = {
-    Registry = {},
-    Unloaded = false,
-    Watermark = nil,
-    KeybindsFrame = nil,
-    ActivePopups = {}
-}
-
--- Вспомогательные функции
 local function Create(class, properties)
     local instance = Instance.new(class)
-    for k, v in pairs(properties) do
-        instance[k] = v
-    end
+    for k, v in pairs(properties) do instance[k] = v end
     return instance
 end
 
-local function ApplyStrictBorder(parent, outerColor, innerColor)
-    local Outer = Create("UIStroke", {
-        Color = outerColor or Theme.BorderDark,
+local function ApplyStrictBorder(parent, color)
+    return Create("UIStroke", {
+        Color = color or Theme.BorderLight,
         Thickness = 1,
         ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
         Parent = parent
     })
-    return Outer
 end
 
 local function CloseAllPopups()
-    for _, popup in pairs(Library.ActivePopups) do
-        if popup then popup:Destroy() end
-    end
+    for _, popup in pairs(Library.ActivePopups) do if popup then popup:Destroy() end end
     table.clear(Library.ActivePopups)
 end
 
--- Математика для HSV пикера
-local function RGBToHex(color)
-    return string.format("#%02x%02x%02x", math.floor(color.R * 255), math.floor(color.G * 255), math.floor(color.B * 255))
-end
+local function RGBToHex(c) return string.format("#%02x%02x%02x", math.floor(c.R*255), math.floor(c.G*255), math.floor(c.B*255)) end
+local function HexToRGB(h) h = h:gsub("#","") return Color3.fromRGB(tonumber("0x"..h:sub(1,2)), tonumber("0x"..h:sub(3,4)), tonumber("0x"..h:sub(5,6))) end
 
-local function HexToRGB(hex)
-    hex = hex:gsub("#","")
-    return Color3.fromRGB(
-        tonumber("0x"..hex:sub(1,2)),
-        tonumber("0x"..hex:sub(3,4)),
-        tonumber("0x"..hex:sub(5,6))
-    )
-end
+local ScreenGui = Create("ScreenGui", { Name = "MeteorEngineGui", ResetOnSpawn = false, DisplayOrder = 999, Parent = LocalPlayer:WaitForChild("PlayerGui") })
 
--- Инициализация Core GUI
-local ScreenGui = Create("ScreenGui", {
-    Name = "MeteorLinoriaPremium",
-    ResetOnSpawn = false,
-    DisplayOrder = 999,
-    Parent = LocalPlayer:WaitForChild("PlayerGui")
-})
-
--- [[ 1. WATERMARK SYSTEM ]]
+-- [1] СИСТЕМНЫЕ ОВЕРЛЕИ (Watermark & Keybinds)
 function Library:InitWatermark(title)
-    local WatermarkFrame = Create("Frame", {
-        Name = "Watermark",
-        Size = UDim2.new(0, 240, 0, 22),
-        Position = UDim2.new(0, 15, 0, 15), -- Высокое позиционирование
-        BackgroundColor3 = Theme.MainBg,
-        BorderSizePixel = 0,
-        Parent = ScreenGui
-    })
+    local WatermarkFrame = Create("Frame", { Size = UDim2.new(0, 260, 0, 22), Position = UDim2.new(0, 15, 0, 10), BackgroundColor3 = Theme.MainBg, Parent = ScreenGui })
     ApplyStrictBorder(WatermarkFrame, Theme.BorderDark)
+    Create("Frame", { Size = UDim2.new(1, 0, 0, 1), BackgroundColor3 = Theme.Accent, BorderSizePixel = 0, Parent = WatermarkFrame })
+    local TextLabel = Create("TextLabel", { Size = UDim2.new(1, -10, 1, -1), Position = UDim2.new(0, 5, 0, 1), BackgroundTransparency = 1, Font = RenderFont, Text = title, TextColor3 = Theme.TextPrimary, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, Parent = WatermarkFrame })
     
-    local TopLine = Create("Frame", {
-        Size = UDim2.new(1, 0, 0, 1),
-        BackgroundColor3 = Theme.Accent,
-        BorderSizePixel = 0,
-        Parent = WatermarkFrame
-    })
-
-    local TextLabel = Create("TextLabel", {
-        Size = UDim2.new(1, -10, 1, -1),
-        Position = UDim2.new(0, 5, 0, 1),
-        BackgroundTransparency = 1,
-        Font = RenderFont,
-        Text = title,
-        TextColor3 = Theme.TextPrimary,
-        TextSize = 12,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        Parent = WatermarkFrame
-    })
-
-    -- Динамическое обновление FPS / Пинга
-    task.spawn(value_generation or function()
-        local lastIteration = os.clock()
-        local frameHistory = {}
-        
+    task.spawn(function()
+        local history = {}
         RunService.RenderStepped:Connect(function()
             if Library.Unloaded then return end
-            local now = os.clock()
-            table.insert(frameHistory, 1, now)
-            while frameHistory[#frameHistory] < now - 1 do
-                table.remove(frameHistory)
-            end
-            local fps = #frameHistory
+            local now = os.clock() table.insert(history, 1, now) while history[#history] < now - 1 do table.remove(history) end
             local ping = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValueString():match("%d+") or "0"
-            TextLabel.Text = string.format("%s | %d fps | %s ms", title, fps, ping)
+            TextLabel.Text = string.format("%s | %d FPS | %s MS", title, #history, ping)
         end)
     end)
-    
     Library.Watermark = WatermarkFrame
 end
 
--- [[ 2. KEYBINDS OVERLAY ]]
 function Library:InitKeybinds()
-    local KeybindsFrame = Create("Frame", {
-        Name = "KeybindList",
-        Size = UDim2.new(0, 210, 0, 24),
-        Position = UDim2.new(0, 15, 0, 300),
-        BackgroundColor3 = Theme.MainBg,
-        BorderSizePixel = 0,
-        Parent = ScreenGui
-    })
-    ApplyStrictBorder(KeybindsFrame, Theme.BorderDark)
-
-    local TopLine = Create("Frame", {
-        Size = UDim2.new(1, 0, 0, 1),
-        BackgroundColor3 = Theme.Accent,
-        BorderSizePixel = 0,
-        Parent = KeybindsFrame
-    })
-
-    local Title = Create("TextLabel", {
-        Size = UDim2.new(1, -10, 0, 22),
-        Position = UDim2.new(0, 5, 0, 1),
-        BackgroundTransparency = 1,
-        Font = RenderFont,
-        Text = "Keybinds",
-        TextColor3 = Theme.TextPrimary,
-        TextSize = 12,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        Parent = KeybindsFrame
-    })
-
-    local ListLayout = Create("UIListLayout", {
-        SortOrder = Enum.SortOrder.LayoutOrder,
-        Padding = UDim.new(0, 2),
-        Parent = KeybindsFrame
-    })
-
-    local Container = Create("Frame", {
-        Size = UDim2.new(1, 0, 0, 0),
-        Position = UDim2.new(0, 0, 0, 23),
-        BackgroundTransparency = 1,
-        Parent = KeybindsFrame
-    })
-    
-    ListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        KeybindsFrame.Size = UDim2.new(0, 210, 0, ListLayout.AbsoluteContentSize.Y + 24)
-    end)
-
+    local KBFrame = Create("Frame", { Size = UDim2.new(0, 210, 0, 24), Position = UDim2.new(0, 15, 0, 40), BackgroundColor3 = Theme.MainBg, Parent = ScreenGui })
+    ApplyStrictBorder(KBFrame, Theme.BorderDark)
+    Create("Frame", { Size = UDim2.new(1, 0, 0, 1), BackgroundColor3 = Theme.Accent, BorderSizePixel = 0, Parent = KBFrame })
+    Create("TextLabel", { Size = UDim2.new(1, -10, 0, 22), Position = UDim2.new(0, 5, 0, 1), BackgroundTransparency = 1, Font = RenderFont, Text = "Active Keybinds", TextColor3 = Theme.TextPrimary, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, Parent = KBFrame })
+    local List = Create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 2), Parent = KBFrame })
+    local Container = Create("Frame", { Size = UDim2.new(1, 0, 0, 0), Position = UDim2.new(0, 0, 0, 23), BackgroundTransparency = 1, Parent = KBFrame })
+    List:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() KBFrame.Size = UDim2.new(0, 210, 0, List.AbsoluteContentSize.Y + 24) end)
     Library.KeybindsFrame = Container
 end
 
 function Library:AddKeybindRow(name, keyStr)
     if not Library.KeybindsFrame then return end
-    
-    local Row = Create("Frame", {
-        Size = UDim2.new(1, 0, 0, 18),
-        BackgroundTransparency = 1,
-        Parent = Library.KeybindsFrame
-    })
-    
-    local Label = Create("TextLabel", {
-        Size = UDim2.new(1, -60, 1, 0),
-        Position = UDim2.new(0, 6, 0, 0),
-        BackgroundTransparency = 1,
-        Font = RenderFont,
-        Text = "[" .. keyStr .. "] " .. name,
-        TextColor3 = Theme.TextSecondary,
-        TextSize = 11,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        Parent = Row
-    })
-    
-    local ModeLabel = Create("TextLabel", {
-        Size = UDim2.new(0, 50, 1, 0),
-        Position = UDim2.new(1, -55, 0, 0),
-        BackgroundTransparency = 1,
-        Font = RenderFont,
-        Text = "(Toggle)",
-        TextColor3 = Theme.TextSecondary,
-        TextSize = 11,
-        TextXAlignment = Enum.TextXAlignment.Right,
-        Parent = Row
-    })
-    
-    return {
-        Update = function(newKey, active)
-            Label.Text = "[" .. newKey .. "] " .. name
-            ModeLabel.TextColor3 = active and Theme.Accent or Theme.TextSecondary
-        end,
-        Destroy = function() Row:Destroy() end
-    }
+    local Row = Create("Frame", { Size = UDim2.new(1, 0, 0, 18), BackgroundTransparency = 1, Parent = Library.KeybindsFrame })
+    local Lbl = Create("TextLabel", { Size = UDim2.new(1, -60, 1, 0), Position = UDim2.new(0, 6, 0, 0), BackgroundTransparency = 1, Font = RenderFont, Text = string.format("[%s] %s", keyStr, name), TextColor3 = Theme.TextSecondary, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left, Parent = Row })
+    local Mode = Create("TextLabel", { Size = UDim2.new(0, 50, 1, 0), Position = UDim2.new(1, -55, 0, 0), BackgroundTransparency = 1, Font = RenderFont, Text = "(Toggle)", TextColor3 = Theme.TextSecondary, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Right, Parent = Row })
+    return { Update = function(newKey, act) Lbl.Text = string.format("[%s] %s", newKey, name) Mode.TextColor3 = act and Theme.Accent or Theme.TextSecondary end }
 end
 
--- [[ 3. MAIN WINDOW CREATION ]]
+-- [2] ГЛАВНОЕ ОКНО С ЛЕВЫМИ ВКЛАДКАМИ И ПОИСКОМ
 function Library:CreateWindow(windowTitle)
     local Window = { Tabs = {}, CurrentTab = nil }
-
-    local MainFrame = Create("Frame", {
-        Name = "MainPanel",
-        Size = UDim2.new(0, 620, 0, 480),
-        Position = UDim2.new(0.5, -310, 0, 45), -- Смещено наверх экрана
-        BackgroundColor3 = Theme.MainBg,
-        BorderSizePixel = 0,
-        Parent = ScreenGui
-    })
+    local MainFrame = Create("Frame", { Name = "MeteorMain", Size = UDim2.new(0, 660, 0, 480), Position = UDim2.new(0.5, -330, 0, 60), BackgroundColor3 = Theme.MainBg, Parent = ScreenGui })
     ApplyStrictBorder(MainFrame, Theme.BorderDark)
 
-    -- Поисковая панель (Сверху справа в шапке)
-    local SearchBar = Create("Frame", {
-        Size = UDim2.new(0, 150, 0, 20),
-        Position = UDim2.new(1, -165, 0, 8),
-        BackgroundColor3 = Theme.ElementBg,
-        Parent = MainFrame
-    })
-    ApplyStrictBorder(SearchBar)
+    -- Левая панель навигации (Sidebar)
+    local Sidebar = Create("Frame", { Size = UDim2.new(0, 140, 1, 0), BackgroundColor3 = Theme.GroupBg, Parent = MainFrame })
+    ApplyStrictBorder(Sidebar, Theme.BorderDark)
+    Create("Frame", { Size = UDim2.new(0, 1, 1, 0), Position = UDim2.new(1, 0, 0, 0), BackgroundColor3 = Theme.BorderLight, BorderSizePixel = 0, Parent = Sidebar })
 
-    local SearchIcon = Create("ImageLabel", {
-        Size = UDim2.new(0, 12, 0, 12),
-        Position = UDim2.new(1, -16, 0.5, -6),
-        BackgroundTransparency = 1,
-        Image = "rbxassetid://118685771787843", -- Твой кастомный ассет лупы
-        ImageColor3 = Theme.Accent,
-        Parent = SearchBar
-    })
+    -- Поиск бар (Внутри Сайбара сверху)
+    local SearchBar = Create("Frame", { Size = UDim2.new(1, -12, 0, 22), Position = UDim2.new(0, 6, 0, 8), BackgroundColor3 = Theme.ElementBg, Parent = Sidebar })
+    ApplyStrictBorder(SearchBar, Theme.BorderLight)
+    local SearchInput = Create("TextBox", { Size = UDim2.new(1, -20, 1, 0), Position = UDim2.new(0, 4, 0, 0), BackgroundTransparency = 1, Font = RenderFont, Text = "", PlaceholderText = "Search...", PlaceholderColor3 = Theme.TextSecondary, TextColor3 = Theme.TextPrimary, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left, Parent = SearchBar })
 
-    local SearchInput = Create("TextBox", {
-        Size = UDim2.new(1, -22, 1, 0),
-        Position = UDim2.new(0, 4, 0, 0),
-        BackgroundTransparency = 1,
-        Font = RenderFont,
-        Text = "",
-        PlaceholderText = "Search features...",
-        PlaceholderColor3 = Theme.TextSecondary,
-        TextColor3 = Theme.TextPrimary,
-        TextSize = 11,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        Parent = SearchBar
-    })
+    -- Контейнер для кнопок вкладок
+    local TabScroller = Create("ScrollingFrame", { Size = UDim2.new(1, -6, 1, -40), Position = UDim2.new(0, 3, 0, 36), BackgroundTransparency = 1, CanvasSize = UDim2.new(0, 0, 0, 0), ScrollBarThickness = 0, Parent = Sidebar })
+    local TabListLayout = Create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 4), Parent = TabScroller })
 
-    -- Линия разграничения топ-бара
-    local DecLine = Create("Frame", {
-        Size = UDim2.new(1, 0, 0, 1),
-        Position = UDim2.new(0, 0, 0, 35),
-        BackgroundColor3 = Theme.BorderLight,
-        BorderSizePixel = 0,
-        Parent = MainFrame
-    })
+    -- Правая рабочая область для контента
+    local ContentArea = Create("Frame", { Size = UDim2.new(1, -140, 1, 0), Position = UDim2.new(0, 140, 0, 0), BackgroundTransparency = 1, Parent = MainFrame })
 
-    local TabScroller = Create("Frame", {
-        Size = UDim2.new(1, -180, 0, 26),
-        Position = UDim2.new(0, 10, 0, 5),
-        BackgroundTransparency = 1,
-        Parent = MainFrame
-    })
-
-    local TabListLayout = Create("UIListLayout", {
-        FillDirection = Enum.FillDirection.Horizontal,
-        SortOrder = Enum.SortOrder.LayoutOrder,
-        Padding = UDim.new(0, 4),
-        Parent = TabScroller
-    })
-
-    local ContainerHolder = Create("Frame", {
-        Size = UDim2.new(1, -12, 1, -45),
-        Position = UDim2.new(0, 6, 0, 40),
-        BackgroundColor3 = Theme.GroupBg,
-        Parent = MainFrame
-    })
-    ApplyStrictBorder(ContainerHolder)
-
-    -- Реализация Dragging (Перетаскивание за топ-бар)
+    -- Драггинг
     local dragging, dragInput, dragStart, startPos
     MainFrame.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 and input.Position.Y - MainFrame.AbsolutePosition.Y < 35 then
-            dragging = true
-            dragStart = input.Position
-            startPos = MainFrame.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then dragging = false end
-            end)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 and input.Position.Y - MainFrame.AbsolutePosition.Y < 30 then
+            dragging = true dragStart = input.Position startPos = MainFrame.Position
+            input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
         end
     end)
-    MainFrame.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement then dragInput = input end
-    end)
+    MainFrame.InputChanged:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseMovement then dragInput = input end end)
     InputService.InputChanged:Connect(function(input)
         if input == dragInput and dragging then
             local delta = input.Position - dragStart
@@ -319,46 +123,20 @@ function Library:CreateWindow(windowTitle)
         end
     end)
 
-    -- [[ 4. TAB COMPONENT ]]
+    -- [3] СОЗДАНИЕ ВЕРТИКАЛЬНЫХ ВКЛАДОК
     function Window:CreateTab(tabName)
         local Tab = { Groupboxes = {}, ElementsMap = {} }
+        
+        local TabButton = Create("TextButton", { Size = UDim2.new(1, 0, 0, 24), BackgroundColor3 = Theme.GroupBg, Font = RenderFont, Text = "  " .. tabName, TextColor3 = Theme.TextSecondary, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, Parent = TabScroller })
+        ApplyStrictBorder(TabButton, Theme.BorderDark)
 
-        local TabButton = Create("TextButton", {
-            Size = UDim2.new(0, 85, 1, 0),
-            BackgroundColor3 = Theme.GroupBg,
-            Font = RenderFont,
-            Text = tabName,
-            TextColor3 = Theme.TextSecondary,
-            TextSize = 12,
-            Parent = TabScroller
-        })
-        ApplyStrictBorder(TabButton)
-
-        local TabView = Create("Frame", {
-            Size = UDim2.new(1, 0, 1, 0),
-            BackgroundTransparency = 1,
-            Visible = false,
-            Parent = ContainerHolder
-        })
-
-        local LeftColumn = Create("ScrollingFrame", {
-            Size = UDim2.new(0.5, -6, 1, -10),
-            Position = UDim2.new(0, 4, 0, 5),
-            BackgroundTransparency = 1,
-            CanvasSize = UDim2.new(0, 0, 0, 0),
-            ScrollBarThickness = 0,
-            Parent = TabView
-        })
+        local TabView = Create("Frame", { Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Visible = false, Parent = ContentArea })
+        
+        -- Сетка из двух колонок (Левая/Правая) внутри открытой вкладки
+        local LeftColumn = Create("ScrollingFrame", { Size = UDim2.new(0.5, -8, 1, -16), Position = UDim2.new(0, 6, 0, 8), BackgroundTransparency = 1, CanvasSize = UDim2.new(0, 0, 0, 0), ScrollBarThickness = 0, Parent = TabView })
         Create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 10), Parent = LeftColumn })
-
-        local RightColumn = Create("ScrollingFrame", {
-            Size = UDim2.new(0.5, -6, 1, -10),
-            Position = UDim2.new(0.5, 2, 0, 5),
-            BackgroundTransparency = 1,
-            CanvasSize = UDim2.new(0, 0, 0, 0),
-            ScrollBarThickness = 0,
-            Parent = TabView
-        })
+        
+        local RightColumn = Create("ScrollingFrame", { Size = UDim2.new(0.5, -8, 1, -16), Position = UDim2.new(0.5, 2, 0, 8), BackgroundTransparency = 1, CanvasSize = UDim2.new(0, 0, 0, 0), ScrollBarThickness = 0, Parent = TabView })
         Create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 10), Parent = RightColumn })
 
         local function Select()
@@ -368,769 +146,256 @@ function Library:CreateWindow(windowTitle)
                 Window.CurrentTab.View.Visible = false
             end
             TabButton.TextColor3 = Theme.Accent
-            TabButton.BackgroundColor3 = Theme.MainBg
+            TabButton.BackgroundColor3 = Theme.ElementBg
             TabView.Visible = true
             Window.CurrentTab = { Button = TabButton, View = TabView }
             CloseAllPopups()
         end
-
         TabButton.MouseButton1Click:Connect(Select)
         if not Window.CurrentTab then Select() end
 
-        -- [[ 5. GROUPBOX COMPONENT (Рамки настроек) ]]
+        -- [4] СТРУКТУРНЫЕ ГРУПБОКСЫ
         function Tab:CreateGroupbox(boxName, columnSide)
-            local Groupbox = { CurrentSubtabFrame = nil, SubtabsContainer = nil }
+            local Groupbox = { SubtabsContainer = nil }
             local targetColumn = (columnSide == "Right") and RightColumn or LeftColumn
 
-            local GroupFrame = Create("Frame", {
-                Name = boxName .. "Group",
-                Size = UDim2.new(1, 0, 0, 40),
-                BackgroundColor3 = Theme.MainBg,
-                Parent = targetColumn
-            })
-            ApplyStrictBorder(GroupFrame, Theme.BorderDark)
+            local GroupFrame = Create("Frame", { Size = UDim2.new(1, 0, 0, 40), BackgroundColor3 = Theme.GroupBg, Parent = targetColumn })
+            ApplyStrictBorder(GroupFrame, Theme.BorderLight)
+            
+            local TopLine = Create("Frame", { Size = UDim2.new(1, 0, 0, 1), BackgroundColor3 = Theme.Accent, BorderSizePixel = 0, Parent = GroupFrame })
+            local GroupTitle = Create("TextLabel", { Position = UDim2.new(0, 10, 0, -6), BackgroundColor3 = Theme.GroupBg, Font = RenderFont, Text = " " .. boxName .. " ", TextColor3 = Theme.TextPrimary, TextSize = 11, Parent = GroupFrame })
+            GroupTitle.Size = UDim2.new(0, GroupTitle.TextBounds.X + 4, 0, 12)
 
-            local AccentTop = Create("Frame", {
-                Size = UDim2.new(1, 0, 0, 2),
-                BackgroundColor3 = Theme.Accent,
-                BorderSizePixel = 0,
-                Parent = GroupFrame
-            })
-
-            local GroupTitle = Create("TextLabel", {
-                Size = UDim2.new(0, 100, 0, 14),
-                Position = UDim2.new(0, 10, 0, -7),
-                BackgroundColor3 = Theme.MainBg,
-                Font = RenderFont,
-                Text = " " .. boxName .. " ",
-                TextColor3 = Theme.TextPrimary,
-                TextSize = 11,
-                TextXAlignment = Enum.TextXAlignment.Left,
-                Parent = GroupFrame
-            })
-            GroupTitle.Size = UDim2.new(0, GroupTitle.TextBounds.X + 6, 0, 14)
-
-            local ItemsList = Create("Frame", {
-                Size = UDim2.new(1, -16, 1, -16),
-                Position = UDim2.new(0, 8, 0, 10),
-                BackgroundTransparency = 1,
-                Parent = GroupFrame
-            })
-            local ItemsLayout = Create("UIListLayout", {
-                SortOrder = Enum.SortOrder.LayoutOrder,
-                Padding = UDim.new(0, 6),
-                Parent = ItemsList
-            })
+            local ItemsList = Create("Frame", { Size = UDim2.new(1, -12, 1, -14), Position = UDim2.new(0, 6, 0, 8), BackgroundTransparency = 1, Parent = GroupFrame })
+            local ItemsLayout = Create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 5), Parent = ItemsList })
 
             local function AutoResize()
-                local baseSize = ItemsLayout.AbsoluteContentSize.Y + 22
-                GroupFrame.Size = UDim2.new(1, 0, 0, baseSize)
+                GroupFrame.Size = UDim2.new(1, 0, 0, ItemsLayout.AbsoluteContentSize.Y + 16)
                 targetColumn.CanvasSize = UDim2.new(0, 0, 0, targetColumn.UIListLayout.AbsoluteContentSize.Y + 20)
             end
             ItemsLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(AutoResize)
 
-            -- [[ 6. SUBTABS / SLOTS SYSTEM INSIDE GROUPBOX ]]
+            -- Внутренние слоты/сабтабы внутри одного групбокса
             function Groupbox:CreateSubtabs()
-                local SubtabSystem = { CurrentSub = nil }
-                
-                local Bar = Create("Frame", {
-                    Size = UDim2.new(1, 0, 0, 20),
-                    BackgroundColor3 = Theme.ElementBg,
-                    Parent = ItemsList
-                })
-                ApplyStrictBorder(Bar)
-                
-                local Layout = Create("UIListLayout", {
-                    FillDirection = Enum.FillDirection.Horizontal,
-                    SortOrder = Enum.SortOrder.LayoutOrder,
-                    Parent = Bar
-                })
+                local SubSystem = { CurrentSub = nil }
+                local Bar = Create("Frame", { Size = UDim2.new(1, 0, 0, 18), BackgroundColor3 = Theme.ElementBg, Parent = ItemsList })
+                ApplyStrictBorder(Bar, Theme.BorderLight)
+                Create("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Parent = Bar })
 
-                local MultiFrame = Create("Frame", {
-                    Size = UDim2.new(1, 0, 0, 0),
-                    BackgroundTransparency = 1,
-                    Parent = ItemsList
-                })
-                local MultiLayout = Create("UIListLayout", {
-                    SortOrder = Enum.SortOrder.LayoutOrder,
-                    Padding = UDim.new(0, 5),
-                    Parent = MultiFrame
-                })
-                MultiLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-                    MultiFrame.Size = UDim2.new(1, 0, 0, MultiLayout.AbsoluteContentSize.Y)
-                    AutoResize()
-                end)
-
+                local MultiFrame = Create("Frame", { Size = UDim2.new(1, 0, 0, 0), BackgroundTransparency = 1, Parent = ItemsList })
+                local MultiLayout = Create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 5), Parent = MultiFrame })
+                MultiLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() MultiFrame.Size = UDim2.new(1, 0, 0, MultiLayout.AbsoluteContentSize.Y) AutoResize() end)
                 Groupbox.SubtabsContainer = MultiFrame
 
-                function SubtabSystem:AddSlot(slotName)
-                    local SlotFrame = Create("Frame", {
-                        Size = UDim2.new(1, 0, 1, 0),
-                        BackgroundTransparency = 1,
-                        Visible = false,
-                        Parent = MultiFrame
-                    })
-                    local SlotLayout = Create("UIListLayout", {
-                        SortOrder = Enum.SortOrder.LayoutOrder,
-                        Padding = UDim.new(0, 5),
-                        Parent = SlotFrame
-                    })
-                    SlotLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-                        if SlotFrame.Visible then
-                            MultiFrame.Size = UDim2.new(1, 0, 0, SlotLayout.AbsoluteContentSize.Y)
-                            AutoResize()
-                        end
-                    end)
+                function SubSystem:AddSlot(slotName)
+                    local SlotFrame = Create("Frame", { Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Visible = false, Parent = MultiFrame })
+                    local SlotLayout = Create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 5), Parent = SlotFrame })
+                    SlotLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() if SlotFrame.Visible then MultiFrame.Size = UDim2.new(1, 0, 0, SlotLayout.AbsoluteContentSize.Y) AutoResize() end end)
 
-                    local Button = Create("TextButton", {
-                        Size = UDim2.new(0, 70, 1, 0),
-                        BackgroundColor3 = Theme.ElementBg,
-                        Font = RenderFont,
-                        Text = slotName,
-                        TextColor3 = Theme.TextSecondary,
-                        TextSize = 11,
-                        Parent = Bar
-                    })
-                    ApplyStrictBorder(Button)
+                    local Btn = Create("TextButton", { Size = UDim2.new(0, 60, 1, 0), BackgroundColor3 = Theme.ElementBg, Font = RenderFont, Text = slotName, TextColor3 = Theme.TextSecondary, TextSize = 10, Parent = Bar })
+                    ApplyStrictBorder(Btn, Theme.BorderDark)
 
-                    local function ActivateSlot()
-                        if SubtabSystem.CurrentSub then
-                            SubtabSystem.CurrentSub.Btn.TextColor3 = Theme.TextSecondary
-                            SubtabSystem.CurrentSub.Btn.BackgroundColor3 = Theme.ElementBg
-                            SubtabSystem.CurrentSub.Fr.Visible = false
-                        end
-                        Button.TextColor3 = Theme.TextPrimary
-                        Button.BackgroundColor3 = Theme.GroupBg
-                        SlotFrame.Visible = true
-                        SubtabSystem.CurrentSub = { Btn = Button, Fr = SlotFrame }
-                        MultiFrame.Size = UDim2.new(1, 0, 0, SlotLayout.AbsoluteContentSize.Y)
-                        AutoResize()
+                    local function Activate()
+                        if SubSystem.CurrentSub then SubSystem.CurrentSub.B.TextColor3 = Theme.TextSecondary SubSystem.CurrentSub.F.Visible = false end
+                        Btn.TextColor3 = Theme.TextPrimary SlotFrame.Visible = true SubSystem.CurrentSub = { B = Btn, F = SlotFrame }
+                        MultiFrame.Size = UDim2.new(1, 0, 0, SlotLayout.AbsoluteContentSize.Y) AutoResize()
                     end
+                    Btn.MouseButton1Click:Connect(Activate) if not SubSystem.CurrentSub then Activate() end
 
-                    Button.MouseButton1Click:Connect(ActivateSlot)
-                    if not SubtabSystem.CurrentSub then ActivateSlot() end
-
-                    -- Перенаправление добавления элементов в контейнер слота
-                    local SlotBuilder = {}
-                    setmetatable(SlotBuilder, {
-                        __index = function(_, key)
-                            return function(self, ...)
-                                return Groupbox[key](Groupbox, ...)
-                            end
-                        end
-                    })
-                    -- Подменяем фабричный родительский объект для элементов слота
-                    return SlotFrame
+                    local Proxy = {} setmetatable(Proxy, { __index = function(_, m) return function(self, ...) return Groupbox[m](Groupbox, ..., SlotFrame) end end })
+                    return Proxy
                 end
-
-                return SubtabSystem
+                return SubSystem
             end
 
-            -- Хелпер для определения куда пушить элемент (в групбокс или активный внутренний слот)
-            local function GetTargetParent(overrideParent)
-                return overrideParent or Groupbox.SubtabsContainer or ItemsList
-            end
+            local function GetParent(override) return override or Groupbox.SubtabsContainer or ItemsList end
 
-            -- [[ 7. ЭЛЕМЕНТ: TOGGLE (Квадратный Чекбокс) ]]
+            -- [ЭЛЕМЕНТ]: Чекбокс (Toggle) + Аддоны (Бинд и Колорпикер)
             function Groupbox:CreateToggle(text, default, callback, overrideParent)
-                local state = default or false
-                local parent = GetTargetParent(overrideParent)
+                local state = default or false local p = GetParent(overrideParent)
+                local TFrame = Create("Frame", { Size = UDim2.new(1, 0, 0, 16), BackgroundTransparency = 1, Parent = p })
+                local Box = Create("TextButton", { Size = UDim2.new(0, 12, 0, 12), Position = UDim2.new(0, 2, 0.5, -6), BackgroundColor3 = state and Theme.Accent or Theme.ElementBg, Text = "", Parent = TFrame })
+                ApplyStrictBorder(Box, Theme.BorderDark)
+                local Lbl = Create("TextButton", { Size = UDim2.new(1, -20, 1, 0), Position = UDim2.new(0, 20, 0, 0), BackgroundTransparency = 1, Font = RenderFont, Text = text, TextColor3 = state and Theme.TextPrimary or Theme.TextSecondary, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left, Parent = TFrame })
+                
+                local Addons = Create("Frame", { Size = UDim2.new(0, 80, 1, 0), Position = UDim2.new(1, -80, 0, 0), BackgroundTransparency = 1, Parent = TFrame })
+                Create("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Right, Padding = UDim.new(0, 4), Parent = Addons })
 
-                local ToggleFrame = Create("Frame", {
-                    Size = UDim2.new(1, 0, 0, 20),
-                    BackgroundTransparency = 1,
-                    Parent = parent
-                })
-
-                local Checkbox = Create("TextButton", {
-                    Size = UDim2.new(0, 12, 0, 12),
-                    Position = UDim2.new(0, 2, 0.5, -6),
-                    BackgroundColor3 = state and Theme.Accent or Theme.ElementBg,
-                    Text = "",
-                    Parent = ToggleFrame
-                })
-                ApplyStrictBorder(Checkbox)
-
-                local Label = Create("TextButton", {
-                    Size = UDim2.new(1, -20, 1, 0),
-                    Position = UDim2.new(0, 22, 0, 0),
-                    BackgroundTransparency = 1,
-                    Font = RenderFont,
-                    Text = text,
-                    TextColor3 = state and Theme.TextPrimary or Theme.TextSecondary,
-                    TextSize = 12,
-                    TextXAlignment = Enum.TextXAlignment.Left,
-                    Parent = ToggleFrame
-                })
-
-                local function ToggleAction()
-                    state = not state
-                    Checkbox.BackgroundColor3 = state and Theme.Accent or Theme.ElementBg
-                    Label.TextColor3 = state and Theme.TextPrimary or Theme.TextSecondary
+                local function Press()
+                    state = not state Box.BackgroundColor3 = state and Theme.Accent or Theme.ElementBg Lbl.TextColor3 = state and Theme.TextPrimary or Theme.TextSecondary
                     pcall(callback, state)
                 end
+                Box.MouseButton1Click:Connect(Press) Lbl.MouseButton1Click:Connect(Press)
+                Tab.ElementsMap[text:lower()] = { Frame = TFrame }
 
-                Checkbox.MouseButton1Click:Connect(ToggleAction)
-                Label.MouseButton1Click:Connect(ToggleAction)
-
-                local Addons = Create("Frame", {
-                    Size = UDim2.new(0, 60, 1, 0),
-                    Position = UDim2.new(1, -60, 0, 0),
-                    BackgroundTransparency = 1,
-                    Parent = ToggleFrame
-                })
-                local AddonLayout = Create("UIListLayout", {
-                    FillDirection = Enum.FillDirection.Horizontal,
-                    HorizontalAlignment = Enum.HorizontalAlignment.Right,
-                    SortOrder = Enum.SortOrder.LayoutOrder,
-                    Padding = UDim.new(0, 4),
-                    Parent = Addons
-                })
-
-                Tab.ElementsMap[text:lower()] = { Frame = ToggleFrame, MainLabel = Label }
-
-                -- Функционал встраивания Keybind в строку Toggle
                 local Builder = {}
-                function Builder:AddKeybind(initialKey, bindCallback)
-                    local currentKey = initialKey or "None"
-                    local KBRow = nil
-                    
-                    local BindButton = Create("TextButton", {
-                        Size = UDim2.new(0, 35, 0, 14),
-                        BackgroundColor3 = Theme.ElementBg,
-                        Font = RenderFont,
-                        Text = "[" .. currentKey .. "]",
-                        TextColor3 = Theme.TextSecondary,
-                        TextSize = 10,
-                        Parent = Addons
-                    })
-                    ApplyStrictBorder(BindButton)
-
-                    if Library.KeybindsFrame then
-                        KBRow = Library:AddKeybindRow(text, currentKey)
-                    end
-
-                    BindButton.MouseButton1Click:Connect(function()
-                        BindButton.Text = "[...]"
-                        local connection
-                        connection = InputService.InputBegan:Connect(function(input)
-                            if input.UserInputType == Enum.UserInputType.Keyboard then
-                                currentKey = input.KeyCode.Name
-                                BindButton.Text = "[" .. currentKey .. "]"
-                                if KBRow then KBRow.Update(currentKey, state) end
-                                connection:Disconnect()
-                            elseif input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.MouseButton2 then
-                                currentKey = input.UserInputType.Name == "MouseButton1" and "MB1" or "MB2"
-                                BindButton.Text = "[" .. currentKey .. "]"
-                                if KBRow then KBRow.Update(currentKey, state) end
-                                connection:Disconnect()
-                            end
+                function Builder:AddKeybind(initKey, bindCall)
+                    local current = initKey or "None" local row = Library:AddKeybindRow(text, current)
+                    local BBtn = Create("TextButton", { Size = UDim2.new(0, 30, 0, 12), BackgroundColor3 = Theme.ElementBg, Font = RenderFont, Text = "["..current.."]", TextColor3 = Theme.TextSecondary, TextSize = 9, Parent = Addons })
+                    ApplyStrictBorder(BBtn, Theme.BorderDark)
+                    BBtn.MouseButton1Click:Connect(function()
+                        BBtn.Text = "[...]" local c con = InputService.InputBegan:Connect(function(i)
+                            if i.UserInputType == Enum.UserInputType.Keyboard then current = i.KeyCode.Name elseif i.UserInputType == Enum.UserInputType.MouseButton1 then current = "MB1" elseif i.UserInputType == Enum.UserInputType.MouseButton2 then current = "MB2" end
+                            BBtn.Text = "["..current.."]" if row then row.Update(current, state) end con:Disconnect()
                         end)
                     end)
-
-                    InputService.InputBegan:Connect(function(input, processed)
-                        if processed then return end
-                        if (input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode.Name == currentKey) or
-                           (currentKey == "MB1" and input.UserInputType == Enum.UserInputType.MouseButton1) or 
-                           (currentKey == "MB2" and input.UserInputType == Enum.UserInputType.MouseButton2) then
-                            ToggleAction()
-                            if KBRow then KBRow.Update(currentKey, state) end
-                            pcall(bindCallback, state)
-                        end
-                    end)
+                    InputService.InputBegan:Connect(function(i, proc) if not proc and ((i.UserInputType == Enum.UserInputType.Keyboard and i.KeyCode.Name == current) or (current == "MB1" and i.UserInputType == Enum.UserInputType.MouseButton1) or (current == "MB2" and i.UserInputType == Enum.UserInputType.MouseButton2)) then Press() if row then row.Update(current, state) end pcall(bindCall, state) end end)
+                    return Builder
                 end
-
-                -- Интеграция Colorpicker прямо в строку Toggle
-                function Builder:AddColorPicker(defaultColor, cpCallback)
-                    local FrameColor = defaultColor or Color3.fromRGB(255, 255, 255)
-                    local VisualBox = Create("TextButton", {
-                        Size = UDim2.new(0, 16, 0, 12),
-                        BackgroundColor3 = FrameColor,
-                        Text = "",
-                        Parent = Addons
-                    })
-                    ApplyStrictBorder(VisualBox)
-
-                    VisualBox.MouseButton1Click:Connect(function()
-                        Groupbox:OpenAdvancedColorPicker(text, FrameColor, function(selectedColor)
-                            VisualBox.BackgroundColor3 = selectedColor
-                            FrameColor = selectedColor
-                            pcall(cpCallback, selectedColor)
-                        end)
-                    end)
+                function Builder:AddColorPicker(initCol, cpCall)
+                    local c = initCol or Color3.new(1,1,1)
+                    local PBox = Create("TextButton", { Size = UDim2.new(0, 14, 0, 12), BackgroundColor3 = c, Text = "", Parent = Addons }) ApplyStrictBorder(PBox, Theme.BorderDark)
+                    PBox.MouseButton1Click:Connect(function() Groupbox:OpenAdvancedColorPicker(text, c, function(nc) PBox.BackgroundColor3 = nc c = nc pcall(cpCall, nc) end) end)
+                    return Builder
                 end
-
                 return Builder
             end
 
-            -- [[ 8. ЭЛЕМЕНТ: SLIDER (Строгий Линория стиль с текстом внутри) ]]
-            function Groupbox:CreateSlider(text, min, max, default, formatStr, callback, overrideParent)
-                local parent = GetTargetParent(overrideParent)
-                formatStr = formatStr or "%d/%d"
-
-                local SliderFrame = Create("Frame", {
-                    Size = UDim2.new(1, 0, 0, 30),
-                    BackgroundTransparency = 1,
-                    Parent = parent
-                })
-
-                local Label = Create("TextLabel", {
-                    Size = UDim2.new(1, 0, 0, 14),
-                    BackgroundTransparency = 1,
-                    Font = RenderFont,
-                    Text = text,
-                    TextColor3 = Theme.TextPrimary,
-                    TextSize = 11,
-                    TextXAlignment = Enum.TextXAlignment.Left,
-                    Parent = SliderFrame
-                })
-
-                local Track = Create("TextButton", {
-                    Size = UDim2.new(1, -4, 0, 12),
-                    Position = UDim2.new(0, 2, 0, 15),
-                    BackgroundColor3 = Theme.ElementBg,
-                    Text = "",
-                    Parent = SliderFrame
-                })
-                ApplyStrictBorder(Track)
-
-                local Fill = Create("Frame", {
-                    Size = UDim2.new((default - min) / (max - min), 0, 1, 0),
-                    BackgroundColor3 = Theme.AccentSecondary, -- Синий цвет трека из референса
-                    BorderSizePixel = 0,
-                    Parent = Track
-                })
-
-                local ValueDisplay = Create("TextLabel", {
-                    Size = UDim2.new(1, 0, 1, 0),
-                    BackgroundTransparency = 1,
-                    Font = RenderFont,
-                    Text = string.format(formatStr, default, max),
-                    TextColor3 = Theme.TextPrimary,
-                    TextSize = 10,
-                    TextYAlignment = Enum.TextYAlignment.Center,
-                    Parent = Track
-                })
-
-                local sliding = false
-                local function UpdateSlider(input)
-                    local delta = math.clamp((input.Position.X - Track.AbsolutePosition.X) / Track.AbsoluteSize.X, 0, 1)
-                    local val = math.floor(min + (max - min) * delta)
-                    ValueDisplay.Text = string.format(formatStr, val, max)
-                    Fill.Size = UDim2.new(delta, 0, 1, 0)
-                    pcall(callback, val)
-                end
-
-                Track.InputBegan:Connect(function(input)
-                    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                        sliding = true
-                        CloseAllPopups()
-                        UpdateSlider(input)
-                    end
-                end)
-                InputService.InputEnded:Connect(function(input)
-                    if input.UserInputType == Enum.UserInputType.MouseButton1 then sliding = false end
-                end)
-                InputService.InputChanged:Connect(function(input)
-                    if sliding and input.UserInputType == Enum.UserInputType.MouseMovement then UpdateSlider(input) end
-                end)
-
-                Tab.ElementsMap[text:lower()] = { Frame = SliderFrame, MainLabel = Label }
-            end
-
-            -- [[ 9. ЭЛЕМЕНТ: DROPDOWN ]]
-            function Groupbox:CreateDropdown(text, items, default, callback, overrideParent)
-                local parent = GetTargetParent(overrideParent)
-                local selected = default or items[1]
-
-                local DropFrame = Create("Frame", {
-                    Size = UDim2.new(1, 0, 0, 32),
-                    BackgroundTransparency = 1,
-                    Parent = parent
-                })
-
-                local Label = Create("TextLabel", {
-                    Size = UDim2.new(1, 0, 0, 12),
-                    BackgroundTransparency = 1,
-                    Font = RenderFont,
-                    Text = text,
-                    TextColor3 = Theme.TextPrimary,
-                    TextSize = 11,
-                    TextXAlignment = Enum.TextXAlignment.Left,
-                    Parent = DropFrame
-                })
-
-                local Field = Create("TextButton", {
-                    Size = UDim2.new(1, -4, 0, 16),
-                    Position = UDim2.new(0, 2, 0, 14),
-                    BackgroundColor3 = Theme.ElementBg,
-                    Font = RenderFont,
-                    Text = "  " .. tostring(selected),
-                    TextColor3 = Theme.TextPrimary,
-                    TextSize = 11,
-                    TextXAlignment = Enum.TextXAlignment.Left,
-                    Parent = DropFrame
-                })
-                ApplyStrictBorder(Field)
-
-                local Indicator = Create("TextLabel", {
-                    Size = UDim2.new(0, 14, 1, 0),
-                    Position = UDim2.new(1, -16, 0, 0),
-                    BackgroundTransparency = 1,
-                    Font = RenderFont,
-                    Text = "▼",
-                    TextColor3 = Theme.TextSecondary,
-                    TextSize = 9,
-                    Parent = Field
-                })
-
-                Field.MouseButton1Click:Connect(function()
-                    local openName = text .. "Pop"
-                    if ScreenGui:FindFirstChild(openName) then
-                        ScreenGui[openName]:Destroy()
-                        return
-                    end
-                    CloseAllPopups()
-
-                    local Menu = Create("Frame", {
-                        Name = openName,
-                        Size = UDim2.new(0, Field.AbsoluteSize.X, 0, #items * 18),
-                        Position = UDim2.new(0, Field.AbsolutePosition.X, 0, Field.AbsolutePosition.Y + Field.AbsoluteSize.Y + 2),
-                        BackgroundColor3 = Theme.MainBg,
-                        ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-                        Parent = ScreenGui
-                    })
-                    ApplyStrictBorder(Menu, Theme.AccentSecondary)
-                    table.insert(Library.ActivePopups, Menu)
-
-                    local List = Create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Parent = Menu })
-
-                    for _, it in pairs(items) do
-                        local Row = Create("TextButton", {
-                            Size = UDim2.new(1, 0, 0, 18),
-                            BackgroundColor3 = Theme.MainBg,
-                            BorderSizePixel = 0,
-                            Font = RenderFont,
-                            Text = "  " .. tostring(it),
-                            TextColor3 = (it == selected) and Theme.AccentSecondary or Theme.TextSecondary,
-                            TextSize = 11,
-                            TextXAlignment = Enum.TextXAlignment.Left,
-                            Parent = Menu
-                        })
-
-                        Row.MouseEnter:Connect(function() Row.BackgroundColor3 = Theme.ElementBg end)
-                        Row.MouseLeave:Connect(function() Row.BackgroundColor3 = Theme.MainBg end)
-                        Row.MouseButton1Click:Connect(function()
-                            selected = it
-                            Field.Text = "  " .. tostring(it)
-                            CloseAllPopups()
-                            pcall(callback, it)
-                        end)
-                    end
-                end)
-
-                Tab.ElementsMap[text:lower()] = { Frame = DropFrame, MainLabel = Label }
-            end
-
-            -- [[ 10. ЭЛЕМЕНТ: TEXTBOX ]]
-            function Groupbox:CreateTextBox(text, default, placeholder, callback, overrideParent)
-                local parent = GetTargetParent(overrideParent)
-
-                local BoxFrame = Create("Frame", {
-                    Size = UDim2.new(1, 0, 0, 32),
-                    BackgroundTransparency = 1,
-                    Parent = parent
-                })
-
-                local Label = Create("TextLabel", {
-                    Size = UDim2.new(1, 0, 0, 12),
-                    BackgroundTransparency = 1,
-                    Font = RenderFont,
-                    Text = text,
-                    TextColor3 = Theme.TextPrimary,
-                    TextSize = 11,
-                    TextXAlignment = Enum.TextXAlignment.Left,
-                    Parent = BoxFrame
-                })
-
-                local Input = Create("TextBox", {
-                    Size = UDim2.new(1, -4, 0, 16),
-                    Position = UDim2.new(0, 2, 0, 14),
-                    BackgroundColor3 = Theme.ElementBg,
-                    Font = RenderFont,
-                    Text = default or "",
-                    PlaceholderText = placeholder or "Type here..",
-                    PlaceholderColor3 = Theme.TextSecondary,
-                    TextColor3 = Theme.TextPrimary,
-                    TextSize = 11,
-                    TextXAlignment = Enum.TextXAlignment.Left,
-                    Parent = BoxFrame
-                })
-                ApplyStrictBorder(Input)
-
-                Input.FocusLost:Connect(function()
-                    pcall(callback, Input.Text)
-                end)
-
-                Tab.ElementsMap[text:lower()] = { Frame = BoxFrame, MainLabel = Label }
-            end
-
-            -- [[ 11. ЭЛЕМЕНТ: МНОГОСТРОЧНЫЙ LABEL ]]
-            function Groupbox:CreateLabel(text, overrideParent)
-                local parent = GetTargetParent(overrideParent)
-
-                local LabelFrame = Create("Frame", {
-                    Size = UDim2.new(1, 0, 0, 14),
-                    BackgroundTransparency = 1,
-                    Parent = parent
-                })
-
-                local RealText = Create("TextLabel", {
-                    Size = UDim2.new(1, 0, 1, 0),
-                    BackgroundTransparency = 1,
-                    Font = RenderFont,
-                    Text = text,
-                    TextColor3 = Theme.TextPrimary,
-                    TextSize = 11,
-                    TextXAlignment = Enum.TextXAlignment.Left,
-                    TextWrapped = true,
-                    Parent = LabelFrame
-                })
-
-                RealText:GetPropertyChangedSignal("TextBounds"):Connect(function()
-                    LabelFrame.Size = UDim2.new(1, 0, 0, RealText.TextBounds.Y + 2)
-                end)
-                LabelFrame.Size = UDim2.new(1, 0, 0, RealText.TextBounds.Y + 2)
-
-                Tab.ElementsMap[text:lower()] = { Frame = LabelFrame, MainLabel = RealText }
-            end
-
-            -- [[ 12. ADVANCED HARDCORE COLOR PICKER ENGINE (Из твоего Скриншота) ]]
-            function Groupbox:OpenAdvancedColorPicker(cpTitle, initColor, cpCallback)
-                CloseAllPopups()
-
-                local h, s, v = initColor:ToHSV()
-
-                local CPWindow = Create("Frame", {
-                    Name = cpTitle .. "PickerPanel",
-                    Size = UDim2.new(0, 180, 0, 195),
-                    Position = UDim2.new(0, MainFrame.AbsolutePosition.X + MainFrame.AbsoluteSize.X + 10, 0, MainFrame.AbsolutePosition.Y + 40),
-                    BackgroundColor3 = Theme.MainBg,
-                    Parent = ScreenGui
-                })
-                ApplyStrictBorder(CPWindow, Theme.BorderDark)
-                table.insert(Library.ActivePopups, CPWindow)
-
-                local Title = Create("TextLabel", {
-                    Size = UDim2.new(1, -10, 0, 16),
-                    Position = UDim2.new(0, 6, 0, 2),
-                    BackgroundTransparency = 1,
-                    Font = RenderFont,
-                    Text = cpTitle,
-                    TextColor3 = Theme.TextPrimary,
-                    TextSize = 11,
-                    TextXAlignment = Enum.TextXAlignment.Left,
-                    Parent = CPWindow
-                })
-
-                -- 2D Матрица Насыщенности / Яркости (Saturation / Value Canvas)
-                local SatValBox = Create("TextButton", {
-                    Size = UDim2.new(0, 140, 0, 115),
-                    Position = UDim2.new(0, 6, 0, 20),
-                    BackgroundColor3 = Color3.fromHSV(h, 1, 1),
-                    Text = "",
-                    Parent = CPWindow
-                })
-                ApplyStrictBorder(SatValBox)
-
-                -- Градиенты для воссоздания полноценной палитры без тяжелых картинок
-                local WhiteGrad = Create("Frame", { Size = UDim2.new(1, 0, 1, 0), Parent = SatValBox })
-                Create("UIGradient", {
-                    Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(255, 255, 255)),
-                    Transparency = NumberSequence.new(0, 1),
-                    Rotation = 0,
-                    Parent = WhiteGrad
-                })
-
-                local BlackGrad = Create("Frame", { Size = UDim2.new(1, 0, 1, 0), Parent = SatValBox })
-                Create("UIGradient", {
-                    Color = ColorSequence.new(Color3.fromRGB(0, 0, 0), Color3.fromRGB(0, 0, 0)),
-                    Transparency = NumberSequence.new(1, 0),
-                    Rotation = 90,
-                    Parent = BlackGrad
-                })
-
-                -- Кружок-указатель на палитре
-                local Pointer = Create("Frame", {
-                    Size = UDim2.new(0, 4, 0, 4),
-                    Position = UDim2.new(s, -2, 1 - v, -2),
-                    BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-                    Parent = SatValBox
-                })
-                Create("UICorner", { CornerRadius = UDim.new(1, 0), Parent = Pointer })
-                ApplyStrictBorder(Pointer, Color3.fromRGB(0, 0, 0))
-
-                -- Вертикальный Радужный Слайдер Оттенка (Hue Slider Bar)
-                local HueBar = Create("TextButton", {
-                    Size = UDim2.new(0, 12, 0, 115),
-                    Position = UDim2.new(0, 154, 0, 20),
-                    Text = "",
-                    Parent = CPWindow
-                })
-                ApplyStrictBorder(HueBar)
-
-                local HueGrad = Create("UIGradient", {
-                    Rotation = 90,
-                    Color = ColorSequence.new({
-                        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
-                        ColorSequenceKeypoint.new(0.16, Color3.fromRGB(255, 255, 0)),
-                        ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0, 255, 0)),
-                        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 255)),
-                        ColorSequenceKeypoint.new(0.66, Color3.fromRGB(0, 0, 255)),
-                        ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255, 0, 255)),
-                        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0))
-                    }),
-                    Parent = HueBar
-                })
-
-                local HueIndicator = Create("Frame", {
-                    Size = UDim2.new(1, 4, 0, 2),
-                    Position = UDim2.new(0, -2, h, -1),
-                    BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-                    BorderSizePixel = 0,
-                    Parent = HueBar
-                })
-
-                -- Нижние Текстовые Поля (Ввод HEX и RGB напрямую как в Линории)
-                local HexInput = Create("TextBox", {
-                    Size = UDim2.new(0, 75, 0, 16),
-                    Position = UDim2.new(0, 6, 0, 142),
-                    BackgroundColor3 = Theme.ElementBg,
-                    Font = RenderFont,
-                    Text = RGBToHex(initColor),
-                    TextColor3 = Theme.TextPrimary,
-                    TextSize = 10,
-                    Parent = CPWindow
-                })
-                ApplyStrictBorder(HexInput)
-
-                local RGBInput = Create("TextBox", {
-                    Size = UDim2.new(0, 85, 0, 16),
-                    Position = UDim2.new(0, 85, 0, 142),
-                    BackgroundColor3 = Theme.ElementBg,
-                    Font = RenderFont,
-                    Text = string.format("%d, %d, %d", math.floor(initColor.R*255), math.floor(initColor.G*255), math.floor(initColor.B*255)),
-                    TextColor3 = Theme.TextPrimary,
-                    TextSize = 9,
-                    Parent = CPWindow
-                })
-                ApplyStrictBorder(RGBInput)
-
-                -- Шкала Альфа / Прозрачности
-                local AlphaBar = Create("Frame", {
-                    Size = UDim2.new(0, 161, 0, 10),
-                    Position = UDim2.new(0, 6, 0, 166),
-                    BackgroundColor3 = Theme.ElementBg,
-                    Parent = CPWindow
-                })
-                ApplyStrictBorder(AlphaBar)
-                local AlphaFill = Create("Frame", {
-                    Size = UDim2.new(1, 0, 1, 0),
-                    BackgroundColor3 = initColor,
-                    BorderSizePixel = 0,
-                    Parent = AlphaBar
-                })
-
-                -- Внутренняя Логика Обновления Цвета
-                local function SynchronizeColors(updateInputs)
-                    local combinedColor = Color3.fromHSV(h, s, v)
-                    SatValBox.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
-                    AlphaFill.BackgroundColor3 = combinedColor
-                    
-                    Pointer.Position = UDim2.new(s, -2, 1 - v, -2)
-                    HueIndicator.Position = UDim2.new(0, -2, h, -1)
-
-                    if updateInputs then
-                        HexInput.Text = RGBToHex(combinedColor)
-                        RGBInput.Text = string.format("%d, %d, %d", math.floor(combinedColor.R*255), math.floor(combinedColor.G*255), math.floor(combinedColor.B*255))
-                    end
-                    pcall(cpCallback, combinedColor)
-                end
-
-                -- Контроллеры Мыши
-                local dragSatVal = false
-                SatValBox.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragSatVal = true end end)
-                InputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragSatVal = false end end)
+            -- [ЭЛЕМЕНТ]: Слайдер (Slider)
+            function Groupbox:CreateSlider(text, min, max, default, fmt, callback, overrideParent)
+                local p = GetParent(overrideParent) fmt = fmt or "%d/%d"
+                local SFrame = Create("Frame", { Size = UDim2.new(1, 0, 0, 26), BackgroundTransparency = 1, Parent = p })
+                Create("TextLabel", { Size = UDim2.new(1, 0, 0, 12), BackgroundTransparency = 1, Font = RenderFont, Text = text, TextColor3 = Theme.TextPrimary, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left, Parent = SFrame })
+                local Track = Create("TextButton", { Size = UDim2.new(1, -4, 0, 10), Position = UDim2.new(0, 2, 0, 13), BackgroundColor3 = Theme.ElementBg, Text = "", Parent = SFrame }) ApplyStrictBorder(Track, Theme.BorderDark)
+                local Fill = Create("Frame", { Size = UDim2.new((default-min)/(max-min), 0, 1, 0), BackgroundColor3 = Theme.AccentSecondary, BorderSizePixel = 0, Parent = Track })
+                local Disp = Create("TextLabel", { Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Font = RenderFont, Text = string.format(fmt, default, max), TextColor3 = Theme.TextPrimary, TextSize = 9, Parent = Track })
                 
-                local dragHue = false
-                HueBar.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragHue = true end end)
-                InputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragHue = false end end)
+                local hold = false
+                local function Upd(input)
+                    local d = math.clamp((input.Position.X - Track.AbsolutePosition.X) / Track.AbsoluteSize.X, 0, 1) local val = math.floor(min + (max - min) * d)
+                    Disp.Text = string.format(fmt, val, max) Fill.Size = UDim2.new(d, 0, 1, 0) pcall(callback, val)
+                end
+                Track.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then hold = true CloseAllPopups() Upd(i) end end)
+                InputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then hold = false end end)
+                InputService.InputChanged:Connect(function(i) if hold and i.UserInputType == Enum.UserInputType.MouseMovement then Upd(i) end end)
+                Tab.ElementsMap[text:lower()] = { Frame = SFrame }
+            end
 
-                InputService.InputChanged:Connect(function(input)
-                    if dragSatVal and input.UserInputType == Enum.UserInputType.MouseMovement then
-                        local mX = math.clamp((input.Position.X - SatValBox.AbsolutePosition.X) / SatValBox.AbsoluteSize.X, 0, 1)
-                        local mY = math.clamp((input.Position.Y - SatValBox.AbsolutePosition.Y) / SatValBox.AbsoluteSize.Y, 0, 1)
-                        s = mX
-                        v = 1 - mY
-                        SynchronizeColors(true)
-                    elseif dragHue and input.UserInputType == Enum.UserInputType.MouseMovement then
-                        h = math.clamp((input.Position.Y - HueBar.AbsolutePosition.Y) / HueBar.AbsoluteSize.Y, 0, 1)
-                        SynchronizeColors(true)
+            -- [ЭЛЕМЕНТ]: Выпадающий список (Dropdown)
+            function Groupbox:CreateDropdown(text, items, default, callback, overrideParent)
+                local p = GetParent(overrideParent) local sel = default or items[1]
+                local DFrame = Create("Frame", { Size = UDim2.new(1, 0, 0, 28), BackgroundTransparency = 1, Parent = p })
+                Create("TextLabel", { Size = UDim2.new(1, 0, 0, 12), BackgroundTransparency = 1, Font = RenderFont, Text = text, TextColor3 = Theme.TextPrimary, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left, Parent = DFrame })
+                local Fld = Create("TextButton", { Size = UDim2.new(1, -4, 0, 14), Position = UDim2.new(0, 2, 0, 13), BackgroundColor3 = Theme.ElementBg, Font = RenderFont, Text = "  "..tostring(sel), TextColor3 = Theme.TextPrimary, TextSize = 10, TextXAlignment = Enum.TextXAlignment.Left, Parent = DFrame }) ApplyStrictBorder(Fld, Theme.BorderDark)
+                
+                Fld.MouseButton1Click:Connect(function()
+                    local n = text.."Pop" if ScreenGui:FindFirstChild(n) then ScreenGui[n]:Destroy() return end CloseAllPopups()
+                    local M = Create("Frame", { Name = n, Size = UDim2.new(0, Fld.AbsoluteSize.X, 0, #items * 16), Position = UDim2.new(0, Fld.AbsolutePosition.X, 0, Fld.AbsolutePosition.Y + Fld.AbsoluteSize.Y + 2), BackgroundColor3 = Theme.MainBg, Parent = ScreenGui }) table.insert(Library.ActivePopups, M) ApplyStrictBorder(M, Theme.Accent)
+                    Create("UIListLayout", { Parent = M })
+                    for _, it in pairs(items) do
+                        local R = Create("TextButton", { Size = UDim2.new(1, 0, 0, 16), BackgroundColor3 = Theme.MainBg, Font = RenderFont, Text = "  "..tostring(it), TextColor3 = (it==sel) and Theme.Accent or Theme.TextSecondary, TextSize = 10, TextXAlignment = Enum.TextXAlignment.Left, Parent = M })
+                        R.MouseButton1Click:Connect(function() sel = it Fld.Text = "  "..tostring(it) CloseAllPopups() pcall(callback, it) end)
                     end
                 end)
+                Tab.ElementsMap[text:lower()] = { Frame = DFrame }
+            end
 
-                -- Кастомный ручной ввод данных игроком
-                HexInput.FocusLost:Connect(function()
-                    local success, res = pcall(HexToRGB, HexInput.Text)
-                    if success and res then
-                        h, s, v = res:ToHSV()
-                        SynchronizeColors(false)
-                        RGBInput.Text = string.format("%d, %d, %d", math.floor(res.R*255), math.floor(res.G*255), math.floor(res.B*255))
-                    end
-                end)
+            -- [ЭЛЕМЕНТ]: Однострочный текстовый ввод (TextBox)
+            function Groupbox:CreateTextBox(text, default, placeholder, callback, overrideParent)
+                local p = GetParent(overrideParent)
+                local BFrame = Create("Frame", { Size = UDim2.new(1, 0, 0, 28), BackgroundTransparency = 1, Parent = p })
+                Create("TextLabel", { Size = UDim2.new(1, 0, 0, 12), BackgroundTransparency = 1, Font = RenderFont, Text = text, TextColor3 = Theme.TextPrimary, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left, Parent = BFrame })
+                local Inp = Create("TextBox", { Size = UDim2.new(1, -4, 0, 14), Position = UDim2.new(0, 2, 0, 13), BackgroundColor3 = Theme.ElementBg, Font = RenderFont, Text = default or "", PlaceholderText = placeholder or "Type...", PlaceholderColor3 = Theme.TextSecondary, TextColor3 = Theme.TextPrimary, TextSize = 10, TextXAlignment = Enum.TextXAlignment.Left, Parent = BFrame }) ApplyStrictBorder(Inp, Theme.BorderDark)
+                Inp.FocusLost:Connect(function() pcall(callback, Inp.Text) end)
+                Tab.ElementsMap[text:lower()] = { Frame = BFrame }
+            end
 
-                RGBInput.FocusLost:Connect(function()
-                    local r, g, b = RGBInput.Text:match("(%d+),%s*(%d+),%s*(%d+)")
-                    if r and g and b then
-                        local c = Color3.fromRGB(tonumber(r), tonumber(g), tonumber(b))
-                        h, s, v = c:ToHSV()
-                        SynchronizeColors(false)
-                        HexInput.Text = RGBToHex(c)
+            -- [ЭЛЕМЕНТ]: Динамический многострочный лейбл
+            function Groupbox:CreateLabel(text, overrideParent)
+                local p = GetParent(overrideParent)
+                local LFrame = Create("Frame", { Size = UDim2.new(1, 0, 0, 12), BackgroundTransparency = 1, Parent = p })
+                local Txt = Create("TextLabel", { Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Font = RenderFont, Text = text, TextColor3 = Theme.TextPrimary, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left, TextWrapped = true, Parent = LFrame })
+                Txt:GetPropertyChangedSignal("TextBounds"):Connect(function() LFrame.Size = UDim2.new(1, 0, 0, Txt.TextBounds.Y + 2) end)
+                LFrame.Size = UDim2.new(1, 0, 0, Txt.TextBounds.Y + 2)
+                Tab.ElementsMap[text:lower()] = { Frame = LFrame }
+            end
+
+            -- [ВНУТРЕННИЙ МОДУЛЬ]: Профессиональная 2D HSV Палитра
+            function Groupbox:OpenAdvancedColorPicker(title, initCol, cpCall)
+                CloseAllPopups() local h, s, v = initCol:ToHSV()
+                local CP = Create("Frame", { Size = UDim2.new(0, 170, 0, 180), Position = UDim2.new(0, MainFrame.AbsolutePosition.X + MainFrame.AbsoluteSize.X + 8, 0, MainFrame.AbsolutePosition.Y), BackgroundColor3 = Theme.MainBg, Parent = ScreenGui }) ApplyStrictBorder(CP, Theme.Accent) table.insert(Library.ActivePopups, CP)
+                Create("TextLabel", { Size = UDim2.new(1, -10, 0, 16), Position = UDim2.new(0, 6, 0, 2), BackgroundTransparency = 1, Font = RenderFont, Text = title, TextColor3 = Theme.TextPrimary, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left, Parent = CP })
+                
+                local Canvas = Create("TextButton", { Size = UDim2.new(0, 130, 0, 110), Position = UDim2.new(0, 6, 0, 20), BackgroundColor3 = Color3.fromHSV(h, 1, 1), Text = "", Parent = CP }) ApplyStrictBorder(Canvas, Theme.BorderDark)
+                local W = Create("Frame", { Size = UDim2.new(1, 0, 1, 0), Parent = Canvas }) Create("UIGradient", { Color = ColorSequence.new(Color3.new(1,1,1)), Transparency = NumberSequence.new(0, 1), Parent = W })
+                local B = Create("Frame", { Size = UDim2.new(1, 0, 1, 0), Parent = Canvas }) Create("UIGradient", { Color = ColorSequence.new(Color3.new(0,0,0)), Transparency = NumberSequence.new(1, 0), Rotation = 90, Parent = B })
+                local Dot = Create("Frame", { Size = UDim2.new(0, 4, 0, 4), Position = UDim2.new(s, -2, 1-v, -2), BackgroundColor3 = Color3.new(1,1,1), Parent = Canvas }) Create("UICorner", { CornerRadius = UDim.new(1,0), Parent = Dot })
+
+                local Hue = Create("TextButton", { Size = UDim2.new(0, 12, 0, 110), Position = UDim2.new(0, 142, 0, 20), Text = "", Parent = CP }) ApplyStrictBorder(Hue, Theme.BorderDark)
+                Create("UIGradient", { Rotation = 90, Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, Color3.fromRGB(255,0,0)), ColorSequenceKeypoint.new(0.16, Color3.fromRGB(255,255,0)), ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0,255,0)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0,255,255)), ColorSequenceKeypoint.new(0.66, Color3.fromRGB(0,0,255)), ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255,0,255)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255,0,0)) }), Parent = Hue })
+                local BarInd = Create("Frame", { Size = UDim2.new(1, 4, 0, 2), Position = UDim2.new(0, -2, h, -1), BackgroundColor3 = Color3.new(1,1,1), Parent = Hue })
+
+                local Hex = Create("TextBox", { Size = UDim2.new(0, 65, 0, 16), Position = UDim2.new(0, 6, 0, 136), BackgroundColor3 = Theme.ElementBg, Font = RenderFont, Text = RGBToHex(initCol), TextColor3 = Theme.TextPrimary, TextSize = 10, Parent = CP }) ApplyStrictBorder(Hex, Theme.BorderDark)
+                local Preview = Create("Frame", { Size = UDim2.new(0, 83, 0, 16), Position = UDim2.new(0, 76, 0, 136), BackgroundColor3 = initCol, Parent = CP }) ApplyStrictBorder(Preview, Theme.BorderDark)
+
+                local function Sync()
+                    local c = Color3.fromHSV(h, s, v) Canvas.BackgroundColor3 = Color3.fromHSV(h, 1, 1) Preview.BackgroundColor3 = c
+                    Dot.Position = UDim2.new(s, -2, 1-v, -2) BarInd.Position = UDim2.new(0, -2, h, -1) Hex.Text = RGBToHex(c) pcall(cpCall, c)
+                end
+                local dSV, dH = false, false
+                Canvas.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dSV = true end end)
+                Hue.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dH = true end end)
+                InputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dSV = false dH = false end end)
+                InputService.InputChanged:Connect(function(i)
+                    if dSV and i.UserInputType == Enum.UserInputType.MouseMovement then
+                        s = math.clamp((i.Position.X - Canvas.AbsolutePosition.X) / Canvas.AbsoluteSize.X, 0, 1)
+                        v = 1 - math.clamp((i.Position.Y - Canvas.AbsolutePosition.Y) / Canvas.AbsoluteSize.Y, 0, 1) Sync()
+                    elseif dH and i.UserInputType == Enum.UserInputType.MouseMovement then
+                        h = math.clamp((i.Position.Y - Hue.AbsolutePosition.Y) / Hue.AbsoluteSize.Y, 0, 1) Sync()
                     end
                 end)
             end
-
             return Groupbox
         end
-
-        return Tab
+        Window.Tabs[tabName] = Tab return Tab
     end
 
-    -- Глобальный поиск по элементам
+    -- Логика сквозного поиска элементов на текущей рабочей вкладке
     SearchInput:GetPropertyChangedSignal("Text"):Connect(function()
-        local query = SearchInput.Text:lower()
+        local q = SearchInput.Text:lower()
         for _, tab in pairs(Window.Tabs) do
-            for name, data in pairs(tab.ElementsMap) do
-                if query == "" or string.find(name, query) then
-                    data.Frame.Visible = true
-                else
-                    data.Frame.Visible = false
-                end
-            end
+            for name, el in pairs(tab.ElementsMap) do el.Frame.Visible = (q == "" or string.find(name, q)) and true or false end
         end
     end)
 
-    -- Переключение видимости всего меню на клавишу RightShift
-    InputService.InputBegan:Connect(function(input, processed)
-        if processed then return end
-        if input.KeyCode == Enum.KeyCode.RightShift then
-            MainFrame.Visible = not MainFrame.Visible
-            if Library.Watermark then Library.Watermark.Visible = MainFrame.Visible end
-            if not MainFrame.Visible then CloseAllPopups() end
-        end
-    end)
-
+    InputService.InputBegan:Connect(function(i, proc) if not proc and i.KeyCode == Enum.KeyCode.RightShift then MainFrame.Visible = not MainFrame.Visible CloseAllPopups() end end)
     return Window
 end
+
+-- =============================================================================
+-- ПРИМЕР СТРУКТУРНОЙ ДЕМОНСТРАЦИИ ПОЛНОГО КОНФИГА
+-- =============================================================================
+Library:InitWatermark("METEOR SYSTEM CLIENT")
+Library:InitKeybinds()
+
+local Win = Library:CreateWindow("METEOR PREMIUM")
+
+-- Создаем 1 Вкладку: Combat (Проверяем Сабтабы, Слайдеры, Дропдауны)
+local Combat = Win:CreateTab("Combat")
+local MainBox = Combat:CreateGroupbox("Aimbot Engine", "Left")
+
+local Slots = MainBox:CreateSubtabs()
+local Primary = Slots:AddSlot("Primary")
+local Secondary = Slots:AddSlot("Secondary")
+
+-- Навешиваем на один тоггл полный комплект аддонов
+local AimToggle = Primary:CreateToggle("Rage Silent Aim", true, function(s) print("Silent state:", s) end)
+AimToggle:AddKeybind("F", function(a) print("Bind state:", a) end)
+AimToggle:AddColorPicker(Color3.fromRGB(218, 43, 172), function(c) print("Fov Color:", c) end)
+
+Primary:CreateSlider("Field Of View", 1, 300, 90, "%d FOV px", function(v) end)
+Primary:CreateDropdown("Target Priority", {"Distance", "Health", "Crosshair"}, "Distance", function(d) end)
+
+Secondary:CreateToggle("Fallback Triggerbot", false, function(s) end):AddKeybind("X", function() end)
+Secondary:CreateTextBox("Target Blacklist", "Username", "Player to ignore...", function(t) end)
+
+-- Создаем 2 Вкладку: Visuals (Проверяем Колонки, Лейблы и Поиск)
+local Visuals = Win:CreateTab("Visuals")
+local EspBox = Visuals:CreateGroupbox("Render Settings", "Left")
+EspBox:CreateToggle("Bounding Boxes", false, function(s) end):AddColorPicker(Color3.fromRGB(0,255,100), function() end)
+
+local InfoBox = Visuals:CreateGroupbox("Meteor Help", "Right")
+InfoBox:CreateLabel("Welcome back. All tabs are now correctly anchored on the left sidebar as requested.")
+InfoBox:CreateLabel("The input filter on top will dynamically parse and hide components across the engine instantly.")
 
 return Library
