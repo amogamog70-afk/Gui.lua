@@ -21,11 +21,12 @@ MeteorUI.Settings = {
     TextSecondaryColor = Color3.fromRGB(180, 180, 190),
     
     -- Размеры
-    TopBarHeight = 45,
-    SearchBarWidth = 250,
-    TabHeight = 40,
-    CornerRadius = 8,
+    TopBarHeight = 50,
+    LeftSidebarWidth = 200,
+    TabButtonHeight = 45,
+    CornerRadius = 10,
     Padding = 10,
+    SearchBarHeight = 35,
     
     -- Анимации
     AnimationSpeed = 0.25,
@@ -59,20 +60,20 @@ MeteorUI.NotificationQueue = {}
 -- =====================================================
 
 MeteorUI.Icons = {
-    -- Главное меню
+    -- === ИКОНКИ TOP BAR (настройки) ===
     Settings = "rbxassetid://103884184213243",
-    
-    -- Логотип проекта
+    Configs = "rbxassetid://9940320722",
+    Theme = "rbxassetid://10190648035",
+    Search = "rbxassetid://118685771787843",
     VoltEclipse = "rbxassetid://7015953925",
     
-    -- Поисковая строка
-    Search = "rbxassetid://118685771787843",
-    
-    -- Конфиги
-    Configs = "rbxassetid://9940320722",
-    
-    -- Темы
-    Theme = "rbxassetid://10190648035",
+    -- === ИКОНКИ ВКЛАДОК (основные категории) ===
+    Combat = "rbxassetid://12614416478",        -- Crosshair
+    Movement = "rbxassetid://136160678435000",  -- Selected
+    Visuals = "rbxassetid://102976018150012",   -- Hide UI on
+    Misc = "rbxassetid://137382232901580",      -- Menu
+    World = "rbxassetid://107448093571441",     -- Earth white
+    Auto = "rbxassetid://17119858971",          -- Loading Icon
 }
 
 function MeteorUI.IconManager:CreateIcon(parent, iconId, size, position)
@@ -157,14 +158,15 @@ function MeteorUI:CreateWindow(config)
         Title = config.Title or "Meteor UI",
         Visible = true,
         Minimized = false,
-        Position = config.Position or UDim2.new(0.5, -300, 0.5, -250),
-        Size = config.Size or UDim2.new(0, 600, 0, 500),
+        Position = config.Position or UDim2.new(0.5, -400, 0.5, -300),
+        Size = config.Size or UDim2.new(0, 800, 0, 600),
         Tabs = {},
         CurrentTab = nil,
         ScreenGui = nil,
         MainFrame = nil,
         TopBar = nil,
         SearchBar = nil,
+        LeftSidebar = nil,
         TabContainer = nil,
         ContentContainer = nil,
     }
@@ -201,12 +203,15 @@ function MeteorUI:CreateWindow(config)
         -- Верхняя панель (TopBar)
         self:CreateTopBar()
         
-        -- Контейнер контента
+        -- Левая боковая панель с вкладками
+        self:CreateLeftSidebar()
+        
+        -- Контейнер контента (справа от левой панели)
         self.ContentContainer = Instance.new("Frame")
         self.ContentContainer.Name = "ContentContainer"
         self.ContentContainer.BackgroundTransparency = 1
-        self.ContentContainer.Position = UDim2.new(0, 0, 0, MeteorUI.Settings.TopBarHeight)
-        self.ContentContainer.Size = UDim2.new(1, 0, 1, -MeteorUI.Settings.TopBarHeight)
+        self.ContentContainer.Position = UDim2.new(0, MeteorUI.Settings.LeftSidebarWidth, 0, MeteorUI.Settings.TopBarHeight)
+        self.ContentContainer.Size = UDim2.new(1, -MeteorUI.Settings.LeftSidebarWidth, 1, -MeteorUI.Settings.TopBarHeight)
         self.ContentContainer.Parent = self.MainFrame
         
         -- Включение перетаскивания
@@ -218,7 +223,7 @@ function MeteorUI:CreateWindow(config)
     end
 
     -- =====================================================
-    -- TOP BAR - ВЕРХНЯЯ ПАНЕЛЬ С ПОИСКОМ И ВКЛАДКАМИ
+    -- TOP BAR - ВЕРХНЯЯ ПАНЕЛЬ С ПОИСКОМ И КНОПКАМИ
     -- =====================================================
     
     function Window:CreateTopBar()
@@ -243,28 +248,15 @@ function MeteorUI:CreateWindow(config)
         BottomCover.Size = UDim2.new(1, 0, 0, 10)
         BottomCover.Parent = self.TopBar
         
-        -- ПОИСКОВАЯ СТРОКА (Search Bar) - СЛЕВА
+        -- ПОИСКОВАЯ СТРОКА В ЦЕНТРЕ
         self.SearchBar = self:CreateSearchBar()
         
-        -- КОНТЕЙНЕР ВКЛАДОК - СПРАВА ОТ ПОИСКА
-        self.TabContainer = Instance.new("Frame")
-        self.TabContainer.Name = "TabContainer"
-        self.TabContainer.BackgroundTransparency = 1
-        self.TabContainer.Position = UDim2.new(0, MeteorUI.Settings.SearchBarWidth + 15, 0, 0)
-        self.TabContainer.Size = UDim2.new(1, -(MeteorUI.Settings.SearchBarWidth + 15), 1, 0)
-        self.TabContainer.Parent = self.TopBar
-        
-        -- Layout для вкладок (горизонтально)
-        local TabLayout = Instance.new("UIListLayout")
-        TabLayout.FillDirection = Enum.FillDirection.Horizontal
-        TabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
-        TabLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-        TabLayout.Padding = UDim.new(0, 5)
-        TabLayout.Parent = self.TabContainer
+        -- КНОПКИ СПРАВА (Configs, Settings и т.д.)
+        self:CreateTopButtons()
     end
 
     -- =====================================================
-    -- SEARCH BAR - ПОИСКОВАЯ СТРОКА
+    -- SEARCH BAR - ПОИСКОВАЯ СТРОКА (В ЦЕНТРЕ TOP BAR)
     -- =====================================================
     
     function Window:CreateSearchBar()
@@ -273,13 +265,13 @@ function MeteorUI:CreateWindow(config)
         SearchContainer.Name = "SearchBar"
         SearchContainer.BackgroundColor3 = MeteorUI.Settings.BackgroundColor
         SearchContainer.BorderSizePixel = 0
-        SearchContainer.Position = UDim2.new(0, 10, 0.5, -15)
-        SearchContainer.Size = UDim2.new(0, MeteorUI.Settings.SearchBarWidth, 0, 30)
+        SearchContainer.Position = UDim2.new(0.5, -200, 0.5, -17)
+        SearchContainer.Size = UDim2.new(0, 400, 0, MeteorUI.Settings.SearchBarHeight)
         SearchContainer.Parent = self.TopBar
         
         -- Скругление
         local SearchCorner = Instance.new("UICorner")
-        SearchCorner.CornerRadius = UDim.new(0, 6)
+        SearchCorner.CornerRadius = UDim.new(0, 8)
         SearchCorner.Parent = SearchContainer
         
         -- Иконка поиска (ImageLabel)
@@ -353,9 +345,129 @@ function MeteorUI:CreateWindow(config)
             -- Логика фильтрации элементов
         end
     end
+    
+    -- =====================================================
+    -- TOP BUTTONS - КНОПКИ СПРАВА В TOP BAR
+    -- =====================================================
+    
+    function Window:CreateTopButtons()
+        -- Контейнер для кнопок
+        local ButtonContainer = Instance.new("Frame")
+        ButtonContainer.Name = "TopButtons"
+        ButtonContainer.BackgroundTransparency = 1
+        ButtonContainer.Position = UDim2.new(1, -150, 0.5, -17)
+        ButtonContainer.Size = UDim2.new(0, 140, 0, 35)
+        ButtonContainer.Parent = self.TopBar
+        
+        -- Layout для кнопок
+        local ButtonLayout = Instance.new("UIListLayout")
+        ButtonLayout.FillDirection = Enum.FillDirection.Horizontal
+        ButtonLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+        ButtonLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+        ButtonLayout.Padding = UDim.new(0, 8)
+        ButtonLayout.Parent = ButtonContainer
+        
+        -- Кнопка Settings
+        local SettingsButton = self:CreateIconButton(ButtonContainer, MeteorUI.Icons.Settings, function()
+            print("Settings clicked")
+        end)
+        
+        -- Кнопка Configs
+        local ConfigsButton = self:CreateIconButton(ButtonContainer, MeteorUI.Icons.Configs, function()
+            print("Configs clicked")
+        end)
+        
+        -- Кнопка Theme
+        local ThemeButton = self:CreateIconButton(ButtonContainer, MeteorUI.Icons.Theme, function()
+            print("Theme clicked")
+        end)
+    end
+    
+    function Window:CreateIconButton(parent, iconId, callback)
+        local Button = Instance.new("TextButton")
+        Button.BackgroundColor3 = MeteorUI.Settings.BackgroundColor
+        Button.BorderSizePixel = 0
+        Button.Size = UDim2.new(0, 35, 0, 35)
+        Button.AutoButtonColor = false
+        Button.Text = ""
+        Button.Parent = parent
+        
+        local ButtonCorner = Instance.new("UICorner")
+        ButtonCorner.CornerRadius = UDim.new(0, 8)
+        ButtonCorner.Parent = Button
+        
+        local Icon = Instance.new("ImageLabel")
+        Icon.BackgroundTransparency = 1
+        Icon.Position = UDim2.new(0.5, -12, 0.5, -12)
+        Icon.Size = UDim2.new(0, 24, 0, 24)
+        Icon.Image = iconId
+        Icon.ImageColor3 = MeteorUI.Settings.TextSecondaryColor
+        Icon.ScaleType = Enum.ScaleType.Fit
+        Icon.Parent = Button
+        
+        Button.MouseButton1Click:Connect(callback)
+        
+        Button.MouseEnter:Connect(function()
+            MeteorUI.AnimationManager:Animate(Button, {
+                BackgroundColor3 = MeteorUI.Settings.SurfaceColor
+            }, MeteorUI.Settings.HoverAnimationSpeed)
+            MeteorUI.AnimationManager:Animate(Icon, {
+                ImageColor3 = MeteorUI.Settings.AccentColor
+            }, MeteorUI.Settings.HoverAnimationSpeed)
+        end)
+        
+        Button.MouseLeave:Connect(function()
+            MeteorUI.AnimationManager:Animate(Button, {
+                BackgroundColor3 = MeteorUI.Settings.BackgroundColor
+            }, MeteorUI.Settings.HoverAnimationSpeed)
+            MeteorUI.AnimationManager:Animate(Icon, {
+                ImageColor3 = MeteorUI.Settings.TextSecondaryColor
+            }, MeteorUI.Settings.HoverAnimationSpeed)
+        end)
+        
+        return Button
+    end
 
     -- =====================================================
-    -- TAB SYSTEM - СИСТЕМА ВКЛАДОК
+    -- LEFT SIDEBAR - ЛЕВАЯ ПАНЕЛЬ С ВКЛАДКАМИ
+    -- =====================================================
+    
+    function Window:CreateLeftSidebar()
+        -- Основной контейнер левой панели
+        self.LeftSidebar = Instance.new("Frame")
+        self.LeftSidebar.Name = "LeftSidebar"
+        self.LeftSidebar.BackgroundColor3 = MeteorUI.Settings.SurfaceColor
+        self.LeftSidebar.BorderSizePixel = 0
+        self.LeftSidebar.Position = UDim2.new(0, 0, 0, MeteorUI.Settings.TopBarHeight)
+        self.LeftSidebar.Size = UDim2.new(0, MeteorUI.Settings.LeftSidebarWidth, 1, -MeteorUI.Settings.TopBarHeight)
+        self.LeftSidebar.Parent = self.MainFrame
+        
+        -- Контейнер для вкладок
+        self.TabContainer = Instance.new("ScrollingFrame")
+        self.TabContainer.Name = "TabContainer"
+        self.TabContainer.BackgroundTransparency = 1
+        self.TabContainer.BorderSizePixel = 0
+        self.TabContainer.Position = UDim2.new(0, 0, 0, 10)
+        self.TabContainer.Size = UDim2.new(1, 0, 1, -20)
+        self.TabContainer.ScrollBarThickness = 0
+        self.TabContainer.Parent = self.LeftSidebar
+        
+        -- Layout для вкладок (вертикально)
+        local TabLayout = Instance.new("UIListLayout")
+        TabLayout.FillDirection = Enum.FillDirection.Vertical
+        TabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+        TabLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+        TabLayout.Padding = UDim.new(0, 5)
+        TabLayout.Parent = self.TabContainer
+        
+        -- Обновление размера canvas
+        TabLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+            self.TabContainer.CanvasSize = UDim2.new(0, 0, 0, TabLayout.AbsoluteContentSize.Y + 20)
+        end)
+    end
+
+    -- =====================================================
+    -- TAB SYSTEM - СИСТЕМА ВКЛАДОК (ВЕРТИКАЛЬНАЯ)
     -- =====================================================
     
     function Window:CreateTab(name, iconId)
@@ -369,29 +481,29 @@ function MeteorUI:CreateWindow(config)
             Sections = {},
         }
         
-        -- Кнопка вкладки
+        -- Кнопка вкладки (ВЕРТИКАЛЬНАЯ)
         Tab.Button = Instance.new("TextButton")
         Tab.Button.Name = name
-        Tab.Button.BackgroundColor3 = MeteorUI.Settings.SurfaceColor
-        Tab.Button.BackgroundTransparency = 0.5
+        Tab.Button.BackgroundColor3 = MeteorUI.Settings.BackgroundColor
+        Tab.Button.BackgroundTransparency = 1
         Tab.Button.BorderSizePixel = 0
-        Tab.Button.Size = UDim2.new(0, 120, 0, 35)
+        Tab.Button.Size = UDim2.new(0.9, 0, 0, MeteorUI.Settings.TabButtonHeight)
         Tab.Button.Font = Enum.Font.GothamMedium
-        Tab.Button.Text = "  " .. name
+        Tab.Button.Text = name
         Tab.Button.TextColor3 = MeteorUI.Settings.TextSecondaryColor
-        Tab.Button.TextSize = 13
+        Tab.Button.TextSize = 14
         Tab.Button.TextXAlignment = Enum.TextXAlignment.Left
         Tab.Button.AutoButtonColor = false
         Tab.Button.Parent = self.TabContainer
         
         -- Скругление кнопки
         local TabCorner = Instance.new("UICorner")
-        TabCorner.CornerRadius = UDim.new(0, 6)
+        TabCorner.CornerRadius = UDim.new(0, 8)
         TabCorner.Parent = Tab.Button
         
         -- Padding для текста
         local TabPadding = Instance.new("UIPadding")
-        TabPadding.PaddingLeft = UDim.new(0, 30)
+        TabPadding.PaddingLeft = UDim.new(0, 45)
         TabPadding.Parent = Tab.Button
         
         -- Иконка вкладки (если предоставлена)
@@ -399,23 +511,27 @@ function MeteorUI:CreateWindow(config)
             Tab.Icon = Instance.new("ImageLabel")
             Tab.Icon.Name = "TabIcon"
             Tab.Icon.BackgroundTransparency = 1
-            Tab.Icon.Position = UDim2.new(0, 8, 0.5, -10)
-            Tab.Icon.Size = UDim2.new(0, 20, 0, 20)
+            Tab.Icon.Position = UDim2.new(0, 12, 0.5, -12)
+            Tab.Icon.Size = UDim2.new(0, 24, 0, 24)
             Tab.Icon.Image = iconId
             Tab.Icon.ImageColor3 = MeteorUI.Settings.TextSecondaryColor
             Tab.Icon.ScaleType = Enum.ScaleType.Fit
             Tab.Icon.Parent = Tab.Button
         end
         
-        -- Индикатор активной вкладки (нижняя линия)
+        -- Индикатор активной вкладки (левая линия)
         local ActiveIndicator = Instance.new("Frame")
         ActiveIndicator.Name = "ActiveIndicator"
         ActiveIndicator.BackgroundColor3 = MeteorUI.Settings.AccentColor
         ActiveIndicator.BorderSizePixel = 0
-        ActiveIndicator.Position = UDim2.new(0, 0, 1, -2)
-        ActiveIndicator.Size = UDim2.new(1, 0, 0, 2)
+        ActiveIndicator.Position = UDim2.new(0, 0, 0, 0)
+        ActiveIndicator.Size = UDim2.new(0, 3, 1, 0)
         ActiveIndicator.Visible = false
         ActiveIndicator.Parent = Tab.Button
+        
+        local IndicatorCorner = Instance.new("UICorner")
+        IndicatorCorner.CornerRadius = UDim.new(0, 2)
+        IndicatorCorner.Parent = ActiveIndicator
 
         -- Контент вкладки
         Tab.Content = Instance.new("ScrollingFrame")
@@ -455,7 +571,7 @@ function MeteorUI:CreateWindow(config)
         Tab.Button.MouseEnter:Connect(function()
             if not Tab.Active then
                 MeteorUI.AnimationManager:Animate(Tab.Button, {
-                    BackgroundTransparency = 0.2
+                    BackgroundTransparency = 0.5
                 }, MeteorUI.Settings.HoverAnimationSpeed)
                 
                 if Tab.Icon then
@@ -469,7 +585,7 @@ function MeteorUI:CreateWindow(config)
         Tab.Button.MouseLeave:Connect(function()
             if not Tab.Active then
                 MeteorUI.AnimationManager:Animate(Tab.Button, {
-                    BackgroundTransparency = 0.5
+                    BackgroundTransparency = 1
                 }, MeteorUI.Settings.HoverAnimationSpeed)
                 
                 if Tab.Icon then
@@ -495,7 +611,7 @@ function MeteorUI:CreateWindow(config)
         for _, t in pairs(self.Tabs) do
             t.Active = false
             t.Content.Visible = false
-            t.Button.BackgroundTransparency = 0.5
+            t.Button.BackgroundTransparency = 1
             t.Button.TextColor3 = MeteorUI.Settings.TextSecondaryColor
             t.Button:FindFirstChild("ActiveIndicator").Visible = false
             
@@ -508,6 +624,7 @@ function MeteorUI:CreateWindow(config)
         tab.Active = true
         tab.Content.Visible = true
         tab.Button.BackgroundTransparency = 0
+        tab.Button.BackgroundColor3 = MeteorUI.Settings.BackgroundColor
         tab.Button.TextColor3 = MeteorUI.Settings.TextColor
         tab.Button:FindFirstChild("ActiveIndicator").Visible = true
         
@@ -777,21 +894,22 @@ end
 -- Создание окна
 local Window = MeteorUI:CreateWindow({
     Title = "Meteor UI Library",
-    Position = UDim2.new(0.5, -300, 0.5, -250),
-    Size = UDim2.new(0, 600, 0, 500)
+    Position = UDim2.new(0.5, -400, 0.5, -300),
+    Size = UDim2.new(0, 800, 0, 600)
 })
 
 -- Создание вкладок с иконками
-local CombatTab = Window:CreateTab("Combat", nil) -- Можно добавить свою иконку
-local MovementTab = Window:CreateTab("Movement", nil)
-local VisualTab = Window:CreateTab("Visual", nil)
-local ConfigsTab = Window:CreateTab("Configs", MeteorUI.Icons.Configs)
-local ThemeTab = Window:CreateTab("Theme", MeteorUI.Icons.Theme)
-local SettingsTab = Window:CreateTab("Settings", MeteorUI.Icons.Settings)
+local CombatTab = Window:CreateTab("Combat", MeteorUI.Icons.Combat)
+local MovementTab = Window:CreateTab("Movement", MeteorUI.Icons.Movement)
+local VisualsTab = Window:CreateTab("Visuals", MeteorUI.Icons.Visuals)
+local MiscTab = Window:CreateTab("Misc", MeteorUI.Icons.Misc)
+local WorldTab = Window:CreateTab("World", MeteorUI.Icons.World)
+local AutoTab = Window:CreateTab("Auto", MeteorUI.Icons.Auto)
 
 -- Создание секций
 local WeaponsSection = Window:CreateSection(CombatTab, "Weapons")
 local SpeedSection = Window:CreateSection(MovementTab, "Speed")
+local ESPSection = Window:CreateSection(VisualsTab, "ESP")
 
 -- Добавление элементов (будут реализованы далее)
 -- WeaponsSection:AddToggle("KillAura", false, function(state) end)
