@@ -1,598 +1,533 @@
 -- Meter Engine - Roblox GUI Library
--- Design inspired by Meteor Client / Wurst Client
+-- Design inspired by LinoriaLib / Ares Client
 
-local MeterEngine = {}
-MeterEngine.__index = MeterEngine
+local InputService = game:GetService('UserInputService')
+local TextService = game:GetService('TextService')
+local CoreGui = game:GetService('CoreGui')
+local RunService = game:GetService('RunService')
+local TweenService = game:GetService('TweenService')
+local RenderStepped = RunService.RenderStepped
+local Players = game:GetService('Players')
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
 
--- Icons
-local Icons = {
-    Search = "rbxassetid://118685771787843",
-    Home = "rbxassetid://",
-    Settings = "rbxassetid://",
-    Modules = "rbxassetid://",
-    Scripts = "rbxassetid://"
+local ProtectGui = protectgui or (syn and syn.protect_gui) or (function() end)
+
+local ScreenGui = Instance.new('ScreenGui')
+ProtectGui(ScreenGui)
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
+ScreenGui.Parent = CoreGui
+
+local Toggles = {}
+local Options = {}
+
+getgenv().Toggles = Toggles
+getgenv().Options = Options
+
+local MeterEngine = {
+    Registry = {}
+    RegistryMap = {}
+    
+    FontColor = Color3.fromRGB(255, 255, 255)
+    MainColor = Color3.fromRGB(28, 28, 28)
+    BackgroundColor = Color3.fromRGB(20, 20, 20)
+    AccentColor = Color3.fromRGB(255, 50, 50)
+    OutlineColor = Color3.fromRGB(50, 50, 50)
+    
+    Font = Enum.Font.Code
+    
+    ScreenGui = ScreenGui
+    Signals = {}
 }
 
--- Colors (Meteor Client style)
-local Colors = {
-    Background = Color3.fromRGB(20, 20, 25),
-    Secondary = Color3.fromRGB(30, 30, 35),
-    Accent = Color3.fromRGB(100, 150, 255),
-    Text = Color3.fromRGB(255, 255, 255),
-    TextSecondary = Color3.fromRGB(180, 180, 180),
-    Border = Color3.fromRGB(60, 60, 70),
-    Hover = Color3.fromRGB(40, 40, 50),
-    ToggleOn = Color3.fromRGB(100, 150, 255),
-    ToggleOff = Color3.fromRGB(60, 60, 70)
-}
+function MeterEngine:Create(Class, Properties)
+    local _Instance = Class
+    
+    if type(Class) == 'string' then
+        _Instance = Instance.new(Class)
+    end
+    
+    for Property, Value in next, Properties do
+        _Instance[Property] = Value
+    end
+    
+    return _Instance
+end
 
--- Tab Class
-local Tab = {}
-Tab.__index = Tab
+function MeterEngine:ApplyTextStroke(Inst)
+    Inst.TextStrokeTransparency = 1
+    
+    self:Create('UIStroke', {
+        Color = Color3.new(0, 0, 0)
+        Thickness = 1
+        LineJoinMode = Enum.LineJoinMode.Miter
+        Parent = Inst
+    })
+end
 
-function Tab.new(name, container, contentArea)
-    local self = setmetatable({}, Tab)
+function MeterEngine:AddToRegistry(Instance, Properties)
+    local Idx = #self.Registry + 1
+    local Data = {
+        Instance = Instance
+        Properties = Properties
+        Idx = Idx
+    }
+    
+    table.insert(self.Registry, Data)
+    self.RegistryMap[Instance] = Data
+end
+
+function MeterEngine:MakeDraggable(Instance, Cutoff)
+    Instance.Active = true
+    
+    Instance.InputBegan:Connect(function(Input)
+        if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+            local ObjPos = Vector2.new(
+                Mouse.X - Instance.AbsolutePosition.X
+                Mouse.Y - Instance.AbsolutePosition.Y
+            )
+            
+            if ObjPos.Y > (Cutoff or 30) then
+                return
+            end
+            
+            while InputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) do
+                Instance.Position = UDim2.new(
+                    0
+                    Mouse.X - ObjPos.X + (Instance.Size.X.Offset * Instance.AnchorPoint.X)
+                    0
+                    Mouse.Y - ObjPos.Y + (Instance.Size.Y.Offset * Instance.AnchorPoint.Y)
+                )
+                
+                RenderStepped:Wait()
+            end
+        end
+    end)
+end
+
+-- Category Class (Column)
+local Category = {}
+Category.__index = Category
+
+function Category.new(name, container, library)
+    local self = setmetatable({}, Category)
     self.Name = name
     self.Container = container
-    self.ContentArea = contentArea
+    self.Library = library
     self.Elements = {}
-    self.YOffset = 10
+    self.YOffset = 0
     
-    -- Create tab content frame
-    self.ContentFrame = Instance.new("ScrollingFrame")
-    self.ContentFrame.Name = name .. "Content"
-    self.ContentFrame.Size = UDim2.new(1, -20, 1, -20)
-    self.ContentFrame.Position = UDim2.new(0, 10, 0, 10)
-    self.ContentFrame.BackgroundTransparency = 1
-    self.ContentFrame.BorderSizePixel = 0
-    self.ContentFrame.ScrollBarThickness = 4
-    self.ContentFrame.ScrollBarImageColor3 = Colors.Border
-    self.ContentFrame.Visible = false
-    self.ContentFrame.Parent = contentArea
+    -- Create column frame
+    self.ColumnFrame = library:Create('Frame', {
+        Name = name .. "Column"
+        Size = UDim2.new(0, 120, 1, 0)
+        BackgroundColor3 = library.BackgroundColor
+        BorderSizePixel = 0
+        Parent = container
+    })
+    
+    library:AddToRegistry(self.ColumnFrame, {
+        BackgroundColor3 = 'BackgroundColor'
+    })
+    
+    -- Category header
+    self.Header = library:Create('TextLabel', {
+        Name = "Header"
+        Size = UDim2.new(1, 0, 0, 25)
+        BackgroundColor3 = library.MainColor
+        BorderSizePixel = 0
+        Text = name
+        TextColor3 = library.FontColor
+        TextSize = 12
+        Font = library.Font
+        TextXAlignment = Enum.TextXAlignment.Center
+        Parent = self.ColumnFrame
+    })
+    
+    library:ApplyTextStroke(self.Header)
+    library:AddToRegistry(self.Header, {
+        BackgroundColor3 = 'MainColor'
+        TextColor3 = 'FontColor'
+    })
+    
+    -- Content scrolling frame
+    self.ContentFrame = library:Create('ScrollingFrame', {
+        Name = "Content"
+        Size = UDim2.new(1, 0, 1, -25)
+        Position = UDim2.new(0, 0, 0, 25)
+        BackgroundTransparency = 1
+        BorderSizePixel = 0
+        ScrollBarThickness = 2
+        ScrollBarImageColor3 = library.OutlineColor
+        Parent = self.ColumnFrame
+    })
     
     return self
 end
 
-function Tab:AddLabel(text)
-    local label = Instance.new("TextLabel")
-    label.Name = "Label"
-    label.Size = UDim2.new(1, 0, 0, 20)
-    label.Position = UDim2.new(0, 0, 0, self.YOffset)
-    label.BackgroundTransparency = 1
-    label.Text = text
-    label.TextColor3 = Colors.Text
-    label.TextSize = 14
-    label.Font = Enum.Font.Gotham
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Parent = self.ContentFrame
+function Category:AddToggle(name, default, callback)
+    local lib = self.Library
     
-    self.YOffset = self.YOffset + 25
-    table.insert(self.Elements, label)
-    return label
-end
-
-function Tab:AddButton(text, callback)
-    local button = Instance.new("TextButton")
-    button.Name = "Button"
-    button.Size = UDim2.new(1, 0, 0, 30)
-    button.Position = UDim2.new(0, 0, 0, self.YOffset)
-    button.BackgroundColor3 = Colors.Secondary
-    button.BorderSizePixel = 0
-    button.Text = text
-    button.TextColor3 = Colors.Text
-    button.TextSize = 14
-    button.Font = Enum.Font.Gotham
-    button.Parent = self.ContentFrame
+    local toggle = lib:Create('Frame', {
+        Name = name
+        Size = UDim2.new(1, -4, 0, 20)
+        Position = UDim2.new(0, 2, 0, self.YOffset)
+        BackgroundColor3 = lib.BackgroundColor
+        BorderSizePixel = 0
+        Parent = self.ContentFrame
+    })
     
-    local ButtonCorner = Instance.new("UICorner")
-    ButtonCorner.CornerRadius = UDim.new(0, 6)
-    ButtonCorner.Parent = button
+    lib:AddToRegistry(toggle, {
+        BackgroundColor3 = 'BackgroundColor'
+    })
     
-    local ButtonStroke = Instance.new("UIStroke")
-    ButtonStroke.Color = Colors.Border
-    ButtonStroke.Thickness = 1
-    ButtonStroke.Parent = button
+    local label = lib:Create('TextLabel', {
+        Name = "Label"
+        Size = UDim2.new(1, -20, 1, 0)
+        BackgroundTransparency = 1
+        Text = "> " .. name
+        TextColor3 = lib.FontColor
+        TextSize = 11
+        Font = lib.Font
+        TextXAlignment = Enum.TextXAlignment.Left
+        Parent = toggle
+    })
     
-    button.MouseEnter:Connect(function()
-        button.BackgroundColor3 = Colors.Hover
-    end)
+    lib:ApplyTextStroke(label)
+    lib:AddToRegistry(label, {
+        TextColor3 = 'FontColor'
+    })
     
-    button.MouseLeave:Connect(function()
-        button.BackgroundColor3 = Colors.Secondary
-    end)
+    local padding = Instance.new("UIPadding")
+    padding.PaddingLeft = UDim.new(0, 5)
+    padding.Parent = label
     
-    button.MouseButton1Click:Connect(callback)
+    local toggleBtn = lib:Create('TextButton', {
+        Name = "ToggleBtn"
+        Size = UDim2.new(0, 15, 0, 15)
+        Position = UDim2.new(1, -18, 0.5, -7)
+        BackgroundColor3 = default and lib.AccentColor or lib.OutlineColor
+        BorderSizePixel = 0
+        Text = ""
+        Parent = toggle
+    })
     
-    self.YOffset = self.YOffset + 35
-    table.insert(self.Elements, button)
-    return button
-end
-
-function Tab:AddToggle(text, default, callback)
-    local toggle = Instance.new("Frame")
-    toggle.Name = "Toggle"
-    toggle.Size = UDim2.new(1, 0, 0, 30)
-    toggle.Position = UDim2.new(0, 0, 0, self.YOffset)
-    toggle.BackgroundTransparency = 1
-    toggle.Parent = self.ContentFrame
-    
-    local toggleLabel = Instance.new("TextLabel")
-    toggleLabel.Name = "Label"
-    toggleLabel.Size = UDim2.new(1, -50, 1, 0)
-    toggleLabel.Position = UDim2.new(0, 0, 0, 0)
-    toggleLabel.BackgroundTransparency = 1
-    toggleLabel.Text = text
-    toggleLabel.TextColor3 = Colors.Text
-    toggleLabel.TextSize = 14
-    toggleLabel.Font = Enum.Font.Gotham
-    toggleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    toggleLabel.Parent = toggle
-    
-    local toggleBtn = Instance.new("TextButton")
-    toggleBtn.Name = "ToggleBtn"
-    toggleBtn.Size = UDim2.new(0, 40, 0, 20)
-    toggleBtn.Position = UDim2.new(1, -45, 0.5, -10)
-    toggleBtn.BackgroundColor3 = default and Colors.ToggleOn or Colors.ToggleOff
-    toggleBtn.BorderSizePixel = 0
-    toggleBtn.Text = ""
-    toggleBtn.Parent = toggle
-    
-    local ToggleCorner = Instance.new("UICorner")
-    ToggleCorner.CornerRadius = UDim.new(0, 10)
-    ToggleCorner.Parent = toggleBtn
+    lib:AddToRegistry(toggleBtn, {
+        BackgroundColor3 = default and 'AccentColor' or 'OutlineColor'
+    })
     
     local state = default
     
+    Toggles[name] = {
+        SetValue = function(new)
+            state = new
+            toggleBtn.BackgroundColor3 = new and lib.AccentColor or lib.OutlineColor
+            callback(new)
+        end
+        GetValue = function()
+            return state
+        end
+    }
+    
+    toggle.MouseEnter:Connect(function()
+        toggle.BackgroundColor3 = lib.MainColor
+    end)
+    
+    toggle.MouseLeave:Connect(function()
+        toggle.BackgroundColor3 = lib.BackgroundColor
+    end)
+    
     toggleBtn.MouseButton1Click:Connect(function()
         state = not state
-        toggleBtn.BackgroundColor3 = state and Colors.ToggleOn or Colors.ToggleOff
+        toggleBtn.BackgroundColor3 = state and lib.AccentColor or lib.OutlineColor
         callback(state)
     end)
     
-    self.YOffset = self.YOffset + 35
+    self.YOffset = self.YOffset + 22
     table.insert(self.Elements, toggle)
-    return toggle, function() return state end
+    return toggle
 end
 
-function Tab:AddSlider(text, min, max, default, callback)
-    local slider = Instance.new("Frame")
-    slider.Name = "Slider"
-    slider.Size = UDim2.new(1, 0, 0, 45)
-    slider.Position = UDim2.new(0, 0, 0, self.YOffset)
-    slider.BackgroundTransparency = 1
-    slider.Parent = self.ContentFrame
+function Category:AddSlider(name, min, max, default, callback)
+    local lib = self.Library
     
-    local sliderLabel = Instance.new("TextLabel")
-    sliderLabel.Name = "Label"
-    sliderLabel.Size = UDim2.new(1, 0, 0, 20)
-    sliderLabel.Position = UDim2.new(0, 0, 0, 0)
-    sliderLabel.BackgroundTransparency = 1
-    sliderLabel.Text = text .. ": " .. tostring(default)
-    sliderLabel.TextColor3 = Colors.Text
-    sliderLabel.TextSize = 14
-    sliderLabel.Font = Enum.Font.Gotham
-    sliderLabel.TextXAlignment = Enum.TextXAlignment.Left
-    sliderLabel.Parent = slider
+    local slider = lib:Create('Frame', {
+        Name = name
+        Size = UDim2.new(1, -4, 0, 35)
+        Position = UDim2.new(0, 2, 0, self.YOffset)
+        BackgroundColor3 = lib.BackgroundColor
+        BorderSizePixel = 0
+        Parent = self.ContentFrame
+    })
     
-    local sliderBar = Instance.new("Frame")
-    sliderBar.Name = "SliderBar"
-    sliderBar.Size = UDim2.new(1, 0, 0, 8)
-    sliderBar.Position = UDim2.new(0, 0, 0, 25)
-    sliderBar.BackgroundColor3 = Colors.Secondary
-    sliderBar.BorderSizePixel = 0
-    sliderBar.Parent = slider
+    lib:AddToRegistry(slider, {
+        BackgroundColor3 = 'BackgroundColor'
+    })
     
-    local SliderBarCorner = Instance.new("UICorner")
-    SliderBarCorner.CornerRadius = UDim.new(0, 4)
-    SliderBarCorner.Parent = sliderBar
+    local label = lib:Create('TextLabel', {
+        Name = "Label"
+        Size = UDim2.new(1, 0, 0, 15)
+        BackgroundTransparency = 1
+        Text = "> " .. name .. ": " .. tostring(default)
+        TextColor3 = lib.FontColor
+        TextSize = 11
+        Font = lib.Font
+        TextXAlignment = Enum.TextXAlignment.Left
+        Parent = slider
+    })
     
-    local sliderFill = Instance.new("Frame")
-    sliderFill.Name = "SliderFill"
-    sliderFill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
-    sliderFill.BackgroundColor3 = Colors.Accent
-    sliderFill.BorderSizePixel = 0
-    sliderFill.Parent = sliderBar
+    lib:ApplyTextStroke(label)
+    lib:AddToRegistry(label, {
+        TextColor3 = 'FontColor'
+    })
     
-    local FillCorner = Instance.new("UICorner")
-    FillCorner.CornerRadius = UDim.new(0, 4)
-    FillCorner.Parent = sliderFill
+    local padding = Instance.new("UIPadding")
+    padding.PaddingLeft = UDim.new(0, 5)
+    padding.Parent = label
     
-    local sliderBtn = Instance.new("TextButton")
-    sliderBtn.Name = "SliderBtn"
-    sliderBtn.Size = UDim2.new(1, 0, 1, 0)
-    sliderBtn.BackgroundTransparency = 1
-    sliderBtn.Text = ""
-    sliderBtn.Parent = sliderBar
+    local sliderBar = lib:Create('Frame', {
+        Name = "SliderBar"
+        Size = UDim2.new(1, -10, 0, 6)
+        Position = UDim2.new(0, 5, 0, 18)
+        BackgroundColor3 = lib.OutlineColor
+        BorderSizePixel = 0
+        Parent = slider
+    })
+    
+    lib:AddToRegistry(sliderBar, {
+        BackgroundColor3 = 'OutlineColor'
+    })
+    
+    local sliderFill = lib:Create('Frame', {
+        Name = "SliderFill"
+        Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
+        BackgroundColor3 = lib.AccentColor
+        BorderSizePixel = 0
+        Parent = sliderBar
+    })
+    
+    lib:AddToRegistry(sliderFill, {
+        BackgroundColor3 = 'AccentColor'
+    })
+    
+    local sliderBtn = lib:Create('TextButton', {
+        Name = "SliderBtn"
+        Size = UDim2.new(1, 0, 1, 0)
+        BackgroundTransparency = 1
+        Text = ""
+        Parent = sliderBar
+    })
     
     local value = default
+    
+    Options[name] = {
+        SetValue = function(new)
+            value = math.clamp(new, min, max)
+            local percentage = (value - min) / (max - min)
+            sliderFill.Size = UDim2.new(percentage, 0, 1, 0)
+            label.Text = "> " .. name .. ": " .. string.format("%.1f", value)
+            callback(value)
+        end
+        GetValue = function()
+            return value
+        end
+    }
     
     local function updateSlider(input)
         local relativeX = input.Position.X - sliderBar.AbsolutePosition.X
         local percentage = math.clamp(relativeX / sliderBar.AbsoluteSize.X, 0, 1)
         value = min + (max - min) * percentage
         sliderFill.Size = UDim2.new(percentage, 0, 1, 0)
-        sliderLabel.Text = text .. ": " .. string.format("%.2f", value)
+        label.Text = "> " .. name .. ": " .. string.format("%.1f", value)
         callback(value)
     end
     
     sliderBtn.MouseButton1Down:Connect(function()
         local connection
-        connection = game:GetService("RunService").RenderStepped:Connect(function()
-            local input = game:GetService("UserInputService"):GetMouseLocation()
+        connection = RenderStepped:Connect(function()
+            local input = InputService:GetMouseLocation()
             updateSlider({Position = input})
         end)
         
-        game:GetService("UserInputService").InputEnded:Connect(function(input)
+        InputService.InputEnded:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 then
                 connection:Disconnect()
             end
         end)
     end)
     
-    self.YOffset = self.YOffset + 50
+    slider.MouseEnter:Connect(function()
+        slider.BackgroundColor3 = lib.MainColor
+    end)
+    
+    slider.MouseLeave:Connect(function()
+        slider.BackgroundColor3 = lib.BackgroundColor
+    end)
+    
+    self.YOffset = self.YOffset + 37
     table.insert(self.Elements, slider)
-    return slider, function() return value end
+    return slider
 end
 
-function Tab:AddTextBox(text, placeholder, callback)
-    local textBox = Instance.new("Frame")
-    textBox.Name = "TextBox"
-    textBox.Size = UDim2.new(1, 0, 0, 50)
-    textBox.Position = UDim2.new(0, 0, 0, self.YOffset)
-    textBox.BackgroundTransparency = 1
-    textBox.Parent = self.ContentFrame
+function Category:AddButton(name, callback)
+    local lib = self.Library
     
-    local textBoxLabel = Instance.new("TextLabel")
-    textBoxLabel.Name = "Label"
-    textBoxLabel.Size = UDim2.new(1, 0, 0, 20)
-    textBoxLabel.Position = UDim2.new(0, 0, 0, 0)
-    textBoxLabel.BackgroundTransparency = 1
-    textBoxLabel.Text = text
-    textBoxLabel.TextColor3 = Colors.Text
-    textBoxLabel.TextSize = 14
-    textBoxLabel.Font = Enum.Font.Gotham
-    textBoxLabel.TextXAlignment = Enum.TextXAlignment.Left
-    textBoxLabel.Parent = textBox
+    local button = lib:Create('TextButton', {
+        Name = name
+        Size = UDim2.new(1, -4, 0, 20)
+        Position = UDim2.new(0, 2, 0, self.YOffset)
+        BackgroundColor3 = lib.BackgroundColor
+        BorderSizePixel = 0
+        Text = "> " .. name
+        TextColor3 = lib.FontColor
+        TextSize = 11
+        Font = lib.Font
+        TextXAlignment = Enum.TextXAlignment.Left
+        Parent = self.ContentFrame
+    })
     
-    local inputBox = Instance.new("TextBox")
-    inputBox.Name = "InputBox"
-    inputBox.Size = UDim2.new(1, 0, 0, 25)
-    inputBox.Position = UDim2.new(0, 0, 0, 25)
-    inputBox.BackgroundColor3 = Colors.Background
-    inputBox.BorderSizePixel = 0
-    inputBox.PlaceholderText = placeholder
-    inputBox.Text = ""
-    inputBox.TextColor3 = Colors.Text
-    inputBox.PlaceholderColor3 = Colors.TextSecondary
-    inputBox.Font = Enum.Font.Gotham
-    inputBox.TextSize = 14
-    inputBox.ClearTextOnFocus = false
-    inputBox.Parent = textBox
+    lib:ApplyTextStroke(button)
+    lib:AddToRegistry(button, {
+        BackgroundColor3 = 'BackgroundColor'
+        TextColor3 = 'FontColor'
+    })
     
-    local InputCorner = Instance.new("UICorner")
-    InputCorner.CornerRadius = UDim.new(0, 6)
-    InputCorner.Parent = inputBox
+    local padding = Instance.new("UIPadding")
+    padding.PaddingLeft = UDim.new(0, 5)
+    padding.Parent = button
     
-    local InputStroke = Instance.new("UIStroke")
-    InputStroke.Color = Colors.Border
-    InputStroke.Thickness = 1
-    InputStroke.Parent = inputBox
-    
-    local InputPadding = Instance.new("UIPadding")
-    InputPadding.PaddingLeft = UDim.new(0, 10)
-    InputPadding.Parent = inputBox
-    
-    inputBox.FocusLost:Connect(function(enterPressed)
-        if enterPressed then
-            callback(inputBox.Text)
-        end
+    button.MouseEnter:Connect(function()
+        button.BackgroundColor3 = lib.MainColor
+        button.TextColor3 = lib.AccentColor
     end)
     
-    self.YOffset = self.YOffset + 55
-    table.insert(self.Elements, textBox)
-    return textBox
-end
-
-function Tab:AddColorPicker(text, default, callback)
-    local colorPicker = Instance.new("Frame")
-    colorPicker.Name = "ColorPicker"
-    colorPicker.Size = UDim2.new(1, 0, 0, 30)
-    colorPicker.Position = UDim2.new(0, 0, 0, self.YOffset)
-    colorPicker.BackgroundTransparency = 1
-    colorPicker.Parent = self.ContentFrame
-    
-    local colorLabel = Instance.new("TextLabel")
-    colorLabel.Name = "Label"
-    colorLabel.Size = UDim2.new(1, -50, 1, 0)
-    colorLabel.Position = UDim2.new(0, 0, 0, 0)
-    colorLabel.BackgroundTransparency = 1
-    colorLabel.Text = text
-    colorLabel.TextColor3 = Colors.Text
-    colorLabel.TextSize = 14
-    colorLabel.Font = Enum.Font.Gotham
-    colorLabel.TextXAlignment = Enum.TextXAlignment.Left
-    colorLabel.Parent = colorPicker
-    
-    local colorBtn = Instance.new("TextButton")
-    colorBtn.Name = "ColorBtn"
-    colorBtn.Size = UDim2.new(0, 40, 0, 20)
-    colorBtn.Position = UDim2.new(1, -45, 0.5, -10)
-    colorBtn.BackgroundColor3 = default
-    colorBtn.BorderSizePixel = 0
-    colorBtn.Text = ""
-    colorBtn.Parent = colorPicker
-    
-    local ColorCorner = Instance.new("UICorner")
-    ColorCorner.CornerRadius = UDim.new(0, 6)
-    ColorCorner.Parent = colorBtn
-    
-    local ColorStroke = Instance.new("UIStroke")
-    ColorStroke.Color = Colors.Border
-    ColorStroke.Thickness = 1
-    ColorStroke.Parent = colorBtn
-    
-    colorBtn.MouseButton1Click:Connect(function()
-        -- Simple color picker implementation
-        local colorPickerGui = Instance.new("ScreenGui")
-        colorPickerGui.Name = "ColorPickerGui"
-        colorPickerGui.Parent = game:GetService("CoreGui")
-        
-        local pickerFrame = Instance.new("Frame")
-        pickerFrame.Name = "PickerFrame"
-        pickerFrame.Size = UDim2.new(0, 200, 0, 200)
-        pickerFrame.Position = UDim2.new(0.5, -100, 0.5, -100)
-        pickerFrame.BackgroundColor3 = Colors.Background
-        pickerFrame.BorderSizePixel = 0
-        pickerFrame.Parent = colorPickerGui
-        
-        local PickerCorner = Instance.new("UICorner")
-        PickerCorner.CornerRadius = UDim.new(0, 8)
-        PickerCorner.Parent = pickerFrame
-        
-        local PickerStroke = Instance.new("UIStroke")
-        PickerStroke.Color = Colors.Border
-        PickerStroke.Thickness = 1
-        PickerStroke.Parent = pickerFrame
-        
-        -- Color presets
-        local colors = {
-            Color3.fromRGB(255, 0, 0),
-            Color3.fromRGB(255, 128, 0),
-            Color3.fromRGB(255, 255, 0),
-            Color3.fromRGB(0, 255, 0),
-            Color3.fromRGB(0, 255, 255),
-            Color3.fromRGB(0, 0, 255),
-            Color3.fromRGB(255, 0, 255),
-            Color3.fromRGB(255, 255, 255),
-            Color3.fromRGB(128, 128, 128),
-            Color3.fromRGB(0, 0, 0)
-        }
-        
-        for i, color in ipairs(colors) do
-            local colorBtn = Instance.new("TextButton")
-            colorBtn.Size = UDim2.new(0, 40, 0, 40)
-            colorBtn.Position = UDim2.new(0, (i - 1) % 5 * 40 + 10, 0, math.floor((i - 1) / 5) * 40 + 10)
-            colorBtn.BackgroundColor3 = color
-            colorBtn.BorderSizePixel = 0
-            colorBtn.Text = ""
-            colorBtn.Parent = pickerFrame
-            
-            local btnCorner = Instance.new("UICorner")
-            btnCorner.CornerRadius = UDim.new(0, 4)
-            btnCorner.Parent = colorBtn
-            
-            colorBtn.MouseButton1Click:Connect(function()
-                colorBtn.BackgroundColor3 = color
-                callback(color)
-                colorPickerGui:Destroy()
-            end)
-        end
-        
-        -- Close when clicking outside
-        game:GetService("UserInputService").InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                colorPickerGui:Destroy()
-            end
-        end)
+    button.MouseLeave:Connect(function()
+        button.BackgroundColor3 = lib.BackgroundColor
+        button.TextColor3 = lib.FontColor
     end)
     
-    self.YOffset = self.YOffset + 35
-    table.insert(self.Elements, colorPicker)
-    return colorPicker
+    button.MouseButton1Click:Connect(callback)
+    
+    self.YOffset = self.YOffset + 22
+    table.insert(self.Elements, button)
+    return button
 end
 
 -- Main Library
 function MeterEngine.new()
     local self = setmetatable({}, MeterEngine)
     
-    -- Create main ScreenGui
-    self.ScreenGui = Instance.new("ScreenGui")
-    self.ScreenGui.Name = "MeterEngine"
-    self.ScreenGui.ResetOnSpawn = false
-    self.ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    self.ScreenGui.Parent = game:GetService("CoreGui")
-    
     -- Create main container
-    self.MainFrame = Instance.new("Frame")
-    self.MainFrame.Name = "MainFrame"
-    self.MainFrame.Size = UDim2.new(0, 600, 0, 400)
-    self.MainFrame.Position = UDim2.new(0.5, -300, 0.5, -200)
-    self.MainFrame.BackgroundColor3 = Colors.Background
-    self.MainFrame.BorderSizePixel = 0
-    self.MainFrame.Parent = self.ScreenGui
+    self.MainFrame = self:Create('Frame', {
+        Name = "MainFrame"
+        Size = UDim2.new(0, 700, 0, 450)
+        Position = UDim2.new(0.5, -350, 0.5, -225)
+        BackgroundColor3 = self.BackgroundColor
+        BorderSizePixel = 0
+        Parent = self.ScreenGui
+    })
     
-    local MainCorner = Instance.new("UICorner")
-    MainCorner.CornerRadius = UDim.new(0, 8)
-    MainCorner.Parent = self.MainFrame
-    
-    local MainStroke = Instance.new("UIStroke")
-    MainStroke.Color = Colors.Border
-    MainStroke.Thickness = 1
-    MainStroke.Parent = self.MainFrame
+    self:AddToRegistry(self.MainFrame, {
+        BackgroundColor3 = 'BackgroundColor'
+    })
     
     -- Create top bar
-    self.TopBar = Instance.new("Frame")
-    self.TopBar.Name = "TopBar"
-    self.TopBar.Size = UDim2.new(1, 0, 0, 40)
-    self.TopBar.BackgroundColor3 = Colors.Secondary
-    self.TopBar.BorderSizePixel = 0
-    self.TopBar.Parent = self.MainFrame
+    self.TopBar = self:Create('Frame', {
+        Name = "TopBar"
+        Size = UDim2.new(1, 0, 0, 30)
+        BackgroundColor3 = self.MainColor
+        BorderSizePixel = 0
+        Parent = self.MainFrame
+    })
     
-    local TopBarCorner = Instance.new("UICorner")
-    TopBarCorner.CornerRadius = UDim.new(0, 8)
-    TopBarCorner.Parent = self.TopBar
+    self:AddToRegistry(self.TopBar, {
+        BackgroundColor3 = 'MainColor'
+    })
     
-    local TopBarMask = Instance.new("Frame")
-    TopBarMask.Name = "Mask"
-    TopBarMask.Size = UDim2.new(1, 0, 0.5, 0)
-    TopBarMask.Position = UDim2.new(0, 0, 0.5, 0)
-    TopBarMask.BackgroundColor3 = Colors.Secondary
-    TopBarMask.BorderSizePixel = 0
-    TopBarMask.Parent = self.TopBar
+    -- Title
+    self.Title = self:Create('TextLabel', {
+        Name = "Title"
+        Size = UDim2.new(0, 200, 1, 0)
+        BackgroundColor3 = self.MainColor
+        BorderSizePixel = 0
+        Text = "Meter Engine v1.0"
+        TextColor3 = self.FontColor
+        TextSize = 14
+        Font = self.Font
+        TextXAlignment = Enum.TextXAlignment.Left
+        Parent = self.TopBar
+    })
     
-    -- Create SearchBar
-    self.SearchBar = Instance.new("TextBox")
-    self.SearchBar.Name = "SearchBar"
-    self.SearchBar.Size = UDim2.new(0, 200, 0, 30)
-    self.SearchBar.Position = UDim2.new(1, -210, 0.5, -15)
-    self.SearchBar.BackgroundColor3 = Colors.Background
-    self.SearchBar.BorderSizePixel = 0
-    self.SearchBar.PlaceholderText = "Search..."
-    self.SearchBar.Text = ""
-    self.SearchBar.TextColor3 = Colors.Text
-    self.SearchBar.PlaceholderColor3 = Colors.TextSecondary
-    self.SearchBar.Font = Enum.Font.Gotham
-    self.SearchBar.TextSize = 14
-    self.SearchBar.ClearTextOnFocus = false
-    self.SearchBar.Parent = self.TopBar
+    self:ApplyTextStroke(self.Title)
+    self:AddToRegistry(self.Title, {
+        BackgroundColor3 = 'MainColor'
+        TextColor3 = 'FontColor'
+    })
     
-    local SearchBarCorner = Instance.new("UICorner")
-    SearchBarCorner.CornerRadius = UDim.new(0, 6)
-    SearchBarCorner.Parent = self.SearchBar
+    local titlePadding = Instance.new("UIPadding")
+    titlePadding.PaddingLeft = UDim.new(0, 10)
+    titlePadding.Parent = self.Title
     
-    local SearchBarStroke = Instance.new("UIStroke")
-    SearchBarStroke.Color = Colors.Border
-    SearchBarStroke.Thickness = 1
-    SearchBarStroke.Parent = self.SearchBar
+    -- SearchBar
+    self.SearchBar = self:Create('TextBox', {
+        Name = "SearchBar"
+        Size = UDim2.new(0, 150, 0, 20)
+        Position = UDim2.new(1, -160, 0.5, -10)
+        BackgroundColor3 = self.BackgroundColor
+        BorderSizePixel = 0
+        PlaceholderText = "Search..."
+        Text = ""
+        TextColor3 = self.FontColor
+        PlaceholderColor3 = self.OutlineColor
+        Font = self.Font
+        TextSize = 11
+        ClearTextOnFocus = false
+        Parent = self.TopBar
+    })
     
-    local SearchBarPadding = Instance.new("UIPadding")
-    SearchBarPadding.PaddingLeft = UDim.new(0, 30)
-    SearchBarPadding.Parent = self.SearchBar
+    self:AddToRegistry(self.SearchBar, {
+        BackgroundColor3 = 'BackgroundColor'
+        TextColor3 = 'FontColor'
+        PlaceholderColor3 = 'OutlineColor'
+    })
     
-    local SearchIcon = Instance.new("ImageLabel")
-    SearchIcon.Name = "SearchIcon"
-    SearchIcon.Size = UDim2.new(0, 16, 0, 16)
-    SearchIcon.Position = UDim2.new(0, 8, 0.5, -8)
-    SearchIcon.BackgroundTransparency = 1
-    SearchIcon.Image = Icons.Search
-    SearchIcon.ImageColor3 = Colors.TextSecondary
-    SearchIcon.Parent = self.SearchBar
+    local searchPadding = Instance.new("UIPadding")
+    searchPadding.PaddingLeft = UDim.new(0, 5)
+    searchPadding.Parent = self.SearchBar
     
-    -- Create tabs container
-    self.TabsContainer = Instance.new("Frame")
-    self.TabsContainer.Name = "TabsContainer"
-    self.TabsContainer.Size = UDim2.new(0, 150, 1, -40)
-    self.TabsContainer.Position = UDim2.new(0, 0, 0, 40)
-    self.TabsContainer.BackgroundColor3 = Colors.Secondary
-    self.TabsContainer.BorderSizePixel = 0
-    self.TabsContainer.Parent = self.MainFrame
+    -- Categories container (columns area)
+    self.CategoriesContainer = self:Create('Frame', {
+        Name = "CategoriesContainer"
+        Size = UDim2.new(1, 0, 1, -30)
+        Position = UDim2.new(0, 0, 0, 30)
+        BackgroundColor3 = self.BackgroundColor
+        BorderSizePixel = 0
+        Parent = self.MainFrame
+    })
     
-    local TabsCorner = Instance.new("UICorner")
-    TabsCorner.CornerRadius = UDim.new(0, 8)
-    TabsCorner.Parent = self.TabsContainer
+    self:AddToRegistry(self.CategoriesContainer, {
+        BackgroundColor3 = 'BackgroundColor'
+    })
     
-    local TabsMask = Instance.new("Frame")
-    TabsMask.Name = "Mask"
-    TabsMask.Size = UDim2.new(0.5, 0, 1, 0)
-    TabsMask.Position = UDim2.new(0.5, 0, 0, 0)
-    TabsMask.BackgroundColor3 = Colors.Secondary
-    TabsMask.BorderSizePixel = 0
-    TabsMask.Parent = self.TabsContainer
+    self.Categories = {}
+    self.CategoryCount = 0
     
-    -- Create content area
-    self.ContentArea = Instance.new("Frame")
-    self.ContentArea.Name = "ContentArea"
-    self.ContentArea.Size = UDim2.new(1, -150, 1, -40)
-    self.ContentArea.Position = UDim2.new(0, 150, 0, 40)
-    self.ContentArea.BackgroundColor3 = Colors.Background
-    self.ContentArea.BorderSizePixel = 0
-    self.ContentArea.Parent = self.MainFrame
-    
-    local ContentCorner = Instance.new("UICorner")
-    ContentCorner.CornerRadius = UDim.new(0, 8)
-    ContentCorner.Parent = self.ContentArea
-    
-    local ContentMask = Instance.new("Frame")
-    ContentMask.Name = "Mask"
-    ContentMask.Size = UDim2.new(1, 0, 0.5, 0)
-    ContentMask.Position = UDim2.new(0, 0, 0.5, 0)
-    ContentMask.BackgroundColor3 = Colors.Background
-    ContentMask.BorderSizePixel = 0
-    ContentMask.Parent = self.ContentArea
-    
-    self.Tabs = {}
-    self.CurrentTab = nil
+    -- Make draggable
+    self:MakeDraggable(self.MainFrame, 30)
     
     return self
 end
 
-function MeterEngine:AddTab(name)
-    local tabButton = Instance.new("TextButton")
-    tabButton.Name = name .. "Tab"
-    tabButton.Size = UDim2.new(1, -10, 0, 35)
-    tabButton.Position = UDim2.new(0, 5, 0, #self.Tabs * 40 + 5)
-    tabButton.BackgroundColor3 = Colors.Background
-    tabButton.BorderSizePixel = 0
-    tabButton.Text = name
-    tabButton.TextColor3 = Colors.Text
-    tabButton.Font = Enum.Font.Gotham
-    tabButton.TextSize = 14
-    tabButton.Parent = self.TabsContainer
+function MeterEngine:AddCategory(name)
+    local category = Category.new(name, self.CategoriesContainer, self)
     
-    local TabCorner = Instance.new("UICorner")
-    TabCorner.CornerRadius = UDim.new(0, 6)
-    TabCorner.Parent = tabButton
+    -- Position column
+    category.ColumnFrame.Position = UDim2.new(0, self.CategoryCount * 120, 0, 0)
     
-    local TabPadding = Instance.new("UIPadding")
-    TabPadding.PaddingLeft = UDim.new(0, 10)
-    TabPadding.Parent = tabButton
+    self.CategoryCount = self.CategoryCount + 1
+    table.insert(self.Categories, category)
     
-    local tab = Tab.new(name, self.TabsContainer, self.ContentArea)
-    
-    tabButton.MouseEnter:Connect(function()
-        tabButton.BackgroundColor3 = Colors.Hover
-    end)
-    
-    tabButton.MouseLeave:Connect(function()
-        if self.CurrentTab ~= tab then
-            tabButton.BackgroundColor3 = Colors.Background
-        end
-    end)
-    
-    tabButton.MouseButton1Click:Connect(function()
-        -- Hide current tab
-        if self.CurrentTab then
-            self.CurrentTab.ContentFrame.Visible = false
-        end
-        
-        -- Show new tab
-        self.CurrentTab = tab
-        tab.ContentFrame.Visible = true
-        tabButton.BackgroundColor3 = Colors.Accent
-    end)
-    
-    table.insert(self.Tabs, {
-        Name = name,
-        Button = tabButton,
-        Tab = tab
-    })
-    
-    -- Select first tab automatically
-    if #self.Tabs == 1 then
-        tabButton.MouseButton1Click:Fire()
-    end
-    
-    return tab
+    return category
 end
 
 function MeterEngine:Toggle()
