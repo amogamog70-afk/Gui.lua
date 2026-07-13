@@ -1,7 +1,7 @@
 -- ╔══════════════════════════════════════════════════════════╗
 -- ║         METEOR UI LIBRARY — METEOR CLIENT STYLE v3.0     ║
 -- ║   Минималистичный дизайн · Прозрачные элементы          ║
--- ║   Вкладки слева · Loading Screen · Fixed RightShift     ║
+-- ║   Вкладки сверху · Loading Screen · Fixed RightShift    ║
 -- ╚══════════════════════════════════════════════════════════╝
 
 local TweenService     = game:GetService("TweenService")
@@ -201,154 +201,146 @@ PopupLayer.InputBegan:Connect(function(i)
     end
 end)
 
--- ── MAIN WINDOW (METEOR STYLE) ─────────────────────────────
--- Левая панель вкладок (без фона) + правая область контента
-local WINDOW_W = 560
-local WINDOW_H = 380
-local TAB_W    = 90  -- ширина левой панели
-local CONTENT_W = WINDOW_W - TAB_W
+-- ── TOP BAR (КАК В METEOR CLIENT) ──────────────────────────
+-- Вкладки горизонтально сверху, Search Bar справа
+local BAR_W  = 600
+local BAR_H  = 32
+local PAGE_H = 340
 
--- Главный контейнер
-local MainWindow = Instance.new("Frame")
-MainWindow.Name            = "MainWindow"
-MainWindow.Size            = UDim2.new(0, WINDOW_W, 0, WINDOW_H)
-MainWindow.Position        = UDim2.new(0.5, -WINDOW_W/2, 0.5, -WINDOW_H/2)
-MainWindow.BackgroundColor3 = Theme.MainBg
-MainWindow.BorderSizePixel = 0
-MainWindow.ZIndex          = 10
-MainWindow.Visible         = false  -- покажется после загрузки
-MainWindow.Parent          = ScreenGui
-Corner(MainWindow, 6)
-Stroke(MainWindow, Theme.Border, 1)
+local TopBar = Instance.new("Frame")
+TopBar.Name            = "TopBar"
+TopBar.Size            = UDim2.new(0, BAR_W, 0, BAR_H)
+TopBar.Position        = UDim2.new(0.5, -BAR_W/2, 0.5, -(BAR_H + PAGE_H)/2)
+TopBar.BackgroundColor3 = Theme.MainBg
+TopBar.BorderSizePixel = 0
+TopBar.ZIndex          = 10
+TopBar.Visible         = false  -- покажется после загрузки
+TopBar.Parent          = ScreenGui
+Corner(TopBar, 6)
+Stroke(TopBar, Theme.Border, 1)
 
 -- Показать после загрузки
 task.spawn(function()
-    task.wait(2.2)  -- после loading screen
-    MainWindow.Visible = true
-    MainWindow.BackgroundTransparency = 1
-    Tween(MainWindow, {BackgroundTransparency = 0}, 0.4)
+    task.wait(2.2)
+    TopBar.Visible = true
+    TopBar.BackgroundTransparency = 1
+    Tween(TopBar, {BackgroundTransparency = 0}, 0.4)
 end)
 
--- ═══ HEADER (лого + название + кнопки) ═══
-local Header = Instance.new("Frame")
-Header.Size            = UDim2.new(1, 0, 0, 36)
-Header.BackgroundTransparency = 1
-Header.ZIndex          = 11
-Header.Parent          = MainWindow
+-- Нижняя акцентная линия
+local BarLine = Instance.new("Frame")
+BarLine.Size            = UDim2.new(1, -8, 0, 1)
+BarLine.Position        = UDim2.new(0, 4, 1, -1)
+BarLine.BackgroundColor3 = Theme.Accent
+BarLine.BorderSizePixel = 0
+BarLine.ZIndex          = 11
+BarLine.Parent          = TopBar
 
--- Разделитель под хедером
-local HeaderLine = Instance.new("Frame")
-HeaderLine.Size            = UDim2.new(1, -12, 0, 1)
-HeaderLine.Position        = UDim2.new(0, 6, 1, -1)
-HeaderLine.BackgroundColor3 = Theme.Divider
-HeaderLine.BorderSizePixel = 0
-HeaderLine.ZIndex          = 11
-HeaderLine.Parent          = Header
-
--- Логотип
+-- Логотип слева
 local LogoLabel = Instance.new("TextLabel")
-LogoLabel.Size            = UDim2.new(0, 100, 1, 0)
-LogoLabel.Position        = UDim2.new(0, 12, 0, 0)
+LogoLabel.Size            = UDim2.new(0, 80, 1, 0)
+LogoLabel.Position        = UDim2.new(0, 10, 0, 0)
 LogoLabel.BackgroundTransparency = 1
 LogoLabel.Text            = "✦ meteor"
 LogoLabel.TextColor3      = Theme.Accent
 LogoLabel.Font            = Enum.Font.GothamBold
-LogoLabel.TextSize        = 14
+LogoLabel.TextSize        = 13
 LogoLabel.TextXAlignment  = Enum.TextXAlignment.Left
 LogoLabel.ZIndex          = 12
-LogoLabel.Parent          = Header
+LogoLabel.Parent          = TopBar
 
--- Search Bar (справа)
+-- Контейнер вкладок (горизонтально после логотипа)
+local TabContainer = Instance.new("Frame")
+TabContainer.Size               = UDim2.new(0, 360, 1, 0)
+TabContainer.Position           = UDim2.new(0, 96, 0, 0)
+TabContainer.BackgroundTransparency = 1
+TabContainer.ZIndex             = 12
+TabContainer.Parent             = TopBar
+
+local TabLayout = Instance.new("UIListLayout")
+TabLayout.FillDirection  = Enum.FillDirection.Horizontal
+TabLayout.SortOrder      = Enum.SortOrder.LayoutOrder
+TabLayout.Padding        = UDim.new(0, 4)
+TabLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+TabLayout.Parent         = TabContainer
+
+-- Search Bar справа
 local SearchBox = Instance.new("Frame")
-SearchBox.Size            = UDim2.new(0, 140, 0, 22)
-SearchBox.Position        = UDim2.new(1, -148, 0.5, -11)
+SearchBox.Size            = UDim2.new(0, 130, 0, 20)
+SearchBox.Position        = UDim2.new(1, -138, 0.5, -10)
 SearchBox.BackgroundColor3 = Theme.TrackBg
 SearchBox.BorderSizePixel = 0
 SearchBox.ZIndex          = 12
-SearchBox.Parent          = Header
+SearchBox.Parent          = TopBar
 Corner(SearchBox, 4)
 Stroke(SearchBox, Theme.Border, 1)
 
 local SearchIcon = Instance.new("TextLabel")
-SearchIcon.Size            = UDim2.new(0, 16, 0, 16)
-SearchIcon.Position        = UDim2.new(0, 6, 0.5, -8)
+SearchIcon.Size            = UDim2.new(0, 14, 0, 14)
+SearchIcon.Position        = UDim2.new(0, 4, 0.5, -7)
 SearchIcon.BackgroundTransparency = 1
 SearchIcon.Text            = "🔍"
 SearchIcon.TextColor3      = Theme.TextSec
-SearchIcon.TextSize        = 12
+SearchIcon.TextSize        = 10
 SearchIcon.ZIndex          = 13
 SearchIcon.Parent          = SearchBox
 
 local SearchInput = Instance.new("TextBox")
-SearchInput.Size            = UDim2.new(1, -28, 1, 0)
-SearchInput.Position        = UDim2.new(0, 24, 0, 0)
+SearchInput.Size            = UDim2.new(1, -24, 1, 0)
+SearchInput.Position        = UDim2.new(0, 20, 0, 0)
 SearchInput.BackgroundTransparency = 1
 SearchInput.Font            = Enum.Font.Gotham
 SearchInput.Text            = ""
 SearchInput.PlaceholderText = "Search..."
 SearchInput.PlaceholderColor3 = Theme.TextSec
 SearchInput.TextColor3      = Theme.TextPri
-SearchInput.TextSize        = 11
+SearchInput.TextSize        = 10
 SearchInput.TextXAlignment  = Enum.TextXAlignment.Left
 SearchInput.ZIndex          = 13
 SearchInput.ClearTextOnFocus = false
 SearchInput.Parent          = SearchBox
 
--- ═══ LEFT PANEL (вкладки вертикально БЕЗ фона) ═══
-local TabPanel = Instance.new("Frame")
-TabPanel.Size            = UDim2.new(0, TAB_W, 1, -36)
-TabPanel.Position        = UDim2.new(0, 0, 0, 36)
-TabPanel.BackgroundTransparency = 1  -- нет фона!
-TabPanel.ZIndex          = 11
-TabPanel.Parent          = MainWindow
-
-local TabLayout = Instance.new("UIListLayout")
-TabLayout.FillDirection  = Enum.FillDirection.Vertical
-TabLayout.SortOrder      = Enum.SortOrder.LayoutOrder
-TabLayout.Padding        = UDim.new(0, 2)
-TabLayout.Parent         = TabPanel
-
-local TabPad = Instance.new("UIPadding")
-TabPad.PaddingTop    = UDim.new(0, 8)
-TabPad.PaddingLeft   = UDim.new(0, 6)
-TabPad.PaddingRight  = UDim.new(0, 6)
-TabPad.Parent        = TabPanel
-
--- Вертикальный разделитель справа от вкладок
-local VerticalDivider = Instance.new("Frame")
-VerticalDivider.Size            = UDim2.new(0, 1, 1, -48)
-VerticalDivider.Position        = UDim2.new(0, TAB_W, 0, 42)
-VerticalDivider.BackgroundColor3 = Theme.Divider
-VerticalDivider.BorderSizePixel = 0
-VerticalDivider.ZIndex          = 11
-VerticalDivider.Parent          = MainWindow
-
--- ═══ CONTENT AREA (справа от вкладок) ═══
+-- ── PAGE CONTAINER (под TopBar) ─────────────────────────────
 local PageContainer = Instance.new("Frame")
 PageContainer.Name            = "Pages"
-PageContainer.Size            = UDim2.new(0, CONTENT_W, 1, -36)
-PageContainer.Position        = UDim2.new(0, TAB_W, 0, 36)
-PageContainer.BackgroundTransparency = 1
+PageContainer.Size            = UDim2.new(0, BAR_W, 0, PAGE_H)
+PageContainer.Position        = UDim2.new(0.5, -BAR_W/2, 0.5, -(BAR_H + PAGE_H)/2 + BAR_H)
+PageContainer.BackgroundColor3 = Theme.MainBg
+PageContainer.BorderSizePixel = 0
 PageContainer.ClipsDescendants = true
-PageContainer.ZIndex          = 10
-PageContainer.Parent          = MainWindow
+PageContainer.ZIndex          = 9
+PageContainer.Visible         = false
+PageContainer.Parent          = ScreenGui
+Corner(PageContainer, 6)
+Stroke(PageContainer, Theme.Border, 1)
 
--- ── DRAG (перетаскивание за Header) ────────────────────────
+task.spawn(function()
+    task.wait(2.2)
+    PageContainer.Visible = true
+    PageContainer.BackgroundTransparency = 1
+    Tween(PageContainer, {BackgroundTransparency = 0}, 0.4)
+end)
+
+-- ── DRAG (перетаскивание за TopBar) ────────────────────────
 do
     local dragging, dragStart, startPos
-    Header.InputBegan:Connect(function(i)
+    TopBar.InputBegan:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging  = true
             dragStart = i.Position
-            startPos  = MainWindow.Position
+            startPos  = TopBar.Position
         end
     end)
     UserInputService.InputChanged:Connect(function(i)
         if dragging and i.UserInputType == Enum.UserInputType.MouseMovement then
             local delta = i.Position - dragStart
-            MainWindow.Position = UDim2.new(
+            local newPos = UDim2.new(
                 startPos.X.Scale, startPos.X.Offset + delta.X,
                 startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            TopBar.Position        = newPos
+            PageContainer.Position = UDim2.new(
+                newPos.X.Scale, newPos.X.Offset,
+                newPos.Y.Scale, newPos.Y.Offset + BAR_H)
             PopupLayer:ClearAllChildren()
         end
     end)
@@ -367,7 +359,6 @@ local ActivePage  = nil
 local FirstActivate = nil
 
 -- ══ FIXED RIGHTSHIFT TOGGLE ══
--- Изоляция от других биндов и правильное скрытие
 local guiVisible = true
 local rightShiftPressed = false
 
@@ -377,7 +368,8 @@ UserInputService.InputBegan:Connect(function(i, gp)
         if not rightShiftPressed then
             rightShiftPressed = true
             guiVisible = not guiVisible
-            MainWindow.Visible    = guiVisible
+            TopBar.Visible         = guiVisible
+            PageContainer.Visible  = guiVisible
             if not guiVisible then CloseAllPopups() end
         end
     end
@@ -406,7 +398,7 @@ SearchInput:GetPropertyChangedSignal("Text"):Connect(function()
 end)
 
 -- ════════════════════════════════════════════════════════════
--- CreateTab (вертикальные вкладки слева)
+-- CreateTab (горизонтальные вкладки сверху как в Meteor Client)
 -- ════════════════════════════════════════════════════════════
 function Library:CreateTab(name, icon)
 
@@ -423,50 +415,50 @@ function Library:CreateTab(name, icon)
     Page.ZIndex               = 10
     Page.Parent               = PageContainer
 
-    -- сетка элементов (2 колонки)
+    -- сетка элементов (3 колонки как в оригинале)
     local Grid = Instance.new("UIGridLayout")
-    Grid.CellSize    = UDim2.new(0, 218, 0, 32)
+    Grid.CellSize    = UDim2.new(0, 190, 0, 32)
     Grid.CellPadding = UDim2.new(0, 6, 0, 5)
     Grid.SortOrder   = Enum.SortOrder.LayoutOrder
     Grid.Parent      = Page
 
     local GridPad = Instance.new("UIPadding")
-    GridPad.PaddingTop    = UDim.new(0, 10)
-    GridPad.PaddingLeft   = UDim.new(0, 10)
-    GridPad.PaddingRight  = UDim.new(0, 10)
-    GridPad.PaddingBottom = UDim.new(0, 10)
+    GridPad.PaddingTop    = UDim.new(0, 8)
+    GridPad.PaddingLeft   = UDim.new(0, 8)
+    GridPad.PaddingRight  = UDim.new(0, 8)
+    GridPad.PaddingBottom = UDim.new(0, 8)
     GridPad.Parent        = Page
 
-    -- ═══ КНОПКА ВКЛАДКИ (вертикально слева) ═══
+    -- ═══ КНОПКА ВКЛАДКИ (горизонтально сверху) ═══
     local TabBtn = Instance.new("TextButton")
-    TabBtn.Size            = UDim2.new(1, -12, 0, 34)
+    TabBtn.Size            = UDim2.new(0, 72, 1, -4)
     TabBtn.BackgroundTransparency = 1
     TabBtn.Font            = Enum.Font.GothamSemibold
-    TabBtn.Text            = (icon and (icon .. "  ") or "") .. name
+    TabBtn.Text            = (icon and (icon .. " ") or "") .. name
     TabBtn.TextColor3      = Theme.TextSec
-    TabBtn.TextSize        = 12
+    TabBtn.TextSize        = 11
     TabBtn.AutoButtonColor = false
-    TabBtn.ZIndex          = 12
-    TabBtn.Parent          = TabPanel
+    TabBtn.ZIndex          = 13
+    TabBtn.Parent          = TabContainer
 
-    -- Тонкий индикатор слева (при активности)
-    local TabIndicator = Instance.new("Frame")
-    TabIndicator.Size            = UDim2.new(0, 2, 0.7, 0)
-    TabIndicator.Position        = UDim2.new(0, -4, 0.15, 0)
-    TabIndicator.BackgroundColor3 = Theme.Accent
-    TabIndicator.BackgroundTransparency = 1
-    TabIndicator.BorderSizePixel = 0
-    TabIndicator.ZIndex          = 13
-    TabIndicator.Parent          = TabBtn
-    Corner(TabIndicator, 2)
+    -- Розовый индикатор снизу (при активности)
+    local TabLine = Instance.new("Frame")
+    TabLine.Size            = UDim2.new(0.8, 0, 0, 2)
+    TabLine.Position        = UDim2.new(0.1, 0, 1, -2)
+    TabLine.BackgroundColor3 = Theme.Accent
+    TabLine.BackgroundTransparency = 1
+    TabLine.BorderSizePixel = 0
+    TabLine.ZIndex          = 14
+    TabLine.Parent          = TabBtn
+    Corner(TabLine, 1)
 
     local function Activate()
         CloseAllPopups()
         -- скрыть всё
         for _, p in pairs(Pages) do p.Visible = false end
-        for _, b in ipairs(TabPanel:GetChildren()) do
+        for _, b in ipairs(TabContainer:GetChildren()) do
             if b:IsA("TextButton") then
-                Tween(b, {TextColor3 = Theme.TextSec, BackgroundTransparency = 1})
+                Tween(b, {TextColor3 = Theme.TextSec})
                 local ind = b:FindFirstChildOfClass("Frame")
                 if ind then ind.BackgroundTransparency = 1 end
             end
@@ -474,19 +466,19 @@ function Library:CreateTab(name, icon)
         -- показать текущее
         Page.Visible              = true
         ActivePage                = Page
-        Tween(TabBtn, {TextColor3 = Theme.TextPri, BackgroundTransparency = 0.95})
-        TabIndicator.BackgroundTransparency = 0
+        Tween(TabBtn, {TextColor3 = Theme.TextPri})
+        TabLine.BackgroundTransparency = 0
     end
 
     TabBtn.MouseButton1Click:Connect(Activate)
     TabBtn.MouseEnter:Connect(function()
         if not Page.Visible then 
-            Tween(TabBtn, {TextColor3 = Theme.TextPri, BackgroundTransparency = 0.97})
+            Tween(TabBtn, {TextColor3 = Theme.TextPri})
         end
     end)
     TabBtn.MouseLeave:Connect(function()
         if not Page.Visible then 
-            Tween(TabBtn, {TextColor3 = Theme.TextSec, BackgroundTransparency = 1})
+            Tween(TabBtn, {TextColor3 = Theme.TextSec})
         end
     end)
 
@@ -1344,7 +1336,7 @@ function Library:CreateTab(name, icon)
         duration = duration or 3
         local notif = Instance.new("Frame")
         notif.Size            = UDim2.new(0, 240, 0, 52)
-        notif.Position        = UDim2.new(1, -248, 0, 50)
+        notif.Position        = UDim2.new(1, -248, 0, BAR_H + 8)
         notif.BackgroundColor3 = Theme.MainBg
         notif.BorderSizePixel = 0
         notif.BackgroundTransparency = 1
@@ -1375,12 +1367,12 @@ function Library:CreateTab(name, icon)
         t2.ZIndex   = 81
 
         -- Slide in animation
-        notif.Position = UDim2.new(1, 20, 0, 50)
+        notif.Position = UDim2.new(1, 20, 0, BAR_H + 8)
         Tween(notif, {BackgroundTransparency = 0}, 0.2)
-        Tween(notif, {Position = UDim2.new(1, -248, 0, 50)}, 0.3, Enum.EasingStyle.Back)
+        Tween(notif, {Position = UDim2.new(1, -248, 0, BAR_H + 8)}, 0.3, Enum.EasingStyle.Back)
 
         task.delay(duration, function()
-            Tween(notif, {Position = UDim2.new(1, 20, 0, 50)}, 0.25, Enum.EasingStyle.Quart)
+            Tween(notif, {Position = UDim2.new(1, 20, 0, BAR_H + 8)}, 0.25, Enum.EasingStyle.Quart)
             Tween(notif, {BackgroundTransparency = 1}, 0.25)
             task.delay(0.28, function() notif:Destroy() end)
         end)
@@ -1403,7 +1395,7 @@ return Library
   
   ОСОБЕННОСТИ:
   • Loading Screen с анимацией
-  • Вкладки слева (вертикально)
+  • Вкладки сверху горизонтально (как в Meteor Client)
   • Прозрачные элементы без фона
   • Фон только у Search Bar
   • Минималистичный дизайн
