@@ -1,8 +1,8 @@
--- [[ METEOR SLIM TOP-BAR UI LIBRARY ]]
+-- [[ METEOR CENTERED TOP-BAR UI LIBRARY ]]
 local Theme = {
     MainBg = Color3.fromRGB(15, 15, 20),         -- Тёмный фон топ-бара (70%)
     ElementBg = Color3.fromRGB(23, 23, 31),      -- Фон элементов
-    Accent = Color3.fromRGB(218, 43, 172),       -- Твой неоново-розовый акцент (30%)
+    Accent = Color3.fromRGB(218, 43, 172),       -- Твой розовый неоновый акцент (30%)
     TextPrimary = Color3.fromRGB(255, 255, 255),
     TextSecondary = Color3.fromRGB(150, 150, 160)
 }
@@ -19,16 +19,21 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.DisplayOrder = 999
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
--- 1. УКОРОЧЕННАЯ ВЕРХНЯЯ ПАНЕЛЬ (В самый верх экрана)
+-- 1. ГЛАВНЫЙ БАР (Компактный, по центру сверху, высота 45)
 local TopBar = Instance.new("Frame")
 TopBar.Name = "TopBar"
-TopBar.Size = UDim2.new(1, 0, 0, 32) -- Сделали тоньше (32 пикселя)
-TopBar.Position = UDim2.new(0, 0, 0, 0)
+TopBar.Size = UDim2.new(0, 650, 0, 45) -- Фиксированная ширина и прошлая высота
+TopBar.Position = UDim2.new(0.5, -325, 0, 0) -- Строго по центру экрана вверху
 TopBar.BackgroundColor3 = Theme.MainBg
 TopBar.BorderSizePixel = 0
 TopBar.Parent = ScreenGui
 
--- Нижняя розовая линия-акцент
+-- Скругление нижних углов бара, чтобы выглядело как плашка
+local BarCorner = Instance.new("UICorner")
+BarCorner.CornerRadius = UDim.new(0, 6)
+BarCorner.Parent = TopBar
+
+-- Розовая линия-акцент на самом низу плашки
 local BottomLine = Instance.new("Frame")
 BottomLine.Size = UDim2.new(1, 0, 0, 2)
 BottomLine.Position = UDim2.new(0, 0, 1, -2)
@@ -36,9 +41,9 @@ BottomLine.BackgroundColor3 = Theme.Accent
 BottomLine.BorderSizePixel = 0
 BottomLine.Parent = TopBar
 
--- Контейнер для вкладок
+-- Контейнер для вкладок внутри плашки
 local TabContainer = Instance.new("Frame")
-TabContainer.Size = UDim2.new(0.6, 0, 1, -2)
+TabContainer.Size = UDim2.new(0, 420, 1, -2)
 TabContainer.Position = UDim2.new(0, 15, 0, 0)
 TabContainer.BackgroundTransparency = 1
 TabContainer.Parent = TopBar
@@ -50,10 +55,10 @@ TabLayout.Padding = UDim.new(0, 14)
 TabLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 TabLayout.Parent = TabContainer
 
--- Контейнер для поиска
+-- Контейнер для поиска (справа в плашке)
 local SearchContainer = Instance.new("Frame")
-SearchContainer.Size = UDim2.new(0, 200, 0, 22) -- Чуть компактнее под новый бар
-SearchContainer.Position = UDim2.new(1, -215, 0.5, -11)
+SearchContainer.Size = UDim2.new(0, 180, 0, 28)
+SearchContainer.Position = UDim2.new(1, -195, 0.5, -14)
 SearchContainer.BackgroundColor3 = Theme.ElementBg
 SearchContainer.BorderSizePixel = 0
 SearchContainer.Parent = TopBar
@@ -71,24 +76,24 @@ SearchInput.Text = ""
 SearchInput.PlaceholderText = "Search.."
 SearchInput.PlaceholderColor3 = Theme.TextSecondary
 SearchInput.TextColor3 = Theme.TextPrimary
-SearchInput.TextSize = 12
+SearchInput.TextSize = 13
 SearchInput.TextXAlignment = Enum.TextXAlignment.Left
 SearchInput.Parent = SearchContainer
 
--- Твоя аккуратная лупа
+-- Твоя правильная лупа
 local SearchIcon = Instance.new("TextLabel")
 SearchIcon.Size = UDim2.new(0, 20, 1, 0)
 SearchIcon.Position = UDim2.new(1, -22, 0, 0)
 SearchIcon.BackgroundTransparency = 1
 SearchIcon.Text = "🔍︎"
-SearchIcon.TextSize = 11
+SearchIcon.TextSize = 12
 SearchIcon.TextColor3 = Theme.Accent
 SearchIcon.Parent = SearchContainer
 
--- 2. КОНТЕЙНЕР ДЛЯ ФУНКЦИЙ
+-- 2. КОНТЕЙНЕР ДЛЯ ВЫПАДАЮЩИХ ФУНКЦИЙ (Открывается ровно под плашкой)
 local ContainerFrame = Instance.new("Frame")
-ContainerFrame.Size = UDim2.new(1, 0, 1, -32)
-ContainerFrame.Position = UDim2.new(0, 0, 0, 32)
+ContainerFrame.Size = UDim2.new(0, 650, 1, -65)
+ContainerFrame.Position = UDim2.new(0.5, -325, 0, 55) -- Висит ровно под баром с отступом
 ContainerFrame.BackgroundTransparency = 1
 ContainerFrame.Parent = ScreenGui
 
@@ -101,8 +106,7 @@ local Library = {}
 function Library:CreateTab(name)
     local Page = Instance.new("ScrollingFrame")
     Page.Name = name .. "Page"
-    Page.Size = UDim2.new(1, -40, 1, -40)
-    Page.Position = UDim2.new(0, 20, 0, 20)
+    Page.Size = UDim2.new(1, 0, 1, 0)
     Page.BackgroundTransparency = 1
     Page.Visible = false
     Page.ScrollBarThickness = 3
@@ -111,8 +115,8 @@ function Library:CreateTab(name)
     Page.Parent = ContainerFrame
 
     local PageGrid = Instance.new("UIGridLayout")
-    PageGrid.CellSize = UDim2.new(0, 210, 0, 36)
-    PageGrid.CellPadding = UDim2.new(0, 10, 0, 10)
+    PageGrid.CellSize = UDim2.new(0, 205, 0, 38) -- Сетка блоков под размер меню
+    PageGrid.CellPadding = UDim2.new(0, 12, 0, 12)
     PageGrid.Parent = Page
 
     PageGrid:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
@@ -122,12 +126,12 @@ function Library:CreateTab(name)
     -- Кнопка вкладки на Топ-Баре
     local TabButton = Instance.new("TextButton")
     TabButton.Name = name .. "Tab"
-    TabButton.Size = UDim2.new(0, 80, 0, 26)
+    TabButton.Size = UDim2.new(0, 75, 0, 30)
     TabButton.BackgroundTransparency = 1
     TabButton.Font = Enum.Font.GothamSemibold
     TabButton.Text = name
     TabButton.TextColor3 = Theme.TextSecondary
-    TabButton.TextSize = 13
+    TabButton.TextSize = 14
     TabButton.Parent = TabContainer
 
     local function Activate()
@@ -155,7 +159,7 @@ function Library:CreateTab(name)
         Button.TextColor3 = Theme.TextPrimary
         Button.TextSize = 12
         Button.Parent = Page
-        Instance.new("UICorner", Button).CornerRadius = UDim.new(0, 4)
+        Instance.new("UICorner", Button).CornerRadius = UDim.new(0, 5)
 
         Button.MouseButton1Click:Connect(function() pcall(callback) end)
         table.insert(AllElements, {Instance = Button, Name = text:lower(), PageActivate = Activate})
@@ -173,7 +177,7 @@ function Library:CreateTab(name)
         Toggle.TextSize = 12
         Toggle.TextXAlignment = Enum.TextXAlignment.Left
         Toggle.Parent = Page
-        Instance.new("UICorner", Toggle).CornerRadius = UDim.new(0, 4)
+        Instance.new("UICorner", Toggle).CornerRadius = UDim.new(0, 5)
 
         local Indicator = Instance.new("Frame")
         Indicator.Size = UDim2.new(0, 14, 0, 14)
@@ -195,7 +199,7 @@ function Library:CreateTab(name)
         local Slider = Instance.new("Frame")
         Slider.BackgroundColor3 = Theme.ElementBg
         Slider.Parent = Page
-        Instance.new("UICorner", Slider).CornerRadius = UDim.new(0, 4)
+        Instance.new("UICorner", Slider).CornerRadius = UDim.new(0, 5)
 
         local Title = Instance.new("TextLabel")
         Title.Size = UDim2.new(1, 0, 0, 16)
@@ -260,7 +264,7 @@ function Library:CreateTab(name)
         local BoxFrame = Instance.new("Frame")
         BoxFrame.BackgroundColor3 = Theme.ElementBg
         BoxFrame.Parent = Page
-        Instance.new("UICorner", BoxFrame).CornerRadius = UDim.new(0, 4)
+        Instance.new("UICorner", BoxFrame).CornerRadius = UDim.new(0, 5)
 
         local BoxInput = Instance.new("TextBox")
         BoxInput.Size = UDim2.new(1, -16, 1, -6)
@@ -279,7 +283,7 @@ function Library:CreateTab(name)
         table.insert(AllElements, {Instance = BoxFrame, Name = placeholder:lower(), PageActivate = Activate})
     end
 
-    -- [[ ВЫБОР ОПЦИЙ (DROPDOWN) ]]
+    -- [[ ВЫБОР ОПЦИЙ ]]
     function Elements:CreateDropdown(text, list, callback)
         local Dropdown = Instance.new("TextButton")
         Dropdown.Size = UDim2.new(1, 0, 1, 0)
@@ -290,7 +294,7 @@ function Library:CreateTab(name)
         Dropdown.TextSize = 12
         Dropdown.TextXAlignment = Enum.TextXAlignment.Left
         Dropdown.Parent = Page
-        Instance.new("UICorner", Dropdown).CornerRadius = UDim.new(0, 4)
+        Instance.new("UICorner", Dropdown).CornerRadius = UDim.new(0, 5)
 
         local currentIdx = 1
         Dropdown.MouseButton1Click:Connect(function()
@@ -312,7 +316,7 @@ function Library:CreateTab(name)
         Picker.TextSize = 12
         Picker.TextXAlignment = Enum.TextXAlignment.Left
         Picker.Parent = Page
-        Instance.new("UICorner", Picker).CornerRadius = UDim.new(0, 4)
+        Instance.new("UICorner", Picker).CornerRadius = UDim.new(0, 5)
 
         local ColorBox = Instance.new("Frame")
         ColorBox.Size = UDim2.new(0, 18, 0, 18)
@@ -337,7 +341,7 @@ function Library:CreateTab(name)
     return Elements
 end
 
--- Скрытие меню на Right Shift
+-- Скрытие всего GUI на Right Shift
 local uiVisible = true
 UserInputService.InputBegan:Connect(function(input, processed)
     if processed then return end
@@ -348,7 +352,7 @@ UserInputService.InputBegan:Connect(function(input, processed)
     end
 end)
 
--- Глобальный поиск
+-- Умный поиск
 SearchInput:GetPropertyChangedSignal("Text"):Connect(function()
     local query = SearchInput.Text:lower()
     for _, elem in pairs(AllElements) do
