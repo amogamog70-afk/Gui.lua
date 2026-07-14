@@ -1,24 +1,23 @@
--- [[ VOLTECLIPSE / PREMIUM STYLE CLEAN UI LIBRARY (V2.1) ]] --
+-- [[ VOLTECLIPSE / PREMIUM STYLE CLEAN UI LIBRARY (V2.2) ]] --
 local Library = {}
 Library.Theme = {
-    Background = Color3.fromRGB(11, 11, 14),       -- Глубокий темный фон всего меню (теперь прозрачный)
-    Header = Color3.fromRGB(16, 16, 20),           -- Темный фон шапки
-    Card = Color3.fromRGB(18, 18, 24),             -- Карточки модулей (Окна)
-    Section = Color3.fromRGB(24, 24, 30),          -- Внутренние карточки под-секций
-    Accent = Color3.fromRGB(145, 70, 255),         -- Фиолетовый Volt-неон
-    Stroke = Color3.fromRGB(32, 32, 40),           -- Тонкие премиальные границы
-    Text = Color3.fromRGB(255, 255, 255),          -- Белый текст заголовков
-    TextDim = Color3.fromRGB(140, 140, 150),       -- Серый текст для опций
+    Background = Color3.fromRGB(11, 11, 14),       
+    Header = Color3.fromRGB(16, 16, 20),           
+    Card = Color3.fromRGB(18, 18, 24),             
+    Section = Color3.fromRGB(24, 24, 30),          
+    Accent = Color3.fromRGB(145, 70, 255),         
+    Stroke = Color3.fromRGB(32, 32, 40),           
+    Text = Color3.fromRGB(255, 255, 255),          
+    TextDim = Color3.fromRGB(140, 140, 150),       
 }
 
--- Автоматические иконки для вкладок
 local TabIcons = {
-    Combat   = "rbxassetid://12614416478",      -- Crosshair
-    Movement = "rbxassetid://136160678435000", -- Selected
-    Visuals  = "rbxassetid://102976018150012", -- Hide UI on
-    Misc     = "rbxassetid://137382232901580", -- Menu
-    World    = "rbxassetid://107448093571441", -- Earth white
-    Auto     = "rbxassetid://17119858971"      -- Loading Icon
+    Combat   = "rbxassetid://12614416478",      
+    Movement = "rbxassetid://136160678435000", 
+    Visuals  = "rbxassetid://102976018150012", 
+    Misc     = "rbxassetid://137382232901580", 
+    World    = "rbxassetid://107448093571441", 
+    Auto     = "rbxassetid://17119858971"      
 }
 
 local UserInputService = game:GetService("UserInputService")
@@ -81,16 +80,14 @@ function Library:Init()
     ScreenGui.ResetOnSpawn = false
     ScreenGui.Parent = ParentContainer
 
-    -- Главный Фрейм (Сделан полностью прозрачным по твоей просьбе)
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
     MainFrame.Size = UDim2.new(0, 800, 0, 500)
     MainFrame.Position = UDim2.new(0.5, -400, 0.5, -250)
-    MainFrame.BackgroundTransparency = 1 -- Фона нет, только невидимый контейнер для позиционирования
+    MainFrame.BackgroundTransparency = 1 
     MainFrame.BorderSizePixel = 0
     MainFrame.Parent = ScreenGui
 
-    -- Шапка (Остается монолитной аккуратной плашкой сверху)
     local Header = Instance.new("Frame")
     Header.Name = "Header"
     Header.Size = UDim2.new(1, 0, 0, 45)
@@ -117,7 +114,6 @@ function Library:Init()
     Logo.Image = "rbxassetid://7015953925"
     Logo.Parent = Header
 
-    -- Контейнер вкладок
     local TabsScroll = Instance.new("ScrollingFrame")
     TabsScroll.Name = "TabsScroll"
     TabsScroll.Size = UDim2.new(1, -310, 0, 28)
@@ -273,7 +269,6 @@ function Library:Init()
     local function createElementsSystem(container)
         local Elements = {}
 
-        -- [[ КНОПКА ]] --
         function Elements:CreateButton(btnText, callback)
             callback = callback or function() end
 
@@ -313,7 +308,6 @@ function Library:Init()
             return Button
         end
 
-        -- [[ ТУГГЛ ]] --
         function Elements:CreateToggle(toggleText, default, callback)
             callback = callback or function() end
             local state = default or false
@@ -359,7 +353,6 @@ function Library:Init()
             return ToggleFrame
         end
 
-        -- [[ ОБНОВЛЕННЫЙ ПРЕМИУМ СЛАЙДЕР ]] --
         function Elements:CreateSlider(sliderText, min, max, default, callback)
             callback = callback or function() end
             local val = default or min
@@ -391,7 +384,6 @@ function Library:Init()
             ValLabel.TextXAlignment = Enum.TextXAlignment.Right
             ValLabel.Parent = SliderFrame
 
-            -- Трек слайдера
             local Track = Instance.new("Frame")
             Track.Size = UDim2.new(1, 0, 0, 5)
             Track.Position = UDim2.new(0, 0, 0, 24)
@@ -403,7 +395,6 @@ function Library:Init()
             TrackCorner.CornerRadius = UDim.new(0, 3)
             TrackCorner.Parent = Track
 
-            -- Заполнение трека (активная часть)
             local Fill = Instance.new("Frame")
             Fill.Size = UDim2.new((val - min) / (max - min), 0, 1, 0)
             Fill.BackgroundColor3 = Library.Theme.Accent
@@ -414,7 +405,6 @@ function Library:Init()
             FillCorner.CornerRadius = UDim.new(0, 3)
             FillCorner.Parent = Fill
 
-            -- Новая деталь: Премиальный круглый бегунок (Thumb)
             local Thumb = Instance.new("Frame")
             Thumb.Name = "Thumb"
             Thumb.Size = UDim2.new(0, 11, 0, 11)
@@ -461,7 +451,6 @@ function Library:Init()
                 end
             end)
             
-            -- Эффект наведения
             SliderFrame.MouseEnter:Connect(function()
                 tween(Label, 0.1, {TextColor3 = Library.Theme.Text})
             end)
@@ -474,7 +463,6 @@ function Library:Init()
             return SliderFrame
         end
 
-        -- [[ ТЕКСТ БОКС ]] --
         function Elements:CreateTextBox(textBoxText, placeholder, callback)
             callback = callback or function() end
             placeholder = placeholder or "Type..."
@@ -525,7 +513,7 @@ function Library:Init()
             TextBox.Parent = BoxBg
 
             TextBox.Focused:Connect(function()
-                boxStroke = tween(BoxStroke, 0.1, {Color = Library.Theme.Accent})
+                tween(BoxStroke, 0.1, {Color = Library.Theme.Accent})
             end)
 
             TextBox.FocusLost:Connect(function(enterPressed)
@@ -541,11 +529,13 @@ function Library:Init()
     function Main:CreateTab(tabName)
         local Tab = {}
 
-        -- Фрейм вкладки с автоматическим ресайзом под текст и иконку
-        local TabFrame = Instance.new("Frame")
+        -- Фикс бага №1: Вкладка изначально является кнопкой, без вложенных костылей
+        local TabFrame = Instance.new("TextButton")
         TabFrame.Name = tabName .. "TabFrame"
         TabFrame.Size = UDim2.new(0, 0, 0, 26)
         TabFrame.BackgroundColor3 = Library.Theme.Header
+        TabFrame.Text = ""
+        TabFrame.AutoButtonColor = false
         TabFrame.AutomaticSize = Enum.AutomaticSize.X
         TabFrame.Parent = TabsScroll
 
@@ -571,7 +561,6 @@ function Library:Init()
         TabListLayout.Padding = UDim.new(0, 6)
         TabListLayout.Parent = TabFrame
 
-        -- Проверка авто-иконки
         local matchedIcon = nil
         for name, id in pairs(TabIcons) do
             if string.lower(name) == string.lower(tabName) then
@@ -602,13 +591,6 @@ function Library:Init()
         TabLabel.LayoutOrder = 2
         TabLabel.Parent = TabFrame
 
-        local TabBtn = Instance.new("TextButton")
-        TabBtn.Size = UDim2.new(1, 0, 1, 0)
-        TabBtn.BackgroundTransparency = 1
-        TabBtn.Text = ""
-        -- Кнопка поверх всего лейаута, чтобы кликалась вся вкладка
-        TabBtn.Parent = TabFrame
-
         local Page = Instance.new("ScrollingFrame")
         Page.Name = tabName .. "Page"
         Page.Size = UDim2.new(1, 0, 1, 0)
@@ -629,7 +611,6 @@ function Library:Init()
         PagePadding.PaddingBottom = UDim.new(0, 12)
         PagePadding.Parent = Page
 
-        -- Левая колонка окон
         local LeftColumn = Instance.new("Frame")
         LeftColumn.Name = "LeftColumn"
         LeftColumn.Size = UDim2.new(0.5, -6, 0, 0)
@@ -642,7 +623,6 @@ function Library:Init()
         LeftLayout.Padding = UDim.new(0, 12)
         LeftLayout.Parent = LeftColumn
 
-        -- Правая колонка окон
         local RightColumn = Instance.new("Frame")
         RightColumn.Name = "RightColumn"
         RightColumn.Size = UDim2.new(0.5, -6, 0, 0)
@@ -661,7 +641,7 @@ function Library:Init()
         Main.Tabs[tabName] = {Frame = TabFrame, Stroke = TabStroke, Label = TabLabel}
         Main.Pages[tabName] = Page
 
-        TabBtn.MouseButton1Click:Connect(function()
+        TabFrame.MouseButton1Click:Connect(function()
             showPage(tabName)
         end)
 
