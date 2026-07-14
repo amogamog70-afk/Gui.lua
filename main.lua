@@ -1,7 +1,7 @@
--- [[ VOLTECLIPSE / PREMIUM STYLE CLEAN UI LIBRARY (V2) ]] --
+-- [[ VOLTECLIPSE / PREMIUM STYLE CLEAN UI LIBRARY (V2.1) ]] --
 local Library = {}
 Library.Theme = {
-    Background = Color3.fromRGB(11, 11, 14),       -- Глубокий темный фон всего меню
+    Background = Color3.fromRGB(11, 11, 14),       -- Глубокий темный фон всего меню (теперь прозрачный)
     Header = Color3.fromRGB(16, 16, 20),           -- Темный фон шапки
     Card = Color3.fromRGB(18, 18, 24),             -- Карточки модулей (Окна)
     Section = Color3.fromRGB(24, 24, 30),          -- Внутренние карточки под-секций
@@ -9,6 +9,16 @@ Library.Theme = {
     Stroke = Color3.fromRGB(32, 32, 40),           -- Тонкие премиальные границы
     Text = Color3.fromRGB(255, 255, 255),          -- Белый текст заголовков
     TextDim = Color3.fromRGB(140, 140, 150),       -- Серый текст для опций
+}
+
+-- Автоматические иконки для вкладок
+local TabIcons = {
+    Combat   = "rbxassetid://12614416478",      -- Crosshair
+    Movement = "rbxassetid://136160678435000", -- Selected
+    Visuals  = "rbxassetid://102976018150012", -- Hide UI on
+    Misc     = "rbxassetid://137382232901580", -- Menu
+    World    = "rbxassetid://107448093571441", -- Earth white
+    Auto     = "rbxassetid://17119858971"      -- Loading Icon
 }
 
 local UserInputService = game:GetService("UserInputService")
@@ -71,25 +81,16 @@ function Library:Init()
     ScreenGui.ResetOnSpawn = false
     ScreenGui.Parent = ParentContainer
 
-    -- Главный Фрейм (Сплошной премиум фон)
+    -- Главный Фрейм (Сделан полностью прозрачным по твоей просьбе)
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
     MainFrame.Size = UDim2.new(0, 800, 0, 500)
     MainFrame.Position = UDim2.new(0.5, -400, 0.5, -250)
-    MainFrame.BackgroundColor3 = Library.Theme.Background
+    MainFrame.BackgroundTransparency = 1 -- Фона нет, только невидимый контейнер для позиционирования
     MainFrame.BorderSizePixel = 0
     MainFrame.Parent = ScreenGui
 
-    local MainCorner = Instance.new("UICorner")
-    MainCorner.CornerRadius = UDim.new(0, 8)
-    MainCorner.Parent = MainFrame
-
-    local MainStroke = Instance.new("UIStroke")
-    MainStroke.Color = Library.Theme.Stroke
-    MainStroke.Thickness = 1
-    MainStroke.Parent = MainFrame
-
-    -- Шапка
+    -- Шапка (Остается монолитной аккуратной плашкой сверху)
     local Header = Instance.new("Frame")
     Header.Name = "Header"
     Header.Size = UDim2.new(1, 0, 0, 45)
@@ -101,13 +102,10 @@ function Library:Init()
     HeaderCorner.CornerRadius = UDim.new(0, 8)
     HeaderCorner.Parent = Header
 
-    -- Линия разделения под шапкой
-    local HeaderLine = Instance.new("Frame")
-    HeaderLine.Size = UDim2.new(1, 0, 0, 1)
-    HeaderLine.Position = UDim2.new(0, 0, 1, -1)
-    HeaderLine.BackgroundColor3 = Library.Theme.Stroke
-    HeaderLine.BorderSizePixel = 0
-    HeaderLine.Parent = Header
+    local HeaderStroke = Instance.new("UIStroke")
+    HeaderStroke.Color = Library.Theme.Stroke
+    HeaderStroke.Thickness = 1
+    HeaderStroke.Parent = Header
 
     makeDraggable(MainFrame, Header)
 
@@ -119,11 +117,11 @@ function Library:Init()
     Logo.Image = "rbxassetid://7015953925"
     Logo.Parent = Header
 
-    -- Контейнер вкладок с ИДЕАЛЬНЫМ центрированием
+    -- Контейнер вкладок
     local TabsScroll = Instance.new("ScrollingFrame")
     TabsScroll.Name = "TabsScroll"
     TabsScroll.Size = UDim2.new(1, -310, 0, 28)
-    TabsScroll.Position = UDim2.new(0, 50, 0.5, -14) -- Идеально ровно по середине
+    TabsScroll.Position = UDim2.new(0, 50, 0.5, -14)
     TabsScroll.BackgroundTransparency = 1
     TabsScroll.BorderSizePixel = 0
     TabsScroll.ScrollBarThickness = 0
@@ -209,29 +207,31 @@ function Library:Init()
 
     local PagesFolder = Instance.new("Frame")
     PagesFolder.Name = "PagesFolder"
-    PagesFolder.Size = UDim2.new(1, -24, 1, -65)
-    PagesFolder.Position = UDim2.new(0, 12, 0, 55)
+    PagesFolder.Size = UDim2.new(1, 0, 1, -55)
+    PagesFolder.Position = UDim2.new(0, 0, 0, 55)
     PagesFolder.BackgroundTransparency = 1
     PagesFolder.Parent = MainFrame
 
     local function showPage(tabName)
         for name, page in pairs(Main.Pages) do
             local tabAsset = Main.Tabs[name]
+            local tabIcon = tabAsset.Frame:FindFirstChild("TabIcon")
             if name == tabName then
                 page.Visible = true
                 tween(tabAsset.Frame, 0.1, {BackgroundColor3 = Library.Theme.Accent})
                 tween(tabAsset.Stroke, 0.1, {Color = Library.Theme.Accent})
                 tween(tabAsset.Label, 0.1, {TextColor3 = Library.Theme.Text})
+                if tabIcon then tween(tabIcon, 0.1, {ImageColor3 = Library.Theme.Text}) end
             else
                 page.Visible = false
                 tween(tabAsset.Frame, 0.1, {BackgroundColor3 = Library.Theme.Header})
                 tween(tabAsset.Stroke, 0.1, {Color = Library.Theme.Stroke})
                 tween(tabAsset.Label, 0.1, {TextColor3 = Library.Theme.TextDim})
+                if tabIcon then tween(tabIcon, 0.1, {ImageColor3 = Library.Theme.TextDim}) end
             end
         end
     end
 
-    -- Умный поиск (Сканирует окна, секции и даже подписи)
     SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
         local query = string.lower(SearchBox.Text)
         for _, page in pairs(Main.Pages) do
@@ -270,7 +270,6 @@ function Library:Init()
         end
     end)
 
-    -- Функция-генератор элементов (чтобы не дублировать код для окон и секций)
     local function createElementsSystem(container)
         local Elements = {}
 
@@ -360,14 +359,14 @@ function Library:Init()
             return ToggleFrame
         end
 
-        -- [[ СЛАЙДЕР ]] --
+        -- [[ ОБНОВЛЕННЫЙ ПРЕМИУМ СЛАЙДЕР ]] --
         function Elements:CreateSlider(sliderText, min, max, default, callback)
             callback = callback or function() end
             local val = default or min
 
             local SliderFrame = Instance.new("Frame")
             SliderFrame.Name = sliderText .. "Slider"
-            SliderFrame.Size = UDim2.new(1, 0, 0, 34)
+            SliderFrame.Size = UDim2.new(1, 0, 0, 36)
             SliderFrame.BackgroundTransparency = 1
             SliderFrame.Parent = container
 
@@ -392,17 +391,19 @@ function Library:Init()
             ValLabel.TextXAlignment = Enum.TextXAlignment.Right
             ValLabel.Parent = SliderFrame
 
+            -- Трек слайдера
             local Track = Instance.new("Frame")
-            Track.Size = UDim2.new(1, 0, 0, 4)
+            Track.Size = UDim2.new(1, 0, 0, 5)
             Track.Position = UDim2.new(0, 0, 0, 24)
-            Track.BackgroundColor3 = Color3.fromRGB(38, 38, 44)
+            Track.BackgroundColor3 = Color3.fromRGB(34, 34, 42)
             Track.BorderSizePixel = 0
             Track.Parent = SliderFrame
 
             local TrackCorner = Instance.new("UICorner")
-            TrackCorner.CornerRadius = UDim.new(0, 2)
+            TrackCorner.CornerRadius = UDim.new(0, 3)
             TrackCorner.Parent = Track
 
+            -- Заполнение трека (активная часть)
             local Fill = Instance.new("Frame")
             Fill.Size = UDim2.new((val - min) / (max - min), 0, 1, 0)
             Fill.BackgroundColor3 = Library.Theme.Accent
@@ -410,14 +411,33 @@ function Library:Init()
             Fill.Parent = Track
 
             local FillCorner = Instance.new("UICorner")
-            FillCorner.CornerRadius = UDim.new(0, 2)
+            FillCorner.CornerRadius = UDim.new(0, 3)
             FillCorner.Parent = Fill
+
+            -- Новая деталь: Премиальный круглый бегунок (Thumb)
+            local Thumb = Instance.new("Frame")
+            Thumb.Name = "Thumb"
+            Thumb.Size = UDim2.new(0, 11, 0, 11)
+            Thumb.AnchorPoint = Vector2.new(0.5, 0.5)
+            Thumb.Position = UDim2.new((val - min) / (max - min), 0, 0.5, 0)
+            Thumb.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            Thumb.Parent = Track
+
+            local ThumbCorner = Instance.new("UICorner")
+            ThumbCorner.CornerRadius = UDim.new(1, 0)
+            ThumbCorner.Parent = Thumb
+
+            local ThumbStroke = Instance.new("UIStroke")
+            ThumbStroke.Color = Library.Theme.Accent
+            ThumbStroke.Thickness = 1.5
+            ThumbStroke.Parent = Thumb
 
             local isDragging = false
             local function update(input)
                 local percentage = math.clamp((input.Position.X - Track.AbsolutePosition.X) / Track.AbsoluteSize.X, 0, 1)
                 val = math.round(min + ((max - min) * percentage))
                 Fill.Size = UDim2.new(percentage, 0, 1, 0)
+                Thumb.Position = UDim2.new(percentage, 0, 0.5, 0)
                 ValLabel.Text = tostring(val)
                 callback(val)
             end
@@ -426,6 +446,7 @@ function Library:Init()
                 if input.UserInputType == Enum.UserInputType.MouseButton1 then
                     isDragging = true
                     update(input)
+                    tween(Thumb, 0.1, {Size = UDim2.new(0, 13, 0, 13)})
                 end
             end)
             UserInputService.InputChanged:Connect(function(input)
@@ -436,8 +457,20 @@ function Library:Init()
             UserInputService.InputEnded:Connect(function(input)
                 if input.UserInputType == Enum.UserInputType.MouseButton1 then
                     isDragging = false
+                    tween(Thumb, 0.1, {Size = UDim2.new(0, 11, 0, 11)})
                 end
             end)
+            
+            -- Эффект наведения
+            SliderFrame.MouseEnter:Connect(function()
+                tween(Label, 0.1, {TextColor3 = Library.Theme.Text})
+            end)
+            SliderFrame.MouseLeave:Connect(function()
+                if not isDragging then
+                    tween(Label, 0.1, {TextColor3 = Library.Theme.TextDim})
+                end
+            end)
+
             return SliderFrame
         end
 
@@ -492,7 +525,7 @@ function Library:Init()
             TextBox.Parent = BoxBg
 
             TextBox.Focused:Connect(function()
-                tween(BoxStroke, 0.1, {Color = Library.Theme.Accent})
+                boxStroke = tween(BoxStroke, 0.1, {Color = Library.Theme.Accent})
             end)
 
             TextBox.FocusLost:Connect(function(enterPressed)
@@ -508,10 +541,12 @@ function Library:Init()
     function Main:CreateTab(tabName)
         local Tab = {}
 
+        -- Фрейм вкладки с автоматическим ресайзом под текст и иконку
         local TabFrame = Instance.new("Frame")
         TabFrame.Name = tabName .. "TabFrame"
-        TabFrame.Size = UDim2.new(0, 85, 0, 26)
+        TabFrame.Size = UDim2.new(0, 0, 0, 26)
         TabFrame.BackgroundColor3 = Library.Theme.Header
+        TabFrame.AutomaticSize = Enum.AutomaticSize.X
         TabFrame.Parent = TabsScroll
 
         local TabCorner = Instance.new("UICorner")
@@ -523,19 +558,55 @@ function Library:Init()
         TabStroke.Thickness = 1
         TabStroke.Parent = TabFrame
 
+        local TabPadding = Instance.new("UIPadding")
+        TabPadding.PaddingLeft = UDim.new(0, 10)
+        TabPadding.PaddingRight = UDim.new(0, 10)
+        TabPadding.Parent = TabFrame
+
+        local TabListLayout = Instance.new("UIListLayout")
+        TabListLayout.FillDirection = Enum.FillDirection.Horizontal
+        TabListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        TabListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+        TabListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+        TabListLayout.Padding = UDim.new(0, 6)
+        TabListLayout.Parent = TabFrame
+
+        -- Проверка авто-иконки
+        local matchedIcon = nil
+        for name, id in pairs(TabIcons) do
+            if string.lower(name) == string.lower(tabName) then
+                matchedIcon = id
+                break
+            end
+        end
+
+        if matchedIcon then
+            local TabIcon = Instance.new("ImageLabel")
+            TabIcon.Name = "TabIcon"
+            TabIcon.Size = UDim2.new(0, 14, 0, 14)
+            TabIcon.BackgroundTransparency = 1
+            TabIcon.Image = matchedIcon
+            TabIcon.ImageColor3 = Library.Theme.TextDim
+            TabIcon.LayoutOrder = 1
+            TabIcon.Parent = TabFrame
+        end
+
         local TabLabel = Instance.new("TextLabel")
-        TabLabel.Size = UDim2.new(1, 0, 1, 0)
+        TabLabel.Size = UDim2.new(0, 0, 1, 0)
+        TabLabel.AutomaticSize = Enum.AutomaticSize.X
         TabLabel.BackgroundTransparency = 1
         TabLabel.Text = string.upper(tabName)
         TabLabel.TextColor3 = Library.Theme.TextDim
         TabLabel.Font = Enum.Font.GothamBold
         TabLabel.TextSize = 10
+        TabLabel.LayoutOrder = 2
         TabLabel.Parent = TabFrame
 
         local TabBtn = Instance.new("TextButton")
         TabBtn.Size = UDim2.new(1, 0, 1, 0)
         TabBtn.BackgroundTransparency = 1
         TabBtn.Text = ""
+        -- Кнопка поверх всего лейаута, чтобы кликалась вся вкладка
         TabBtn.Parent = TabFrame
 
         local Page = Instance.new("ScrollingFrame")
@@ -554,7 +625,7 @@ function Library:Init()
         local PagePadding = Instance.new("UIPadding")
         PagePadding.PaddingLeft = UDim.new(0, 4)
         PagePadding.PaddingRight = UDim.new(0, 4)
-        PagePadding.PaddingTop = UDim.new(0, 4)
+        PagePadding.PaddingTop = UDim.new(0, 6)
         PagePadding.PaddingBottom = UDim.new(0, 12)
         PagePadding.Parent = Page
 
@@ -603,7 +674,6 @@ function Library:Init()
             local Window = {}
             windowCount = windowCount + 1
 
-            -- Сама карточка окна
             local WindowFrame = Instance.new("Frame")
             WindowFrame.Name = windowName .. "Window"
             WindowFrame.Size = UDim2.new(1, 0, 0, 0) 
@@ -620,7 +690,6 @@ function Library:Init()
             WindowStroke.Thickness = 1
             WindowStroke.Parent = WindowFrame
 
-            -- Вертикальный премиум индикатор у заголовка
             local TitleIndicator = Instance.new("Frame")
             TitleIndicator.Name = "Indicator"
             TitleIndicator.Size = UDim2.new(0, 2, 0, 12)
@@ -658,13 +727,11 @@ function Library:Init()
             Padding.PaddingBottom = UDim.new(0, 10)
             Padding.Parent = ElementsContainer
 
-            -- Навешиваем базовые элементы на окно
             local WindowElements = createElementsSystem(ElementsContainer)
             for k, v in pairs(WindowElements) do
                 Window[k] = v
             end
 
-            -- [[ СОЗДАНИЕ СЕКЦИИ (Создает отдельную под-группу элементов) ]] --
             function Window:CreateSection(sectionName)
                 local SectionFrame = Instance.new("Frame")
                 SectionFrame.Name = sectionName .. "Section"
@@ -682,7 +749,6 @@ function Library:Init()
                 SectionStroke.Thickness = 1
                 SectionStroke.Parent = SectionFrame
 
-                -- Заголовок секции (мелкий капс)
                 local SectionTitle = Instance.new("TextLabel")
                 SectionTitle.Name = "SectionTitle"
                 SectionTitle.Size = UDim2.new(1, -16, 0, 24)
@@ -712,7 +778,6 @@ function Library:Init()
                 SecPadding.PaddingBottom = UDim.new(0, 8)
                 SecPadding.Parent = SecElementsContainer
 
-                -- Навешиваем такие же элементы внутрь Секции
                 return createElementsSystem(SecElementsContainer)
             end
 
