@@ -1,4 +1,4 @@
--- [[ VOLTECLIPSE / PREMIUM STYLE CLEAN UI LIBRARY (V2.4 - OPTIMIZED EDITION) ]] --
+-- [[ VOLTECLIPSE / PREMIUM STYLE CLEAN UI LIBRARY (V2.5 - OPTIMIZED EDITION) ]] --
 local Library = {}
 Library.Theme = {
     Background = Color3.fromRGB(11, 11, 14),       
@@ -17,7 +17,7 @@ local TabIcons = {
     Visuals  = "rbxassetid://102976018150012", 
     Misc     = "rbxassetid://137382232901580", 
     World    = "rbxassetid://122563205713088", -- earth white
-    Auto     = "rbxassetid://102927017461693", -- loading v2 (NEW ID)
+    Auto     = "rbxassetid://102927017461693", -- loading v2
     Guns     = "rbxassetid://84647432170503",  -- iconarma
     Skins    = "rbxassetid://101708694952341"  -- Pencil Icon
 }
@@ -71,7 +71,7 @@ local function makeDraggable(frame, dragAnchor)
     end)
 end
 
--- Вспомогательная функция поиска ScrollingFrame для предотвращения конфликтов прокрутки при зажатии элементов
+-- Поиск ScrollingFrame для отключения скролла списка при перемещении слайдеров
 local function getParentScrollingFrame(obj)
     local parent = obj.Parent
     while parent do
@@ -84,7 +84,6 @@ local function getParentScrollingFrame(obj)
 end
 
 -- Сброс фокуса ввода при клике на экран (исправляет блокировку камеры роблоксом)
--- Использование gameProcessed предотвращает мгновенный сброс фокуса при клике на сам текст-бокс
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if not gameProcessed and input.UserInputType == Enum.UserInputType.MouseButton1 then
         local focused = UserInputService:GetFocusedTextBox()
@@ -156,7 +155,7 @@ function Library:Init()
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "VoltEclipseLibrary"
     ScreenGui.ResetOnSpawn = false
-    ScreenGui.IgnoreGuiInset = true -- Включено для идеального соответствия мыши и объектов на экране
+    ScreenGui.IgnoreGuiInset = true -- Игнорируем инсет для корректных координат мыши
     ScreenGui.Parent = ParentContainer
 
     local MainFrame = Instance.new("Frame")
@@ -166,6 +165,7 @@ function Library:Init()
     MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
     MainFrame.BackgroundTransparency = 1 
     MainFrame.BorderSizePixel = 0
+    MainFrame.Active = false -- Позволяет вращать/зумировать камеру за границами GUI
     MainFrame.Parent = ScreenGui
 
     local robloxMenuOpen = false
@@ -360,6 +360,7 @@ function Library:Init()
         updateLayout(tabName)
     end
 
+    -- Умный глубокий поиск по всем элементам
     SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
         local rawQuery = SearchBox.Text
         if rawQuery == "" then
@@ -386,45 +387,42 @@ function Library:Init()
             for _, column in ipairs({data.LeftColumn, data.RightColumn}) do
                 for _, window in ipairs(column:GetChildren()) do
                     if window:IsA("Frame") then
-                        local winTitle = window:FindFirstChild("WindowTitle")
+                        local winTitle = window:FindFirstChild("WindowTitle", true)
+                        local match = false
+                        
                         if winTitle then
                             local titleText = string.lower(winTitle.Text)
-                            local match = string.find(titleText, q1) or string.find(titleText, q2) or string.find(titleText, q3)
-                            
-                            if not match then
-                                local elements = window:FindFirstChild("Elements")
-                                if elements then
-                                    for _, elem in ipairs(elements:GetChildren()) do
-                                        if elem:IsA("Frame") or elem:IsA("TextButton") then
-                                            local secTitle = elem:FindFirstChild("SectionTitle")
-                                            if secTitle then
-                                                local secText = string.lower(secTitle.Text)
-                                                if string.find(secText, q1) or string.find(secText, q2) or string.find(secText, q3) then
-                                                    match = true
-                                                    break
-                                                end
-                                            end
-                                            
-                                            local lbl = elem:FindFirstChild("Label") or elem:FindFirstChild("TextLabel")
-                                            if not lbl and elem:IsA("TextButton") then
-                                                lbl = elem
-                                            end
-                                            if lbl then
-                                                local lblText = string.lower(lbl.Text)
-                                                if string.find(lblText, q1) or string.find(lblText, q2) or string.find(lblText, q3) then
-                                                    match = true
-                                                    break
+                            if string.find(titleText, q1, 1, true) or string.find(titleText, q2, 1, true) or string.find(titleText, q3, 1, true) then
+                                match = true
+                            end
+                        end
+                        
+                        if not match then
+                            local elements = window:FindFirstChild("Elements")
+                            if elements then
+                                for _, elem in ipairs(elements:GetChildren()) do
+                                    if elem:IsA("Frame") or elem:IsA("TextButton") then
+                                        -- Рекурсивный поиск совпадений по надписям внутри элементов
+                                        for _, desc in ipairs(elem:GetDescendants()) do
+                                            if desc:IsA("TextLabel") or desc:IsA("TextButton") then
+                                                local txt = string.lower(desc.Text)
+                                                if txt ~= "" then
+                                                    if string.find(txt, q1, 1, true) or string.find(txt, q2, 1, true) or string.find(txt, q3, 1, true) then
+                                                        match = true
+                                                        break
+                                                    end
                                                 end
                                             end
                                         end
+                                        if match then break end
                                     end
                                 end
                             end
-                            
-                            window.Visible = match
-                            if match then
-                                tabHasMatch = true
-                            end
+                        end
+                        
+                        window.Visible = match
+                        if match then
+                            tabHasMatch = true
                         end
                     end
                 end
@@ -444,30 +442,41 @@ function Library:Init()
     local function createElementsSystem(container)
         local Elements = {}
 
-        -- Инлайновые инструкции (Tooltip)
-        local function addTooltip(parentFrame, text, yOffset)
+        -- Модернизированная функция подсказок (Tooltip) с поддержкой UIListLayout
+        local function addTooltip(parentFrame, anchorFrame, text)
             if not text or text == "" then return end
+            
+            local ListLayout = parentFrame:FindFirstChildOfClass("UIListLayout")
+            if not ListLayout then
+                ListLayout = Instance.new("UIListLayout")
+                ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+                ListLayout.Padding = UDim.new(0, 4)
+                ListLayout.Parent = parentFrame
+            end
+            
+            anchorFrame.LayoutOrder = 1
             
             local DotsBtn = Instance.new("TextButton")
             DotsBtn.Name = "DotsBtn"
             DotsBtn.Size = UDim2.new(0, 18, 0, 14)
-            DotsBtn.Position = UDim2.new(1, -18, 0, (yOffset or 5))
+            DotsBtn.Position = UDim2.new(1, -18, 0.5, -7)
+            DotsBtn.AnchorPoint = Vector2.new(0, 0.5)
             DotsBtn.BackgroundTransparency = 1
             DotsBtn.Text = "•••"
             DotsBtn.TextColor3 = Library.Theme.TextDim
             DotsBtn.Font = Enum.Font.GothamBold
             DotsBtn.TextSize = 10
-            DotsBtn.Parent = parentFrame
+            DotsBtn.Parent = anchorFrame
             
             local InfoFrame = Instance.new("Frame")
             InfoFrame.Name = "InfoFrame"
             InfoFrame.Size = UDim2.new(1, 0, 0, 0)
-            InfoFrame.Position = UDim2.new(0, 0, 0, 24)
             InfoFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
             InfoFrame.BackgroundTransparency = 0.4
             InfoFrame.AutomaticSize = Enum.AutomaticSize.Y
             InfoFrame.Visible = false
             InfoFrame.ClipsDescendants = true
+            InfoFrame.LayoutOrder = 10 -- Подсказка гарантированно в самом низу
             InfoFrame.Parent = parentFrame
             
             local InfoPadding = Instance.new("UIPadding")
@@ -605,7 +614,7 @@ function Library:Init()
             
             local ButtonFrame = Instance.new("Frame")
             ButtonFrame.Name = btnText .. "ButtonFrame"
-            ButtonFrame.Size = UDim2.new(1, 0, 0, 24)
+            ButtonFrame.Size = UDim2.new(1, 0, 0, 0)
             ButtonFrame.BackgroundTransparency = 1
             ButtonFrame.AutomaticSize = Enum.AutomaticSize.Y
             ButtonFrame.Parent = container
@@ -645,7 +654,7 @@ function Library:Init()
             end)
 
             if tooltipText then
-                addTooltip(ButtonFrame, tooltipText, 5)
+                addTooltip(ButtonFrame, Button, tooltipText)
             end
 
             return ButtonFrame
@@ -658,7 +667,7 @@ function Library:Init()
 
             local ToggleFrame = Instance.new("Frame")
             ToggleFrame.Name = toggleText .. "Toggle"
-            ToggleFrame.Size = UDim2.new(1, 0, 0, 24)
+            ToggleFrame.Size = UDim2.new(1, 0, 0, 0)
             ToggleFrame.BackgroundTransparency = 1
             ToggleFrame.AutomaticSize = Enum.AutomaticSize.Y
             ToggleFrame.Parent = container
@@ -722,7 +731,7 @@ function Library:Init()
             end)
 
             if tooltipText then
-                addTooltip(ToggleFrame, tooltipText, 5)
+                addTooltip(ToggleFrame, ClickArea, tooltipText)
             end
 
             return ToggleFrame
@@ -743,7 +752,7 @@ function Library:Init()
 
             local ContentRow = Instance.new("Frame")
             ContentRow.Name = "ContentRow"
-            ContentRow.Size = UDim2.new(1, (tooltipText and -22 or 0), 1, 0)
+            ContentRow.Size = UDim2.new(1, (tooltipText and -22 or 0), 0, 36)
             ContentRow.BackgroundTransparency = 1
             ContentRow.Parent = SliderFrame
 
@@ -865,7 +874,7 @@ function Library:Init()
             end)
 
             if tooltipText then
-                addTooltip(SliderFrame, tooltipText, 5)
+                addTooltip(SliderFrame, ContentRow, tooltipText)
             end
 
             return SliderFrame
@@ -878,7 +887,7 @@ function Library:Init()
 
             local TextFrame = Instance.new("Frame")
             TextFrame.Name = textBoxText .. "TextBox"
-            TextFrame.Size = UDim2.new(1, 0, 0, 24)
+            TextFrame.Size = UDim2.new(1, 0, 0, 0)
             TextFrame.BackgroundTransparency = 1
             TextFrame.AutomaticSize = Enum.AutomaticSize.Y
             TextFrame.Parent = container
@@ -948,7 +957,7 @@ function Library:Init()
             end)
 
             if tooltipText then
-                addTooltip(TextFrame, tooltipText, 5)
+                addTooltip(TextFrame, ContentRow, tooltipText)
             end
 
             return TextFrame
@@ -962,7 +971,7 @@ function Library:Init()
             
             local DropdownFrame = Instance.new("Frame")
             DropdownFrame.Name = dropdownText .. "Dropdown"
-            DropdownFrame.Size = UDim2.new(1, 0, 0, 24)
+            DropdownFrame.Size = UDim2.new(1, 0, 0, 0)
             DropdownFrame.BackgroundTransparency = 1
             DropdownFrame.AutomaticSize = Enum.AutomaticSize.Y
             DropdownFrame.Parent = container
@@ -1016,6 +1025,7 @@ function Library:Init()
             OptionsScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
             OptionsScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
             OptionsScroll.Active = false
+            OptionsScroll.LayoutOrder = 2
             OptionsScroll.Parent = DropdownFrame
             
             local ScrollCorner = Instance.new("UICorner")
@@ -1125,20 +1135,20 @@ function Library:Init()
             end
             
             if tooltipText then
-                addTooltip(DropdownFrame, tooltipText, 5)
+                addTooltip(DropdownFrame, HeaderBtn, tooltipText)
             end
             
             return DropdownFrame
         end
 
-        -- Современный HSV Выбор цвета с блокировкой скролла страницы при перетаскивании
+        -- Современный HSV Выбор цвета
         function Elements:CreateColorPicker(pickerText, defaultColor, callback, tooltipText)
             callback = callback or function() end
             defaultColor = defaultColor or Color3.fromRGB(255, 255, 255)
             
             local PickerFrame = Instance.new("Frame")
             PickerFrame.Name = pickerText .. "ColorPicker"
-            PickerFrame.Size = UDim2.new(1, 0, 0, 24)
+            PickerFrame.Size = UDim2.new(1, 0, 0, 0)
             PickerFrame.BackgroundTransparency = 1
             PickerFrame.AutomaticSize = Enum.AutomaticSize.Y
             PickerFrame.Parent = container
@@ -1184,6 +1194,7 @@ function Library:Init()
             PickerContainer.BorderSizePixel = 0
             PickerContainer.Visible = false
             PickerContainer.ClipsDescendants = true
+            PickerContainer.LayoutOrder = 2
             PickerContainer.Parent = PickerFrame
             
             local ContainerCorner = Instance.new("UICorner")
@@ -1210,22 +1221,23 @@ function Library:Init()
             CanvasCorner.CornerRadius = UDim.new(0, 3)
             CanvasCorner.Parent = SatValCanvas
 
+            -- Новый красивый высококонтрастный курсор
             local Cursor = Instance.new("Frame")
             Cursor.Name = "Cursor"
-            Cursor.Size = UDim2.new(0, 6, 0, 6)
+            Cursor.Size = UDim2.new(0, 10, 0, 10)
             Cursor.AnchorPoint = Vector2.new(0.5, 0.5)
             Cursor.Position = UDim2.new(currentSat, 0, 1 - currentVal, 0)
             Cursor.BackgroundTransparency = 1
             Cursor.Parent = SatValCanvas
 
-            local CursorStroke = Instance.new("UIStroke")
-            CursorStroke.Color = Color3.fromRGB(255, 255, 255)
-            CursorStroke.Thickness = 1.5
-            CursorStroke.Parent = Cursor
-
             local CursorCorner = Instance.new("UICorner")
             CursorCorner.CornerRadius = UDim.new(1, 0)
             CursorCorner.Parent = Cursor
+
+            local CursorStroke = Instance.new("UIStroke")
+            CursorStroke.Color = Color3.fromRGB(255, 255, 255)
+            CursorStroke.Thickness = 2
+            CursorStroke.Parent = Cursor
 
             local HueSlider = Instance.new("ImageButton")
             HueSlider.Name = "HueSlider"
@@ -1252,13 +1264,19 @@ function Library:Init()
             })
             HueGradient.Parent = HueSlider
 
+            -- Новый красивый высококонтрастный горизонтальный курсор
             local HueCursor = Instance.new("Frame")
             HueCursor.Name = "HueCursor"
-            HueCursor.Size = UDim2.new(1, 4, 0, 2)
+            HueCursor.Size = UDim2.new(1, 4, 0, 4)
+            HueCursor.AnchorPoint = Vector2.new(0, 0.5)
             HueCursor.Position = UDim2.new(0, -2, currentHue, 0)
             HueCursor.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
             HueCursor.BorderSizePixel = 0
             HueCursor.Parent = HueSlider
+
+            local HueCursorCorner = Instance.new("UICorner")
+            HueCursorCorner.CornerRadius = UDim.new(0, 2)
+            HueCursorCorner.Parent = HueCursor
 
             local HueCursorStroke = Instance.new("UIStroke")
             HueCursorStroke.Color = Color3.fromRGB(0, 0, 0)
@@ -1327,6 +1345,10 @@ function Library:Init()
             AlphaCursor.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
             AlphaCursor.BorderSizePixel = 0
             AlphaCursor.Parent = AlphaTrack
+
+            local AlphaCursorCorner = Instance.new("UICorner")
+            AlphaCursorCorner.CornerRadius = UDim.new(0, 2)
+            AlphaCursorCorner.Parent = AlphaCursor
 
             local AlphaCursorStroke = Instance.new("UIStroke")
             AlphaCursorStroke.Color = Color3.fromRGB(0, 0, 0)
@@ -1408,10 +1430,18 @@ function Library:Init()
                 end
             end
 
+            -- Высокоэффективная работа dragging на RenderStepped без подвисаний и вылетов
+            local RunService = game:GetService("RunService")
+            local canvasConnection = nil
+            local hueConnection = nil
+            local alphaConnection = nil
+
             SatValCanvas.InputBegan:Connect(function(input)
                 if input.UserInputType == Enum.UserInputType.MouseButton1 then
                     isDraggingCanvas = true
-                    setScrolling(false) -- Отключаем прокрутку родительской страницы при манипуляциях с цветом
+                    setScrolling(false)
+                    if canvasConnection then canvasConnection:Disconnect() end
+                    canvasConnection = RunService.RenderStepped:Connect(updateCanvasFromMouse)
                     updateCanvasFromMouse()
                 end
             end)
@@ -1420,6 +1450,8 @@ function Library:Init()
                 if input.UserInputType == Enum.UserInputType.MouseButton1 then
                     isDraggingHue = true
                     setScrolling(false)
+                    if hueConnection then hueConnection:Disconnect() end
+                    hueConnection = RunService.RenderStepped:Connect(updateHueFromMouse)
                     updateHueFromMouse()
                 end
             end)
@@ -1428,19 +1460,9 @@ function Library:Init()
                 if input.UserInputType == Enum.UserInputType.MouseButton1 then
                     isDraggingAlpha = true
                     setScrolling(false)
+                    if alphaConnection then alphaConnection:Disconnect() end
+                    alphaConnection = RunService.RenderStepped:Connect(updateAlphaFromMouse)
                     updateAlphaFromMouse()
-                end
-            end)
-
-            UserInputService.InputChanged:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseMovement then
-                    if isDraggingCanvas then
-                        updateCanvasFromMouse()
-                    elseif isDraggingHue then
-                        updateHueFromMouse()
-                    elseif isDraggingAlpha then
-                        updateAlphaFromMouse()
-                    end
                 end
             end)
 
@@ -1450,7 +1472,12 @@ function Library:Init()
                         isDraggingCanvas = false
                         isDraggingHue = false
                         isDraggingAlpha = false
-                        setScrolling(true) -- Возвращаем скролл списка в исходное состояние
+                        
+                        if canvasConnection then canvasConnection:Disconnect(); canvasConnection = nil end
+                        if hueConnection then hueConnection:Disconnect(); hueConnection = nil end
+                        if alphaConnection then alphaConnection:Disconnect(); alphaConnection = nil end
+                        
+                        setScrolling(true)
                     end
                 end
             end)
@@ -1480,7 +1507,7 @@ function Library:Init()
             updateAllColors("init")
 
             if tooltipText then
-                addTooltip(PickerFrame, tooltipText, 5)
+                addTooltip(PickerFrame, MainRow, tooltipText)
             end
             
             return PickerFrame
@@ -1625,6 +1652,7 @@ function Library:Init()
             WindowFrame.Size = UDim2.new(1, 0, 0, 0) 
             WindowFrame.BackgroundColor3 = Library.Theme.Card
             WindowFrame.AutomaticSize = Enum.AutomaticSize.Y
+            WindowFrame.ClipsDescendants = false -- Чтобы тени и выпадающие списки не обрезались внизу
             WindowFrame.Parent = (PageData.WindowCount % 2 == 1) and LeftColumn or RightColumn
 
             updateLayout(tabName)
@@ -1638,17 +1666,30 @@ function Library:Init()
             WindowStroke.Thickness = 1
             WindowStroke.Parent = WindowFrame
 
+            local WindowLayout = Instance.new("UIListLayout")
+            WindowLayout.SortOrder = Enum.SortOrder.LayoutOrder
+            WindowLayout.Padding = UDim.new(0, 0)
+            WindowLayout.Parent = WindowFrame
+
+            -- Шапка окна в виде отдельного контейнера для безупречного расчета высоты через UIListLayout
+            local TitleBar = Instance.new("Frame")
+            TitleBar.Name = "TitleBar"
+            TitleBar.Size = UDim2.new(1, 0, 0, 28)
+            TitleBar.BackgroundTransparency = 1
+            TitleBar.LayoutOrder = 1
+            TitleBar.Parent = WindowFrame
+
             local TitleIndicator = Instance.new("Frame")
             TitleIndicator.Name = "Indicator"
             TitleIndicator.Size = UDim2.new(0, 2, 0, 10)
-            TitleIndicator.Position = UDim2.new(0, 8, 0, 9)
+            TitleIndicator.Position = UDim2.new(0, 8, 0.5, -5)
             TitleIndicator.BackgroundColor3 = Library.Theme.Accent
             TitleIndicator.BorderSizePixel = 0
-            TitleIndicator.Parent = WindowFrame
+            TitleIndicator.Parent = TitleBar
 
             local WindowTitle = Instance.new("TextLabel")
             WindowTitle.Name = "WindowTitle"
-            WindowTitle.Size = UDim2.new(1, -20, 0, 28)
+            WindowTitle.Size = UDim2.new(1, -20, 1, 0)
             WindowTitle.Position = UDim2.new(0, 14, 0, 0)
             WindowTitle.BackgroundTransparency = 1
             WindowTitle.Text = windowName
@@ -1656,14 +1697,16 @@ function Library:Init()
             WindowTitle.Font = Enum.Font.GothamBold
             WindowTitle.TextSize = 11
             WindowTitle.TextXAlignment = Enum.TextXAlignment.Left
-            WindowTitle.Parent = WindowFrame
+            WindowTitle.Parent = TitleBar
 
             local ElementsContainer = Instance.new("Frame")
             ElementsContainer.Name = "Elements"
             ElementsContainer.Size = UDim2.new(1, -16, 0, 0)
-            ElementsContainer.Position = UDim2.new(0, 8, 0, 28)
+            ElementsContainer.Position = UDim2.new(0, 8, 0, 0) -- Позиционируется под TitleBar через UIListLayout
             ElementsContainer.BackgroundTransparency = 1
             ElementsContainer.AutomaticSize = Enum.AutomaticSize.Y
+            ElementsContainer.ClipsDescendants = false
+            ElementsContainer.LayoutOrder = 2
             ElementsContainer.Parent = WindowFrame
 
             local ElementsLayout = Instance.new("UIListLayout")
