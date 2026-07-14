@@ -69,7 +69,7 @@ local function makeDraggable(frame, dragAnchor)
     end)
 end
 
--- Функция для очистки и адаптации поиска под раскладку клавиатуры
+-- Функция транслитерации для поиска на любой раскладке клавиатуры
 local function cleanSearchText(text)
     local query = string.lower(text)
     
@@ -109,11 +109,11 @@ function Library:Init()
     ScreenGui.ResetOnSpawn = false
     ScreenGui.Parent = ParentContainer
 
-    -- Главный контейнер (сразу центрирован по AnchorPoint)
+    -- Главный фрейм теперь фиксирован по ширине (500px), чтобы вкладки не сжимались
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
     MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-    MainFrame.Size = UDim2.new(0, 310, 0, 380) -- Начальный размер (будет адаптирован под окна первой вкладки)
+    MainFrame.Size = UDim2.new(0, 500, 0, 420)
     MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
     MainFrame.BackgroundTransparency = 1 
     MainFrame.BorderSizePixel = 0
@@ -126,7 +126,6 @@ function Library:Init()
         ScreenGui.Enabled = Main.Visible
     end
 
-    -- Убрана проверка 'processed' для мгновенной реакции на клавишу
     UserInputService.InputBegan:Connect(function(input)
         if input.KeyCode == Enum.KeyCode.RightShift then
             toggleMenu(not Main.Visible)
@@ -174,7 +173,6 @@ function Library:Init()
     Logo.Image = "rbxassetid://7015953925"
     Logo.Parent = Header
 
-    -- Уменьшен отступ под правый контейнер
     local TabsScroll = Instance.new("ScrollingFrame")
     TabsScroll.Name = "TabsScroll"
     TabsScroll.Size = UDim2.new(1, -196, 0, 26)
@@ -194,7 +192,6 @@ function Library:Init()
     TabsLayout.Padding = UDim.new(0, 5)
     TabsLayout.Parent = TabsScroll
 
-    -- Компактный правый контейнер (ширина 140px вместо 180px)
     local RightContainer = Instance.new("Frame")
     RightContainer.Name = "RightContainer"
     RightContainer.Size = UDim2.new(0, 140, 0, 24)
@@ -210,7 +207,6 @@ function Library:Init()
     RightLayout.Padding = UDim.new(0, 6)
     RightLayout.Parent = RightContainer
 
-    -- Уменьшенный поиск (ширина 110px вместо 120px)
     local SearchFrame = Instance.new("Frame")
     SearchFrame.Name = "SearchFrame"
     SearchFrame.Size = UDim2.new(0, 110, 0, 24)
@@ -271,27 +267,25 @@ function Library:Init()
     PagesFolder.BackgroundTransparency = 1
     PagesFolder.Parent = MainFrame
 
-    -- Функция умного автоматического ресайза сетки и главного окна
+    -- Функция умного центрирования колонок (240px)
     local function updateLayout(tabName)
         local pageInfo = Main.Pages[tabName]
         if not pageInfo then return end
 
         local data = pageInfo.Data
         if data.WindowCount <= 1 then
-            -- Одно окно: колонка занимает 100%, меню сужается до 310px
-            data.LeftColumn.Size = UDim2.new(1, 0, 0, 0)
+            -- Одно окно: колонка шириной 240px встает ровно по центру
+            data.LeftColumn.Size = UDim2.new(0, 240, 1, 0)
+            data.LeftColumn.Position = UDim2.new(0.5, -120, 0, 0)
             data.RightColumn.Visible = false
-            if Main.CurrentTab == tabName then
-                tween(MainFrame, 0.15, {Size = UDim2.new(0, 310, 0, 380)})
-            end
         else
-            -- Много окон: активируются две колонки, меню расширяется до 580px
-            data.LeftColumn.Size = UDim2.new(0.5, -5, 0, 0)
-            data.RightColumn.Size = UDim2.new(0.5, -5, 0, 0)
+            -- Несколько окон: две колонки по 240px распределяются по бокам
+            data.LeftColumn.Size = UDim2.new(0, 240, 1, 0)
+            data.LeftColumn.Position = UDim2.new(0.5, -245, 0, 0)
+            
+            data.RightColumn.Size = UDim2.new(0, 240, 1, 0)
+            data.RightColumn.Position = UDim2.new(0.5, 5, 0, 0)
             data.RightColumn.Visible = true
-            if Main.CurrentTab == tabName then
-                tween(MainFrame, 0.15, {Size = UDim2.new(0, 580, 0, 420)})
-            end
         end
     end
 
@@ -318,7 +312,7 @@ function Library:Init()
         updateLayout(tabName)
     end
 
-    -- Умный поиск с исправленной проблемой русских букв
+    -- Улучшенный сквозной поиск (ищет везде и переключает вкладки сам)
     SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
         local rawQuery = SearchBox.Text
         if rawQuery == "" then
@@ -336,9 +330,12 @@ function Library:Init()
         end
 
         local q1, q2, q3 = cleanSearchText(rawQuery)
+        local firstMatchingTab = nil
 
-        for _, pageInfo in pairs(Main.Pages) do
+        for tabName, pageInfo in pairs(Main.Pages) do
             local data = pageInfo.Data
+            local tabHasMatch = false
+            
             for _, column in ipairs({data.LeftColumn, data.RightColumn}) do
                 for _, window in ipairs(column:GetChildren()) do
                     if window:IsA("Frame") then
@@ -376,11 +373,24 @@ function Library:Init()
                                     end
                                 end
                             end
+                            
                             window.Visible = match
+                            if match then
+                                tabHasMatch = true
+                            end
                         end
                     end
                 end
             end
+            
+            if tabHasMatch and not firstMatchingTab then
+                firstMatchingTab = tabName
+            end
+        end
+
+        -- Автоматически переходим на вкладку, где нашлось совпадение
+        if firstMatchingTab and Main.CurrentTab ~= firstMatchingTab then
+            showPage(firstMatchingTab)
         end
     end)
 
@@ -767,7 +777,7 @@ function Library:Init()
 
         local LeftColumn = Instance.new("Frame")
         LeftColumn.Name = "LeftColumn"
-        LeftColumn.Size = UDim2.new(0.5, -5, 0, 0)
+        LeftColumn.Size = UDim2.new(0, 240, 0, 0)
         LeftColumn.BackgroundTransparency = 1
         LeftColumn.AutomaticSize = Enum.AutomaticSize.Y
         LeftColumn.Parent = Page
@@ -779,8 +789,7 @@ function Library:Init()
 
         local RightColumn = Instance.new("Frame")
         RightColumn.Name = "RightColumn"
-        RightColumn.Size = UDim2.new(0.5, -5, 0, 0)
-        RightColumn.Position = UDim2.new(0.5, 5, 0, 0)
+        RightColumn.Size = UDim2.new(0, 240, 0, 0)
         RightColumn.BackgroundTransparency = 1
         RightColumn.AutomaticSize = Enum.AutomaticSize.Y
         RightColumn.Parent = Page
@@ -819,7 +828,7 @@ function Library:Init()
             WindowFrame.AutomaticSize = Enum.AutomaticSize.Y
             WindowFrame.Parent = (PageData.WindowCount % 2 == 1) and LeftColumn or RightColumn
 
-            -- После создания каждого окна перерассчитываем сетку
+            -- Рассчитываем сетку и центрирование
             updateLayout(tabName)
 
             local WindowCorner = Instance.new("UICorner")
