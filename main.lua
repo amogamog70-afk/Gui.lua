@@ -1,4 +1,4 @@
--- [[ VOLTECLIPSE / PREMIUM STYLE CLEAN UI LIBRARY (V2.2 - COMPACT EDITION) ]] --
+-- [[ VOLTECLIPSE / PREMIUM STYLE CLEAN UI LIBRARY (V2.2 - OPTIMIZED EDITION) ]] --
 local Library = {}
 Library.Theme = {
     Background = Color3.fromRGB(11, 11, 14),       
@@ -82,16 +82,15 @@ function Library:Init()
     ScreenGui.ResetOnSpawn = false
     ScreenGui.Parent = ParentContainer
 
-    -- Компактный размер: 600x420 вместо 800x500
+    -- Возвращен стандартный размер: 800x500
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
-    MainFrame.Size = UDim2.new(0, 600, 0, 420)
-    MainFrame.Position = UDim2.new(0.5, -300, 0.5, -210)
+    MainFrame.Size = UDim2.new(0, 800, 0, 500)
+    MainFrame.Position = UDim2.new(0.5, -400, 0.5, -250)
     MainFrame.BackgroundTransparency = 1 
     MainFrame.BorderSizePixel = 0
     MainFrame.Parent = ScreenGui
 
-    -- Обработка скрытия на Right Shift и авто-скрытия при ESC настроек Roblox
     local robloxMenuOpen = false
     
     local function toggleMenu(state)
@@ -216,7 +215,6 @@ function Library:Init()
     SearchBox.TextSize = 10
     SearchBox.Parent = SearchFrame
 
-    -- Новая иконка шестеренки настроек
     local SettingsBtn = Instance.new("ImageButton")
     SettingsBtn.Name = "SettingsBtn"
     SettingsBtn.Size = UDim2.new(0, 24, 0, 24)
@@ -282,7 +280,10 @@ function Library:Init()
                                                 if secTitle and string.find(string.lower(secTitle.Text), query) then
                                                     match = true
                                                 end
-                                                local lbl = elem:FindFirstChild("Label") or elem:FindFirstChild("TextLabel") or (elem:IsA("TextButton") and elem)
+                                                local lbl = elem:FindFirstChild("Label") or elem:FindFirstChild("TextLabel")
+                                                if not lbl and elem:IsA("TextButton") then
+                                                    lbl = elem
+                                                end
                                                 if lbl and string.find(string.lower(lbl.Text), query) then
                                                     match = true
                                                 end
@@ -303,7 +304,7 @@ function Library:Init()
     local function createElementsSystem(container)
         local Elements = {}
 
-        -- Кнопка
+        -- Кнопка (Button)
         function Elements:CreateButton(btnText, callback)
             callback = callback or function() end
 
@@ -343,32 +344,24 @@ function Library:Init()
             return Button
         end
 
-        -- Тоггл (Флажок)
+        -- Тоггл / Флажок (Toggle) - Флажок слева, текст сразу справа, кликабельна вся строка
         function Elements:CreateToggle(toggleText, default, callback)
             callback = callback or function() end
             local state = default or false
 
-            local ToggleFrame = Instance.new("Frame")
+            local ToggleFrame = Instance.new("TextButton")
             ToggleFrame.Name = toggleText .. "Toggle"
             ToggleFrame.Size = UDim2.new(1, 0, 0, 24)
             ToggleFrame.BackgroundTransparency = 1
+            ToggleFrame.Text = ""
+            ToggleFrame.AutoButtonColor = false
             ToggleFrame.Parent = container
 
-            local Label = Instance.new("TextLabel")
-            Label.Size = UDim2.new(1, -24, 1, 0)
-            Label.BackgroundTransparency = 1
-            Label.Text = toggleText
-            Label.TextColor3 = Library.Theme.TextDim
-            Label.Font = Enum.Font.Gotham
-            Label.TextSize = 11
-            Label.TextXAlignment = Enum.TextXAlignment.Left
-            Label.Parent = ToggleFrame
-
-            local Box = Instance.new("TextButton")
+            local Box = Instance.new("Frame")
             Box.Size = UDim2.new(0, 14, 0, 14)
-            Box.Position = UDim2.new(1, -14, 0.5, -7)
+            Box.Position = UDim2.new(0, 2, 0.5, -7)
             Box.BackgroundColor3 = state and Library.Theme.Accent or Color3.fromRGB(30, 30, 36)
-            Box.Text = ""
+            Box.BorderSizePixel = 0
             Box.Parent = ToggleFrame
 
             local BoxCorner = Instance.new("UICorner")
@@ -380,28 +373,58 @@ function Library:Init()
             BoxStroke.Thickness = 1
             BoxStroke.Parent = Box
 
-            Box.MouseButton1Click:Connect(function()
+            local Label = Instance.new("TextLabel")
+            Label.Name = "Label"
+            Label.Size = UDim2.new(1, -24, 1, 0)
+            Label.Position = UDim2.new(0, 24, 0, 0)
+            Label.BackgroundTransparency = 1
+            Label.Text = toggleText
+            Label.TextColor3 = state and Library.Theme.Text or Library.Theme.TextDim
+            Label.Font = Enum.Font.Gotham
+            Label.TextSize = 11
+            Label.TextXAlignment = Enum.TextXAlignment.Left
+            Label.Parent = ToggleFrame
+
+            local function toggle()
                 state = not state
                 tween(Box, 0.1, {BackgroundColor3 = state and Library.Theme.Accent or Color3.fromRGB(30, 30, 36)})
                 tween(BoxStroke, 0.1, {Color = state and Library.Theme.Accent or Library.Theme.Stroke})
+                tween(Label, 0.1, {TextColor3 = state and Library.Theme.Text or Library.Theme.TextDim})
                 callback(state)
+            end
+
+            ToggleFrame.MouseButton1Click:Connect(toggle)
+
+            ToggleFrame.MouseEnter:Connect(function()
+                if not state then
+                    tween(Label, 0.1, {TextColor3 = Library.Theme.Text})
+                    tween(BoxStroke, 0.1, {Color = Color3.fromRGB(80, 80, 95)})
+                end
             end)
+            ToggleFrame.MouseLeave:Connect(function()
+                if not state then
+                    tween(Label, 0.1, {TextColor3 = Library.Theme.TextDim})
+                    tween(BoxStroke, 0.1, {Color = Library.Theme.Stroke})
+                end
+            end)
+
             return ToggleFrame
         end
 
-        -- Слайдер
+        -- Однострочный Слайдер (Slider) - Название, ползунок и значение на одной линии без лишнего места
         function Elements:CreateSlider(sliderText, min, max, default, callback)
             callback = callback or function() end
             local val = default or min
 
             local SliderFrame = Instance.new("Frame")
             SliderFrame.Name = sliderText .. "Slider"
-            SliderFrame.Size = UDim2.new(1, 0, 0, 32)
+            SliderFrame.Size = UDim2.new(1, 0, 0, 24) -- Высота уменьшена до стандартных 24px
             SliderFrame.BackgroundTransparency = 1
             SliderFrame.Parent = container
 
             local Label = Instance.new("TextLabel")
-            Label.Size = UDim2.new(0.7, 0, 0, 14)
+            Label.Name = "Label"
+            Label.Size = UDim2.new(0.4, -5, 1, 0)
             Label.BackgroundTransparency = 1
             Label.Text = sliderText
             Label.TextColor3 = Library.Theme.TextDim
@@ -410,20 +433,10 @@ function Library:Init()
             Label.TextXAlignment = Enum.TextXAlignment.Left
             Label.Parent = SliderFrame
 
-            local ValLabel = Instance.new("TextLabel")
-            ValLabel.Size = UDim2.new(0.3, 0, 0, 14)
-            ValLabel.Position = UDim2.new(0.7, 0, 0, 0)
-            ValLabel.BackgroundTransparency = 1
-            ValLabel.Text = tostring(val)
-            ValLabel.TextColor3 = Library.Theme.Text
-            ValLabel.Font = Enum.Font.GothamBold
-            ValLabel.TextSize = 11
-            ValLabel.TextXAlignment = Enum.TextXAlignment.Right
-            ValLabel.Parent = SliderFrame
-
+            -- Шкала ползунка
             local Track = Instance.new("Frame")
-            Track.Size = UDim2.new(1, 0, 0, 4)
-            Track.Position = UDim2.new(0, 0, 0, 20)
+            Track.Size = UDim2.new(0.6, -45, 0, 4)
+            Track.Position = UDim2.new(0.4, 5, 0.5, -2)
             Track.BackgroundColor3 = Color3.fromRGB(34, 34, 42)
             Track.BorderSizePixel = 0
             Track.Parent = SliderFrame
@@ -458,6 +471,18 @@ function Library:Init()
             ThumbStroke.Color = Library.Theme.Accent
             ThumbStroke.Thickness = 1.5
             ThumbStroke.Parent = Thumb
+
+            -- Числовое значение справа
+            local ValLabel = Instance.new("TextLabel")
+            ValLabel.Size = UDim2.new(0, 35, 1, 0)
+            ValLabel.Position = UDim2.new(1, -35, 0, 0)
+            ValLabel.BackgroundTransparency = 1
+            ValLabel.Text = tostring(val)
+            ValLabel.TextColor3 = Library.Theme.Text
+            ValLabel.Font = Enum.Font.GothamBold
+            ValLabel.TextSize = 11
+            ValLabel.TextXAlignment = Enum.TextXAlignment.Right
+            ValLabel.Parent = SliderFrame
 
             local isDragging = false
             local function update(input)
@@ -500,7 +525,7 @@ function Library:Init()
             return SliderFrame
         end
 
-        -- Поле ввода (TextBox)
+        -- Компактное поле ввода (TextBox) - Поле ввода расположено сразу после текста
         function Elements:CreateTextBox(textBoxText, placeholder, callback)
             callback = callback or function() end
             placeholder = placeholder or "Type..."
@@ -511,8 +536,18 @@ function Library:Init()
             TextFrame.BackgroundTransparency = 1
             TextFrame.Parent = container
 
+            -- Горизонтальный список, чтобы поле ввода было вплотную к названию функции
+            local TextLayout = Instance.new("UIListLayout")
+            TextLayout.FillDirection = Enum.FillDirection.Horizontal
+            TextLayout.SortOrder = Enum.SortOrder.LayoutOrder
+            TextLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+            TextLayout.Padding = UDim.new(0, 8)
+            TextLayout.Parent = TextFrame
+
             local Label = Instance.new("TextLabel")
-            Label.Size = UDim2.new(1, -100, 1, 0)
+            Label.Name = "Label"
+            Label.Size = UDim2.new(0, 0, 1, 0)
+            Label.AutomaticSize = Enum.AutomaticSize.X
             Label.BackgroundTransparency = 1
             Label.Text = textBoxText
             Label.TextColor3 = Library.Theme.TextDim
@@ -522,8 +557,7 @@ function Library:Init()
             Label.Parent = TextFrame
 
             local BoxBg = Instance.new("Frame")
-            BoxBg.Size = UDim2.new(0, 90, 0, 20)
-            BoxBg.Position = UDim2.new(1, -90, 0.5, -10)
+            BoxBg.Size = UDim2.new(0, 110, 0, 20)
             BoxBg.BackgroundColor3 = Color3.fromRGB(30, 30, 36)
             BoxBg.Parent = TextFrame
 
@@ -552,10 +586,12 @@ function Library:Init()
 
             TextBox.Focused:Connect(function()
                 tween(BoxStroke, 0.1, {Color = Library.Theme.Accent})
+                tween(Label, 0.1, {TextColor3 = Library.Theme.Text})
             end)
 
             TextBox.FocusLost:Connect(function(enterPressed)
                 tween(BoxStroke, 0.1, {Color = Library.Theme.Stroke})
+                tween(Label, 0.1, {TextColor3 = Library.Theme.TextDim})
                 callback(TextBox.Text, enterPressed)
             end)
             return TextFrame
