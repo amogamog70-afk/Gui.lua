@@ -16,8 +16,10 @@ local TabIcons = {
     Movement = "rbxassetid://136160678435000", 
     Visuals  = "rbxassetid://102976018150012", 
     Misc     = "rbxassetid://137382232901580", 
-    World    = "rbxassetid://107448093571441", 
-    Auto     = "rbxassetid://17119858971"      
+    World    = "rbxassetid://122563205713088", -- earth white
+    Auto     = "rbxassetid://118224132270063", -- loading v2 (Decal ID)
+    Guns     = "rbxassetid://84647432170503",  -- iconarma
+    Skins    = "rbxassetid://101708694952341"  -- Pencil Icon
 }
 
 local UserInputService = game:GetService("UserInputService")
