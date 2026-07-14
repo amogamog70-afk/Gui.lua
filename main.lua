@@ -1,4 +1,4 @@
--- [[ VOLTECLIPSE / PREMIUM STYLE CLEAN UI LIBRARY (V2.2 - OPTIMIZED EDITION) ]] --
+-- [[ VOLTECLIPSE / PREMIUM STYLE CLEAN UI LIBRARY (V2.3 - OPTIMIZED EDITION) ]] --
 local Library = {}
 Library.Theme = {
     Background = Color3.fromRGB(11, 11, 14),       
@@ -17,7 +17,7 @@ local TabIcons = {
     Visuals  = "rbxassetid://102976018150012", 
     Misc     = "rbxassetid://137382232901580", 
     World    = "rbxassetid://122563205713088", -- earth white
-    Auto     = "rbxassetid://118224132270063", -- loading v2 (Decal ID)
+    Auto     = "rbxassetid://102927017461693", -- loading v2 (NEW ID)
     Guns     = "rbxassetid://84647432170503",  -- iconarma
     Skins    = "rbxassetid://101708694952341"  -- Pencil Icon
 }
@@ -72,8 +72,9 @@ local function makeDraggable(frame, dragAnchor)
 end
 
 -- Сброс фокуса ввода при клике на экран (исправляет блокировку камеры роблоксом)
-UserInputService.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+-- Использование gameProcessed предотвращает мгновенный сброс фокуса при клике на сам текст-бокс
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if not gameProcessed and input.UserInputType == Enum.UserInputType.MouseButton1 then
         local focused = UserInputService:GetFocusedTextBox()
         if focused then
             focused:ReleaseFocus()
@@ -143,6 +144,7 @@ function Library:Init()
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "VoltEclipseLibrary"
     ScreenGui.ResetOnSpawn = false
+    ScreenGui.IgnoreGuiInset = true -- Включено для идеального соответствия мыши и объектов на экране
     ScreenGui.Parent = ParentContainer
 
     local MainFrame = Instance.new("Frame")
@@ -218,7 +220,7 @@ function Library:Init()
     TabsScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
     TabsScroll.ScrollingDirection = Enum.ScrollingDirection.X
     TabsScroll.AutomaticCanvasSize = Enum.AutomaticSize.X
-    TabsScroll.Active = false -- Убрано поглощение скролла
+    TabsScroll.Active = false
     TabsScroll.Parent = Header
 
     local TabsLayout = Instance.new("UIListLayout")
@@ -426,11 +428,11 @@ function Library:Init()
         end
     end)
 
-    -- Создание компактных элементов без пустот
+    -- Создание элементов
     local function createElementsSystem(container)
         local Elements = {}
 
-        -- Инлайновые инструкции (Tooltip) - появляются только при желании разработчика (если передан текст)
+        -- Инлайновые инструкции (Tooltip)
         local function addTooltip(parentFrame, text, yOffset)
             if not text or text == "" then return end
             
@@ -490,7 +492,7 @@ function Library:Init()
             end)
         end
 
-        -- Вспомогательный элемент ползунка каналов для ColorPicker
+        -- Ползунок цветового канала в ColorPicker
         local function createColorChannel(name, labelColor, defaultValue, onUpdate)
             local ChannelFrame = Instance.new("Frame")
             ChannelFrame.Name = name .. "Channel"
@@ -543,8 +545,9 @@ function Library:Init()
             ValLabel.Parent = ChannelFrame
             
             local isDragging = false
-            local function update(input)
-                local percentage = math.clamp((input.Position.X - Track.AbsolutePosition.X) / Track.AbsoluteSize.X, 0, 1)
+            local function update()
+                local mouseLocation = UserInputService:GetMouseLocation()
+                local percentage = math.clamp((mouseLocation.X - Track.AbsolutePosition.X) / Track.AbsoluteSize.X, 0, 1)
                 local val = math.round(percentage * 255)
                 Fill.Size = UDim2.new(percentage, 0, 1, 0)
                 Thumb.Position = UDim2.new(percentage, 0, 0.5, 0)
@@ -555,12 +558,12 @@ function Library:Init()
             ChannelFrame.InputBegan:Connect(function(input)
                 if input.UserInputType == Enum.UserInputType.MouseButton1 then
                     isDragging = true
-                    update(input)
+                    update()
                 end
             end)
             UserInputService.InputChanged:Connect(function(input)
                 if isDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-                    update(input)
+                    update()
                 end
             end)
             UserInputService.InputEnded:Connect(function(input)
@@ -701,7 +704,7 @@ function Library:Init()
             return ToggleFrame
         end
 
-        -- Однострочный Слайдер (Slider) с настраиваемым суффиксом (проценты, пиксели и т.д.)
+        -- Однострочный Слайдер (Slider)
         function Elements:CreateSlider(sliderText, min, max, default, callback, tooltipText, suffix)
             callback = callback or function() end
             local val = default or min
@@ -770,7 +773,7 @@ function Library:Init()
             ThumbStroke.Parent = Thumb
 
             local ValLabel = Instance.new("TextLabel")
-            ValLabel.Size = UDim2.new(0, 50, 1, 0) -- Ширина увеличена до 50 для поддержки длинных суффиксов
+            ValLabel.Size = UDim2.new(0, 50, 1, 0)
             ValLabel.Position = UDim2.new(1, -55, 0, 0)
             ValLabel.BackgroundTransparency = 1
             ValLabel.Text = tostring(val) .. displaySuffix
@@ -781,8 +784,9 @@ function Library:Init()
             ValLabel.Parent = ContentRow
 
             local isDragging = false
-            local function update(input)
-                local percentage = math.clamp((input.Position.X - Track.AbsolutePosition.X) / Track.AbsoluteSize.X, 0, 1)
+            local function update()
+                local mouseLocation = UserInputService:GetMouseLocation()
+                local percentage = math.clamp((mouseLocation.X - Track.AbsolutePosition.X) / Track.AbsoluteSize.X, 0, 1)
                 val = math.round(min + ((max - min) * percentage))
                 Fill.Size = UDim2.new(percentage, 0, 1, 0)
                 Thumb.Position = UDim2.new(percentage, 0, 0.5, 0)
@@ -793,13 +797,13 @@ function Library:Init()
             ContentRow.InputBegan:Connect(function(input)
                 if input.UserInputType == Enum.UserInputType.MouseButton1 then
                     isDragging = true
-                    update(input)
+                    update()
                     tween(Thumb, 0.1, {Size = UDim2.new(0, 11, 0, 11)})
                 end
             end)
             UserInputService.InputChanged:Connect(function(input)
                 if isDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-                    update(input)
+                    update()
                 end
             end)
             UserInputService.InputEnded:Connect(function(input)
@@ -969,7 +973,7 @@ function Library:Init()
             OptionsScroll.Visible = false
             OptionsScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
             OptionsScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-            OptionsScroll.Active = false -- Отключена блокировка прокрутки
+            OptionsScroll.Active = false
             OptionsScroll.Parent = DropdownFrame
             
             local ScrollCorner = Instance.new("UICorner")
@@ -1209,7 +1213,7 @@ function Library:Init()
             local HueCursor = Instance.new("Frame")
             HueCursor.Name = "HueCursor"
             HueCursor.Size = UDim2.new(1, 4, 0, 2)
-            HueCursor.Position = UDim2.new(0, -2, currentHue, 0) -- Исправлено на прямую шкалу
+            HueCursor.Position = UDim2.new(0, -2, currentHue, 0)
             HueCursor.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
             HueCursor.BorderSizePixel = 0
             HueCursor.Parent = HueSlider
@@ -1298,7 +1302,6 @@ function Library:Init()
                     HexBox.Text = rgbToHex(solidColor)
                 end
 
-                -- ГАРАНТИРОВАННОЕ ОБНОВЛЕНИЕ КУРСОРОВ ПРИ ВВОДЕ HEX ИЛИ ПЕРВОМ ЗАПУСКЕ (Баг решен)
                 if source == "hex" or source == "init" then
                     Cursor.Position = UDim2.new(currentSat, 0, 1 - currentVal, 0)
                     HueCursor.Position = UDim2.new(0, -2, currentHue, 0)
@@ -1311,13 +1314,14 @@ function Library:Init()
                 callback(solidColor, currentAlpha)
             end
 
-            local isDraggingCanvas = false
-            local isDraggingHue = false
-            local isDraggingAlpha = false
+            -- Функции обновления, использующие GetMouseLocation() для точного позиционирования
+            local function updateCanvasFromMouse()
+                local mouseLocation = UserInputService:GetMouseLocation()
+                local relativeX = mouseLocation.X - SatValCanvas.AbsolutePosition.X
+                local relativeY = mouseLocation.Y - SatValCanvas.AbsolutePosition.Y
 
-            local function dragCanvas(input)
-                local percentageX = math.clamp((input.Position.X - SatValCanvas.AbsolutePosition.X) / SatValCanvas.AbsoluteSize.X, 0, 1)
-                local percentageY = math.clamp((input.Position.Y - SatValCanvas.AbsolutePosition.Y) / SatValCanvas.AbsoluteSize.Y, 0, 1)
+                local percentageX = math.clamp(relativeX / SatValCanvas.AbsoluteSize.X, 0, 1)
+                local percentageY = math.clamp(relativeY / SatValCanvas.AbsoluteSize.Y, 0, 1)
                 
                 currentSat = percentageX
                 currentVal = 1 - percentageY
@@ -1326,17 +1330,21 @@ function Library:Init()
                 updateAllColors("canvas")
             end
 
-            local function dragHue(input)
-                local percentageY = math.clamp((input.Position.Y - HueSlider.AbsolutePosition.Y) / HueSlider.AbsoluteSize.Y, 0, 1)
+            local function updateHueFromMouse()
+                local mouseLocation = UserInputService:GetMouseLocation()
+                local relativeY = mouseLocation.Y - HueSlider.AbsolutePosition.Y
+                local percentageY = math.clamp(relativeY / HueSlider.AbsoluteSize.Y, 0, 1)
                 
-                currentHue = percentageY -- Прямое соответствие шкале
+                currentHue = percentageY
                 
                 HueCursor.Position = UDim2.new(0, -2, percentageY, 0)
                 updateAllColors("hue")
             end
 
-            local function dragAlpha(input)
-                local percentageX = math.clamp((input.Position.X - AlphaTrack.AbsolutePosition.X) / AlphaTrack.AbsoluteSize.X, 0, 1)
+            local function updateAlphaFromMouse()
+                local mouseLocation = UserInputService:GetMouseLocation()
+                local relativeX = mouseLocation.X - AlphaTrack.AbsolutePosition.X
+                local percentageX = math.clamp(relativeX / AlphaTrack.AbsoluteSize.X, 0, 1)
                 
                 currentAlpha = percentageX
                 
@@ -1344,35 +1352,39 @@ function Library:Init()
                 updateAllColors("alpha")
             end
 
+            local isDraggingCanvas = false
+            local isDraggingHue = false
+            local isDraggingAlpha = false
+
             SatValCanvas.InputBegan:Connect(function(input)
                 if input.UserInputType == Enum.UserInputType.MouseButton1 then
                     isDraggingCanvas = true
-                    dragCanvas(input)
+                    updateCanvasFromMouse()
                 end
             end)
 
             HueSlider.InputBegan:Connect(function(input)
                 if input.UserInputType == Enum.UserInputType.MouseButton1 then
                     isDraggingHue = true
-                    dragHue(input)
+                    updateHueFromMouse()
                 end
             end)
 
             AlphaTrack.InputBegan:Connect(function(input)
                 if input.UserInputType == Enum.UserInputType.MouseButton1 then
                     isDraggingAlpha = true
-                    dragAlpha(input)
+                    updateAlphaFromMouse()
                 end
             end)
 
             UserInputService.InputChanged:Connect(function(input)
                 if input.UserInputType == Enum.UserInputType.MouseMovement then
                     if isDraggingCanvas then
-                        dragCanvas(input)
+                        updateCanvasFromMouse()
                     elseif isDraggingHue then
-                        dragHue(input)
+                        updateHueFromMouse()
                     elseif isDraggingAlpha then
-                        dragAlpha(input)
+                        updateAlphaFromMouse()
                     end
                 end
             end)
@@ -1494,7 +1506,7 @@ function Library:Init()
         Page.ScrollingDirection = Enum.ScrollingDirection.Y
         Page.CanvasSize = UDim2.new(0, 0, 0, 0)
         Page.AutomaticCanvasSize = Enum.AutomaticSize.Y
-        Page.Active = false -- Убрано поглощение скролла
+        Page.Active = false
         Page.Parent = PagesFolder
 
         local PagePadding = Instance.new("UIPadding")
