@@ -69,6 +69,16 @@ local function makeDraggable(frame, dragAnchor)
     end)
 end
 
+-- Сброс фокуса ввода при клике на экран (исправляет блокировку камеры роблоксом)
+UserInputService.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        local focused = UserInputService:GetFocusedTextBox()
+        if focused then
+            focused:ReleaseFocus()
+        end
+    end
+end)
+
 -- Вспомогательные функции конвертации Hex
 local function rgbToHex(color)
     local r = math.round(color.R * 255)
@@ -206,6 +216,7 @@ function Library:Init()
     TabsScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
     TabsScroll.ScrollingDirection = Enum.ScrollingDirection.X
     TabsScroll.AutomaticCanvasSize = Enum.AutomaticSize.X
+    TabsScroll.Active = false -- Убрано поглощение скролла
     TabsScroll.Parent = Header
 
     local TabsLayout = Instance.new("UIListLayout")
@@ -477,6 +488,88 @@ function Library:Init()
             end)
         end
 
+        -- Вспомогательный элемент ползунка каналов для ColorPicker
+        local function createColorChannel(name, labelColor, defaultValue, onUpdate)
+            local ChannelFrame = Instance.new("Frame")
+            ChannelFrame.Name = name .. "Channel"
+            ChannelFrame.Size = UDim2.new(1, 0, 0, 16)
+            ChannelFrame.BackgroundTransparency = 1
+            
+            local Label = Instance.new("TextLabel")
+            Label.Size = UDim2.new(0, 15, 1, 0)
+            Label.BackgroundTransparency = 1
+            Label.Text = name
+            Label.TextColor3 = labelColor
+            Label.Font = Enum.Font.GothamBold
+            Label.TextSize = 10
+            Label.TextXAlignment = Enum.TextXAlignment.Left
+            Label.Parent = ChannelFrame
+            
+            local Track = Instance.new("Frame")
+            Track.Size = UDim2.new(1, -55, 0, 3)
+            Track.Position = UDim2.new(0, 20, 0.5, -1)
+            Track.BackgroundColor3 = Color3.fromRGB(34, 34, 42)
+            Track.BorderSizePixel = 0
+            Track.Parent = ChannelFrame
+            
+            local Fill = Instance.new("Frame")
+            Fill.Size = UDim2.new(defaultValue / 255, 0, 1, 0)
+            Fill.BackgroundColor3 = labelColor
+            Fill.BorderSizePixel = 0
+            Fill.Parent = Track
+            
+            local Thumb = Instance.new("Frame")
+            Thumb.Size = UDim2.new(0, 7, 0, 7)
+            Thumb.AnchorPoint = Vector2.new(0.5, 0.5)
+            Thumb.Position = UDim2.new(defaultValue / 255, 0, 0.5, 0)
+            Thumb.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            Thumb.Parent = Track
+            
+            local ThumbCorner = Instance.new("UICorner")
+            ThumbCorner.CornerRadius = UDim.new(1, 0)
+            ThumbCorner.Parent = Thumb
+            
+            local ValLabel = Instance.new("TextLabel")
+            ValLabel.Size = UDim2.new(0, 25, 1, 0)
+            ValLabel.Position = UDim2.new(1, -25, 0, 0)
+            ValLabel.BackgroundTransparency = 1
+            ValLabel.Text = tostring(math.round(defaultValue))
+            ValLabel.TextColor3 = Library.Theme.TextDim
+            ValLabel.Font = Enum.Font.Gotham
+            ValLabel.TextSize = 9
+            ValLabel.TextXAlignment = Enum.TextXAlignment.Right
+            ValLabel.Parent = ChannelFrame
+            
+            local isDragging = false
+            local function update(input)
+                local percentage = math.clamp((input.Position.X - Track.AbsolutePosition.X) / Track.AbsoluteSize.X, 0, 1)
+                local val = math.round(percentage * 255)
+                Fill.Size = UDim2.new(percentage, 0, 1, 0)
+                Thumb.Position = UDim2.new(percentage, 0, 0.5, 0)
+                ValLabel.Text = tostring(val)
+                onUpdate(val)
+            end
+            
+            ChannelFrame.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    isDragging = true
+                    update(input)
+                end
+            end)
+            UserInputService.InputChanged:Connect(function(input)
+                if isDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+                    update(input)
+                end
+            end)
+            UserInputService.InputEnded:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    isDragging = false
+                end
+            end)
+            
+            return ChannelFrame
+        end
+
         -- Кнопка (Button)
         function Elements:CreateButton(btnText, callback, tooltipText)
             callback = callback or function() end
@@ -606,10 +699,11 @@ function Library:Init()
             return ToggleFrame
         end
 
-        -- Однострочный Слайдер (Slider)
-        function Elements:CreateSlider(sliderText, min, max, default, callback, tooltipText)
+        -- Однострочный Слайдер (Slider) с настраиваемым суффиксом (проценты, пиксели и т.д.)
+        function Elements:CreateSlider(sliderText, min, max, default, callback, tooltipText, suffix)
             callback = callback or function() end
             local val = default or min
+            local displaySuffix = suffix or ""
 
             local SliderFrame = Instance.new("Frame")
             SliderFrame.Name = sliderText .. "Slider"
@@ -674,10 +768,10 @@ function Library:Init()
             ThumbStroke.Parent = Thumb
 
             local ValLabel = Instance.new("TextLabel")
-            ValLabel.Size = UDim2.new(0, 30, 1, 0)
+            ValLabel.Size = UDim2.new(0, 50, 1, 0) -- Ширина увеличена до 50 для поддержки длинных суффиксов
             ValLabel.Position = UDim2.new(1, -55, 0, 0)
             ValLabel.BackgroundTransparency = 1
-            ValLabel.Text = tostring(val)
+            ValLabel.Text = tostring(val) .. displaySuffix
             ValLabel.TextColor3 = Library.Theme.Text
             ValLabel.Font = Enum.Font.GothamBold
             ValLabel.TextSize = 11
@@ -690,7 +784,7 @@ function Library:Init()
                 val = math.round(min + ((max - min) * percentage))
                 Fill.Size = UDim2.new(percentage, 0, 1, 0)
                 Thumb.Position = UDim2.new(percentage, 0, 0.5, 0)
-                ValLabel.Text = tostring(val)
+                ValLabel.Text = tostring(val) .. displaySuffix
                 callback(val)
             end
 
@@ -873,6 +967,7 @@ function Library:Init()
             OptionsScroll.Visible = false
             OptionsScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
             OptionsScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+            OptionsScroll.Active = false -- Отключена блокировка прокрутки
             OptionsScroll.Parent = DropdownFrame
             
             local ScrollCorner = Instance.new("UICorner")
@@ -1033,7 +1128,6 @@ function Library:Init()
             ColorStroke.Thickness = 1
             ColorStroke.Parent = ColorBox
             
-            -- Выдвижная панель меню HSV-выбора
             local PickerContainer = Instance.new("Frame")
             PickerContainer.Name = "PickerContainer"
             PickerContainer.Size = UDim2.new(1, 0, 0, 0)
@@ -1053,24 +1147,21 @@ function Library:Init()
             ContainerStroke.Thickness = 1
             ContainerStroke.Parent = PickerContainer
 
-            -- Переменные HSV и Альфы (Прозрачности)
             local currentHue, currentSat, currentVal = defaultColor:ToHSV()
-            local currentAlpha = 1 -- По умолчанию полностью непрозрачный
+            local currentAlpha = 1
             
-            -- 1. Спектральное поле Sat/Val Canvas
             local SatValCanvas = Instance.new("ImageButton")
             SatValCanvas.Name = "SatValCanvas"
             SatValCanvas.Size = UDim2.new(0, 180, 0, 110)
             SatValCanvas.Position = UDim2.new(0, 8, 0, 6)
             SatValCanvas.BackgroundColor3 = Color3.fromHSV(currentHue, 1, 1)
-            SatValCanvas.Image = "rbxassetid://415583266" -- Универсальная текстура наложения Sat/Val
+            SatValCanvas.Image = "rbxassetid://415583266"
             SatValCanvas.Parent = PickerContainer
 
             local CanvasCorner = Instance.new("UICorner")
             CanvasCorner.CornerRadius = UDim.new(0, 3)
             CanvasCorner.Parent = SatValCanvas
 
-            -- Круглый курсор на спектральном поле
             local Cursor = Instance.new("Frame")
             Cursor.Name = "Cursor"
             Cursor.Size = UDim2.new(0, 6, 0, 6)
@@ -1088,7 +1179,6 @@ function Library:Init()
             CursorCorner.CornerRadius = UDim.new(1, 0)
             CursorCorner.Parent = Cursor
 
-            -- 2. Вертикальный Радужный Hue Slider
             local HueSlider = Instance.new("ImageButton")
             HueSlider.Name = "HueSlider"
             HueSlider.Size = UDim2.new(0, 12, 0, 110)
@@ -1114,11 +1204,10 @@ function Library:Init()
             })
             HueGradient.Parent = HueSlider
 
-            -- Курсор на Hue Slider
             local HueCursor = Instance.new("Frame")
             HueCursor.Name = "HueCursor"
             HueCursor.Size = UDim2.new(1, 4, 0, 2)
-            HueCursor.Position = UDim2.new(0, -2, 1 - currentHue, 0)
+            HueCursor.Position = UDim2.new(0, -2, currentHue, 0) -- Исправлено на прямую шкалу
             HueCursor.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
             HueCursor.BorderSizePixel = 0
             HueCursor.Parent = HueSlider
@@ -1128,7 +1217,6 @@ function Library:Init()
             HueCursorStroke.Thickness = 1
             HueCursorStroke.Parent = HueCursor
 
-            -- 3. Текстовое поле ввода HEX (#00ff8c)
             local HexInputFrame = Instance.new("Frame")
             HexInputFrame.Size = UDim2.new(0, 90, 0, 20)
             HexInputFrame.Position = UDim2.new(0, 8, 0, 124)
@@ -1154,7 +1242,6 @@ function Library:Init()
             HexBox.TextXAlignment = Enum.TextXAlignment.Left
             HexBox.Parent = HexInputFrame
 
-            -- 4. Текстовое табло RGB (0, 255, 139)
             local RgbLabel = Instance.new("TextLabel")
             RgbLabel.Size = UDim2.new(0, 102, 0, 20)
             RgbLabel.Position = UDim2.new(0, 106, 0, 124)
@@ -1165,7 +1252,6 @@ function Library:Init()
             RgbLabel.TextXAlignment = Enum.TextXAlignment.Right
             RgbLabel.Parent = PickerContainer
 
-            -- 5. Горизонтальный слайдер прозрачности (Alpha Slider)
             local AlphaTrack = Instance.new("ImageButton")
             AlphaTrack.Name = "AlphaTrack"
             AlphaTrack.Size = UDim2.new(0, 200, 0, 10)
@@ -1180,12 +1266,11 @@ function Library:Init()
 
             local AlphaGradient = Instance.new("UIGradient")
             AlphaGradient.Transparency = NumberSequence.new({
-                NumberSequenceKeypoint.new(0, 1), -- прозрачно на левой стороне
-                NumberSequenceKeypoint.new(1, 0)  -- полностью цветное на правой стороне
+                NumberSequenceKeypoint.new(0, 1),
+                NumberSequenceKeypoint.new(1, 0)
             })
             AlphaGradient.Parent = AlphaTrack
 
-            -- Курсор слайдера прозрачности
             local AlphaCursor = Instance.new("Frame")
             AlphaCursor.Name = "AlphaCursor"
             AlphaCursor.Size = UDim2.new(0, 4, 1, 4)
@@ -1200,28 +1285,30 @@ function Library:Init()
             AlphaCursorStroke.Thickness = 1
             AlphaCursorStroke.Parent = AlphaCursor
 
-            -- Логика синхронизации и обновления цветов
             local function updateAllColors(source)
                 local solidColor = Color3.fromHSV(currentHue, currentSat, currentVal)
                 ColorBox.BackgroundColor3 = solidColor
                 
-                -- Обновление RGB-текста
                 local r, g, b = math.round(solidColor.R * 255), math.round(solidColor.G * 255), math.round(solidColor.B * 255)
                 RgbLabel.Text = string.format("%d, %d, %d", r, g, b)
 
-                -- Обновление HEX-текста
                 if source ~= "hex" then
                     HexBox.Text = rgbToHex(solidColor)
                 end
 
-                -- Обновление фонового цвета Canvas и шкалы прозрачности
+                -- ГАРАНТИРОВАННОЕ ОБНОВЛЕНИЕ КУРСОРОВ ПРИ ВВОДЕ HEX ИЛИ ПЕРВОМ ЗАПУСКЕ (Баг решен)
+                if source == "hex" or source == "init" then
+                    Cursor.Position = UDim2.new(currentSat, 0, 1 - currentVal, 0)
+                    HueCursor.Position = UDim2.new(0, -2, currentHue, 0)
+                    AlphaCursor.Position = UDim2.new(currentAlpha, 0, 0.5, 0)
+                end
+
                 SatValCanvas.BackgroundColor3 = Color3.fromHSV(currentHue, 1, 1)
                 AlphaGradient.Color = ColorSequence.new(solidColor)
 
                 callback(solidColor, currentAlpha)
             end
 
-            -- Хендлеры нажатий и перемещений мыши
             local isDraggingCanvas = false
             local isDraggingHue = false
             local isDraggingAlpha = false
@@ -1233,14 +1320,14 @@ function Library:Init()
                 currentSat = percentageX
                 currentVal = 1 - percentageY
                 
-                Cursor.Position = UDim2.new(currentSat, 0, 1 - currentVal, 0)
+                Cursor.Position = UDim2.new(currentSat, 0, percentageY, 0)
                 updateAllColors("canvas")
             end
 
             local function dragHue(input)
                 local percentageY = math.clamp((input.Position.Y - HueSlider.AbsolutePosition.Y) / HueSlider.AbsoluteSize.Y, 0, 1)
                 
-                currentHue = 1 - percentageY
+                currentHue = percentageY -- Прямое соответствие шкале
                 
                 HueCursor.Position = UDim2.new(0, -2, percentageY, 0)
                 updateAllColors("hue")
@@ -1296,23 +1383,17 @@ function Library:Init()
                 end
             end)
 
-            -- Обработчик ввода HEX вручную
             HexBox.FocusLost:Connect(function()
                 local text = HexBox.Text
                 local success, parsedColor = pcall(function() return hexToRgb(text) end)
                 if success and parsedColor then
                     currentHue, currentSat, currentVal = parsedColor:ToHSV()
-                    
-                    Cursor.Position = UDim2.new(currentSat, 0, 1 - currentVal, 0)
-                    HueCursor.Position = UDim2.new(0, -2, 1 - currentHue, 0)
-                    
                     updateAllColors("hex")
                 else
                     HexBox.Text = rgbToHex(ColorBox.BackgroundColor3)
                 end
             end)
 
-            -- Показ/скрытие панели
             local isOpen = false
             ColorBox.MouseButton1Click:Connect(function()
                 isOpen = not isOpen
@@ -1324,7 +1405,6 @@ function Library:Init()
                 end
             end)
 
-            -- Первичная инициализация
             updateAllColors("init")
 
             if tooltipText then
@@ -1412,6 +1492,7 @@ function Library:Init()
         Page.ScrollingDirection = Enum.ScrollingDirection.Y
         Page.CanvasSize = UDim2.new(0, 0, 0, 0)
         Page.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        Page.Active = false -- Убрано поглощение скролла
         Page.Parent = PagesFolder
 
         local PagePadding = Instance.new("UIPadding")
