@@ -69,6 +69,33 @@ local function makeDraggable(frame, dragAnchor)
     end)
 end
 
+-- Функция для очистки и адаптации поиска под раскладку клавиатуры
+local function cleanSearchText(text)
+    local query = string.lower(text)
+    
+    local ru_to_en = {
+        ["й"]="q", ["ц"]="w", ["у"]="e", ["к"]="r", ["е"]="t", ["н"]="y", ["г"]="u", ["ш"]="i", ["щ"]="o", ["з"]="p", ["х"]="[", ["ъ"]="]",
+        ["ф"]="a", ["ы"]="s", ["в"]="d", ["а"]="f", ["п"]="g", ["р"]="h", ["о"]="j", ["л"]="k", ["д"]="l", ["ж"]=";", ["э"]="'",
+        ["я"]="z", ["ч"]="x", ["с"]="c", ["м"]="v", ["и"]="b", ["т"]="n", ["ь"]="m", ["б"]=",", ["ю"]="."
+    }
+    
+    local cyr_to_lat = {
+        ["а"]="a", ["в"]="b", ["с"]="c", ["е"]="e", ["н"]="h", ["к"]="k", 
+        ["м"]="m", ["о"]="o", ["р"]="p", ["т"]="t", ["у"]="y", ["х"]="x"
+    }
+    
+    local layout_query = ""
+    local visual_query = ""
+    
+    for _, code in ipairs({utf8.codepoint(query, 1, -1)}) do
+        local char = utf8.char(code)
+        layout_query = layout_query .. (ru_to_en[char] or char)
+        visual_query = visual_query .. (cyr_to_lat[char] or char)
+    end
+    
+    return query, layout_query, visual_query
+end
+
 function Library:Init()
     local Main = {
         CurrentTab = nil,
@@ -82,11 +109,12 @@ function Library:Init()
     ScreenGui.ResetOnSpawn = false
     ScreenGui.Parent = ParentContainer
 
-    -- Возвращен стандартный размер: 800x500
+    -- Главный контейнер (сразу центрирован по AnchorPoint)
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
-    MainFrame.Size = UDim2.new(0, 800, 0, 500)
-    MainFrame.Position = UDim2.new(0.5, -400, 0.5, -250)
+    MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+    MainFrame.Size = UDim2.new(0, 310, 0, 380) -- Начальный размер (будет адаптирован под окна первой вкладки)
+    MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
     MainFrame.BackgroundTransparency = 1 
     MainFrame.BorderSizePixel = 0
     MainFrame.Parent = ScreenGui
@@ -98,8 +126,9 @@ function Library:Init()
         ScreenGui.Enabled = Main.Visible
     end
 
-    UserInputService.InputBegan:Connect(function(input, processed)
-        if not processed and input.KeyCode == Enum.KeyCode.RightShift then
+    -- Убрана проверка 'processed' для мгновенной реакции на клавишу
+    UserInputService.InputBegan:Connect(function(input)
+        if input.KeyCode == Enum.KeyCode.RightShift then
             toggleMenu(not Main.Visible)
         end
     end)
@@ -145,9 +174,10 @@ function Library:Init()
     Logo.Image = "rbxassetid://7015953925"
     Logo.Parent = Header
 
+    -- Уменьшен отступ под правый контейнер
     local TabsScroll = Instance.new("ScrollingFrame")
     TabsScroll.Name = "TabsScroll"
-    TabsScroll.Size = UDim2.new(1, -250, 0, 26)
+    TabsScroll.Size = UDim2.new(1, -196, 0, 26)
     TabsScroll.Position = UDim2.new(0, 42, 0.5, -13)
     TabsScroll.BackgroundTransparency = 1
     TabsScroll.BorderSizePixel = 0
@@ -164,10 +194,11 @@ function Library:Init()
     TabsLayout.Padding = UDim.new(0, 5)
     TabsLayout.Parent = TabsScroll
 
+    -- Компактный правый контейнер (ширина 140px вместо 180px)
     local RightContainer = Instance.new("Frame")
     RightContainer.Name = "RightContainer"
-    RightContainer.Size = UDim2.new(0, 180, 0, 24)
-    RightContainer.Position = UDim2.new(1, -192, 0.5, -12)
+    RightContainer.Size = UDim2.new(0, 140, 0, 24)
+    RightContainer.Position = UDim2.new(1, -152, 0.5, -12)
     RightContainer.BackgroundTransparency = 1
     RightContainer.Parent = Header
 
@@ -179,9 +210,10 @@ function Library:Init()
     RightLayout.Padding = UDim.new(0, 6)
     RightLayout.Parent = RightContainer
 
+    -- Уменьшенный поиск (ширина 110px вместо 120px)
     local SearchFrame = Instance.new("Frame")
     SearchFrame.Name = "SearchFrame"
-    SearchFrame.Size = UDim2.new(0, 120, 0, 24)
+    SearchFrame.Size = UDim2.new(0, 110, 0, 24)
     SearchFrame.BackgroundColor3 = Library.Theme.Background
     SearchFrame.Parent = RightContainer
 
@@ -239,8 +271,34 @@ function Library:Init()
     PagesFolder.BackgroundTransparency = 1
     PagesFolder.Parent = MainFrame
 
+    -- Функция умного автоматического ресайза сетки и главного окна
+    local function updateLayout(tabName)
+        local pageInfo = Main.Pages[tabName]
+        if not pageInfo then return end
+
+        local data = pageInfo.Data
+        if data.WindowCount <= 1 then
+            -- Одно окно: колонка занимает 100%, меню сужается до 310px
+            data.LeftColumn.Size = UDim2.new(1, 0, 0, 0)
+            data.RightColumn.Visible = false
+            if Main.CurrentTab == tabName then
+                tween(MainFrame, 0.15, {Size = UDim2.new(0, 310, 0, 380)})
+            end
+        else
+            -- Много окон: активируются две колонки, меню расширяется до 580px
+            data.LeftColumn.Size = UDim2.new(0.5, -5, 0, 0)
+            data.RightColumn.Size = UDim2.new(0.5, -5, 0, 0)
+            data.RightColumn.Visible = true
+            if Main.CurrentTab == tabName then
+                tween(MainFrame, 0.15, {Size = UDim2.new(0, 580, 0, 420)})
+            end
+        end
+    end
+
     local function showPage(tabName)
-        for name, page in pairs(Main.Pages) do
+        Main.CurrentTab = tabName
+        for name, pageInfo in pairs(Main.Pages) do
+            local page = pageInfo.Page
             local tabAsset = Main.Tabs[name]
             local tabIcon = tabAsset.Frame:FindFirstChild("TabIcon")
             if name == tabName then
@@ -257,42 +315,68 @@ function Library:Init()
                 if tabIcon then tween(tabIcon, 0.1, {ImageColor3 = Library.Theme.TextDim}) end
             end
         end
+        updateLayout(tabName)
     end
 
+    -- Умный поиск с исправленной проблемой русских букв
     SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
-        local query = string.lower(SearchBox.Text)
-        for _, page in pairs(Main.Pages) do
-            for _, column in ipairs({page:FindFirstChild("LeftColumn"), page:FindFirstChild("RightColumn")}) do
-                if column then
+        local rawQuery = SearchBox.Text
+        if rawQuery == "" then
+            for _, pageInfo in pairs(Main.Pages) do
+                local data = pageInfo.Data
+                for _, column in ipairs({data.LeftColumn, data.RightColumn}) do
                     for _, window in ipairs(column:GetChildren()) do
                         if window:IsA("Frame") then
-                            local winTitle = window:FindFirstChild("WindowTitle")
-                            if winTitle then
-                                local match = false
-                                if string.find(string.lower(winTitle.Text), query) then
-                                    match = true
-                                else
-                                    local elements = window:FindFirstChild("Elements")
-                                    if elements then
-                                        for _, elem in ipairs(elements:GetChildren()) do
-                                            if elem:IsA("Frame") or elem:IsA("TextButton") then
-                                                local secTitle = elem:FindFirstChild("SectionTitle")
-                                                if secTitle and string.find(string.lower(secTitle.Text), query) then
+                            window.Visible = true
+                        end
+                    end
+                end
+            end
+            return
+        end
+
+        local q1, q2, q3 = cleanSearchText(rawQuery)
+
+        for _, pageInfo in pairs(Main.Pages) do
+            local data = pageInfo.Data
+            for _, column in ipairs({data.LeftColumn, data.RightColumn}) do
+                for _, window in ipairs(column:GetChildren()) do
+                    if window:IsA("Frame") then
+                        local winTitle = window:FindFirstChild("WindowTitle")
+                        if winTitle then
+                            local titleText = string.lower(winTitle.Text)
+                            local match = string.find(titleText, q1) or string.find(titleText, q2) or string.find(titleText, q3)
+                            
+                            if not match then
+                                local elements = window:FindFirstChild("Elements")
+                                if elements then
+                                    for _, elem in ipairs(elements:GetChildren()) do
+                                        if elem:IsA("Frame") or elem:IsA("TextButton") then
+                                            local secTitle = elem:FindFirstChild("SectionTitle")
+                                            if secTitle then
+                                                local secText = string.lower(secTitle.Text)
+                                                if string.find(secText, q1) or string.find(secText, q2) or string.find(secText, q3) then
                                                     match = true
+                                                    break
                                                 end
-                                                local lbl = elem:FindFirstChild("Label") or elem:FindFirstChild("TextLabel")
-                                                if not lbl and elem:IsA("TextButton") then
-                                                    lbl = elem
-                                                end
-                                                if lbl and string.find(string.lower(lbl.Text), query) then
+                                            end
+                                            
+                                            local lbl = elem:FindFirstChild("Label") or elem:FindFirstChild("TextLabel")
+                                            if not lbl and elem:IsA("TextButton") then
+                                                lbl = elem
+                                            end
+                                            if lbl then
+                                                local lblText = string.lower(lbl.Text)
+                                                if string.find(lblText, q1) or string.find(lblText, q2) or string.find(lblText, q3) then
                                                     match = true
+                                                    break
                                                 end
                                             end
                                         end
                                     end
                                 end
-                                window.Visible = (query == "" or match)
                             end
+                            window.Visible = match
                         end
                     end
                 end
@@ -344,7 +428,7 @@ function Library:Init()
             return Button
         end
 
-        -- Тоггл / Флажок (Toggle) - Флажок слева, текст сразу справа, кликабельна вся строка
+        -- Тоггл (Toggle) - Флажок слева, текст сразу справа, без пустых зон
         function Elements:CreateToggle(toggleText, default, callback)
             callback = callback or function() end
             local state = default or false
@@ -411,14 +495,14 @@ function Library:Init()
             return ToggleFrame
         end
 
-        -- Однострочный Слайдер (Slider) - Название, ползунок и значение на одной линии без лишнего места
+        -- Однострочный Слайдер (Slider) - Все на одной линии, без пустот
         function Elements:CreateSlider(sliderText, min, max, default, callback)
             callback = callback or function() end
             local val = default or min
 
             local SliderFrame = Instance.new("Frame")
             SliderFrame.Name = sliderText .. "Slider"
-            SliderFrame.Size = UDim2.new(1, 0, 0, 24) -- Высота уменьшена до стандартных 24px
+            SliderFrame.Size = UDim2.new(1, 0, 0, 24)
             SliderFrame.BackgroundTransparency = 1
             SliderFrame.Parent = container
 
@@ -433,7 +517,6 @@ function Library:Init()
             Label.TextXAlignment = Enum.TextXAlignment.Left
             Label.Parent = SliderFrame
 
-            -- Шкала ползунка
             local Track = Instance.new("Frame")
             Track.Size = UDim2.new(0.6, -45, 0, 4)
             Track.Position = UDim2.new(0.4, 5, 0.5, -2)
@@ -472,7 +555,6 @@ function Library:Init()
             ThumbStroke.Thickness = 1.5
             ThumbStroke.Parent = Thumb
 
-            -- Числовое значение справа
             local ValLabel = Instance.new("TextLabel")
             ValLabel.Size = UDim2.new(0, 35, 1, 0)
             ValLabel.Position = UDim2.new(1, -35, 0, 0)
@@ -525,7 +607,7 @@ function Library:Init()
             return SliderFrame
         end
 
-        -- Компактное поле ввода (TextBox) - Поле ввода расположено сразу после текста
+        -- Текстовое Поле (TextBox) - Вплотную к названию, без пустот
         function Elements:CreateTextBox(textBoxText, placeholder, callback)
             callback = callback or function() end
             placeholder = placeholder or "Type..."
@@ -536,7 +618,6 @@ function Library:Init()
             TextFrame.BackgroundTransparency = 1
             TextFrame.Parent = container
 
-            -- Горизонтальный список, чтобы поле ввода было вплотную к названию функции
             local TextLayout = Instance.new("UIListLayout")
             TextLayout.FillDirection = Enum.FillDirection.Horizontal
             TextLayout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -678,8 +759,8 @@ function Library:Init()
         Page.Parent = PagesFolder
 
         local PagePadding = Instance.new("UIPadding")
-        PagePadding.PaddingLeft = UDim.new(0, 4)
-        PagePadding.PaddingRight = UDim.new(0, 4)
+        PagePadding.PaddingLeft = UDim.new(0, 6)
+        PagePadding.PaddingRight = UDim.new(0, 6)
         PagePadding.PaddingTop = UDim.new(0, 6)
         PagePadding.PaddingBottom = UDim.new(0, 12)
         PagePadding.Parent = Page
@@ -709,10 +790,14 @@ function Library:Init()
         RightLayout.Padding = UDim.new(0, 8)
         RightLayout.Parent = RightColumn
 
-        local windowCount = 0
+        local PageData = {
+            WindowCount = 0,
+            LeftColumn = LeftColumn,
+            RightColumn = RightColumn
+        }
 
         Main.Tabs[tabName] = {Frame = TabFrame, Stroke = TabStroke, Label = TabLabel}
-        Main.Pages[tabName] = Page
+        Main.Pages[tabName] = {Page = Page, Data = PageData}
 
         TabFrame.MouseButton1Click:Connect(function()
             showPage(tabName)
@@ -725,14 +810,17 @@ function Library:Init()
 
         function Tab:CreateWindow(windowName)
             local Window = {}
-            windowCount = windowCount + 1
+            PageData.WindowCount = PageData.WindowCount + 1
 
             local WindowFrame = Instance.new("Frame")
             WindowFrame.Name = windowName .. "Window"
             WindowFrame.Size = UDim2.new(1, 0, 0, 0) 
             WindowFrame.BackgroundColor3 = Library.Theme.Card
             WindowFrame.AutomaticSize = Enum.AutomaticSize.Y
-            WindowFrame.Parent = (windowCount % 2 == 1) and LeftColumn or RightColumn
+            WindowFrame.Parent = (PageData.WindowCount % 2 == 1) and LeftColumn or RightColumn
+
+            -- После создания каждого окна перерассчитываем сетку
+            updateLayout(tabName)
 
             local WindowCorner = Instance.new("UICorner")
             WindowCorner.CornerRadius = UDim.new(0, 5)
