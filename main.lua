@@ -1,4 +1,4 @@
--- [[ VOLTECLIPSE / PREMIUM STYLE CLEAN UI LIBRARY (V2.3 - OPTIMIZED EDITION) ]] --
+-- [[ VOLTECLIPSE / PREMIUM STYLE CLEAN UI LIBRARY (V2.4 - OPTIMIZED EDITION) ]] --
 local Library = {}
 Library.Theme = {
     Background = Color3.fromRGB(11, 11, 14),       
@@ -69,6 +69,18 @@ local function makeDraggable(frame, dragAnchor)
             frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
         end
     end)
+end
+
+-- Вспомогательная функция поиска ScrollingFrame для предотвращения конфликтов прокрутки при зажатии элементов
+local function getParentScrollingFrame(obj)
+    local parent = obj.Parent
+    while parent do
+        if parent:IsA("ScrollingFrame") then
+            return parent
+        end
+        parent = parent.Parent
+    end
+    return nil
 end
 
 -- Сброс фокуса ввода при клике на экран (исправляет блокировку камеры роблоксом)
@@ -545,6 +557,16 @@ function Library:Init()
             ValLabel.Parent = ChannelFrame
             
             local isDragging = false
+            local scrollFrame = nil
+            local function setScrolling(state)
+                if not scrollFrame then
+                    scrollFrame = getParentScrollingFrame(ChannelFrame)
+                end
+                if scrollFrame then
+                    scrollFrame.ScrollingEnabled = state
+                end
+            end
+
             local function update()
                 local mouseLocation = UserInputService:GetMouseLocation()
                 local percentage = math.clamp((mouseLocation.X - Track.AbsolutePosition.X) / Track.AbsoluteSize.X, 0, 1)
@@ -558,6 +580,7 @@ function Library:Init()
             ChannelFrame.InputBegan:Connect(function(input)
                 if input.UserInputType == Enum.UserInputType.MouseButton1 then
                     isDragging = true
+                    setScrolling(false)
                     update()
                 end
             end)
@@ -567,8 +590,9 @@ function Library:Init()
                 end
             end)
             UserInputService.InputEnded:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                if input.UserInputType == Enum.UserInputType.MouseButton1 and isDragging then
                     isDragging = false
+                    setScrolling(true)
                 end
             end)
             
@@ -704,7 +728,7 @@ function Library:Init()
             return ToggleFrame
         end
 
-        -- Однострочный Слайдер (Slider)
+        -- Современный Слайдер с защитой от наложений (Двухстрочный макет)
         function Elements:CreateSlider(sliderText, min, max, default, callback, tooltipText, suffix)
             callback = callback or function() end
             local val = default or min
@@ -712,20 +736,22 @@ function Library:Init()
 
             local SliderFrame = Instance.new("Frame")
             SliderFrame.Name = sliderText .. "Slider"
-            SliderFrame.Size = UDim2.new(1, 0, 0, 24)
+            SliderFrame.Size = UDim2.new(1, 0, 0, 36) -- Высота увеличена для двух строк
             SliderFrame.BackgroundTransparency = 1
             SliderFrame.AutomaticSize = Enum.AutomaticSize.Y
             SliderFrame.Parent = container
 
             local ContentRow = Instance.new("Frame")
             ContentRow.Name = "ContentRow"
-            ContentRow.Size = UDim2.new(1, (tooltipText and -22 or 0), 0, 24)
+            ContentRow.Size = UDim2.new(1, (tooltipText and -22 or 0), 1, 0)
             ContentRow.BackgroundTransparency = 1
             ContentRow.Parent = SliderFrame
 
+            -- Текст названия расположен сверху слева
             local Label = Instance.new("TextLabel")
             Label.Name = "Label"
-            Label.Size = UDim2.new(0.35, 0, 1, 0)
+            Label.Size = UDim2.new(0.7, 0, 0, 16)
+            Label.Position = UDim2.new(0, 0, 0, 2)
             Label.BackgroundTransparency = 1
             Label.Text = sliderText
             Label.TextColor3 = Library.Theme.TextDim
@@ -734,9 +760,22 @@ function Library:Init()
             Label.TextXAlignment = Enum.TextXAlignment.Left
             Label.Parent = ContentRow
 
+            -- Текст значения расположен сверху справа
+            local ValLabel = Instance.new("TextLabel")
+            ValLabel.Size = UDim2.new(0.3, 0, 0, 16)
+            ValLabel.Position = UDim2.new(0.7, 0, 0, 2)
+            ValLabel.BackgroundTransparency = 1
+            ValLabel.Text = tostring(val) .. displaySuffix
+            ValLabel.TextColor3 = Library.Theme.Text
+            ValLabel.Font = Enum.Font.GothamBold
+            ValLabel.TextSize = 11
+            ValLabel.TextXAlignment = Enum.TextXAlignment.Right
+            ValLabel.Parent = ContentRow
+
+            -- Трек ползунка расположен снизу во всю ширину
             local Track = Instance.new("Frame")
-            Track.Size = UDim2.new(0.65, -65, 0, 4)
-            Track.Position = UDim2.new(0.35, 5, 0.5, -2)
+            Track.Size = UDim2.new(1, 0, 0, 4)
+            Track.Position = UDim2.new(0, 0, 0, 24)
             Track.BackgroundColor3 = Color3.fromRGB(34, 34, 42)
             Track.BorderSizePixel = 0
             Track.Parent = ContentRow
@@ -772,18 +811,17 @@ function Library:Init()
             ThumbStroke.Thickness = 1.5
             ThumbStroke.Parent = Thumb
 
-            local ValLabel = Instance.new("TextLabel")
-            ValLabel.Size = UDim2.new(0, 50, 1, 0)
-            ValLabel.Position = UDim2.new(1, -55, 0, 0)
-            ValLabel.BackgroundTransparency = 1
-            ValLabel.Text = tostring(val) .. displaySuffix
-            ValLabel.TextColor3 = Library.Theme.Text
-            ValLabel.Font = Enum.Font.GothamBold
-            ValLabel.TextSize = 11
-            ValLabel.TextXAlignment = Enum.TextXAlignment.Right
-            ValLabel.Parent = ContentRow
-
             local isDragging = false
+            local scrollFrame = nil
+            local function setScrolling(state)
+                if not scrollFrame then
+                    scrollFrame = getParentScrollingFrame(SliderFrame)
+                end
+                if scrollFrame then
+                    scrollFrame.ScrollingEnabled = state
+                end
+            end
+
             local function update()
                 local mouseLocation = UserInputService:GetMouseLocation()
                 local percentage = math.clamp((mouseLocation.X - Track.AbsolutePosition.X) / Track.AbsoluteSize.X, 0, 1)
@@ -797,18 +835,22 @@ function Library:Init()
             ContentRow.InputBegan:Connect(function(input)
                 if input.UserInputType == Enum.UserInputType.MouseButton1 then
                     isDragging = true
+                    setScrolling(false) -- Отключаем прокрутку фонового списка при перетаскивании ползунка
                     update()
                     tween(Thumb, 0.1, {Size = UDim2.new(0, 11, 0, 11)})
                 end
             end)
+            
             UserInputService.InputChanged:Connect(function(input)
                 if isDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
                     update()
                 end
             end)
+            
             UserInputService.InputEnded:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                if input.UserInputType == Enum.UserInputType.MouseButton1 and isDragging then
                     isDragging = false
+                    setScrolling(true) -- Включаем прокрутку обратно
                     tween(Thumb, 0.1, {Size = UDim2.new(0, 9, 0, 9)})
                 end
             end)
@@ -1089,7 +1131,7 @@ function Library:Init()
             return DropdownFrame
         end
 
-        -- Современный HSV Выбор цвета (Advanced HSV Color Picker)
+        -- Современный HSV Выбор цвета с блокировкой скролла страницы при перетаскивании
         function Elements:CreateColorPicker(pickerText, defaultColor, callback, tooltipText)
             callback = callback or function() end
             defaultColor = defaultColor or Color3.fromRGB(255, 255, 255)
@@ -1314,7 +1356,7 @@ function Library:Init()
                 callback(solidColor, currentAlpha)
             end
 
-            -- Функции обновления, использующие GetMouseLocation() для точного позиционирования
+            -- Функции точного расчета перетаскивания с использованием GetMouseLocation()
             local function updateCanvasFromMouse()
                 local mouseLocation = UserInputService:GetMouseLocation()
                 local relativeX = mouseLocation.X - SatValCanvas.AbsolutePosition.X
@@ -1355,10 +1397,21 @@ function Library:Init()
             local isDraggingCanvas = false
             local isDraggingHue = false
             local isDraggingAlpha = false
+            
+            local scrollFrame = nil
+            local function setScrolling(state)
+                if not scrollFrame then
+                    scrollFrame = getParentScrollingFrame(PickerFrame)
+                end
+                if scrollFrame then
+                    scrollFrame.ScrollingEnabled = state
+                end
+            end
 
             SatValCanvas.InputBegan:Connect(function(input)
                 if input.UserInputType == Enum.UserInputType.MouseButton1 then
                     isDraggingCanvas = true
+                    setScrolling(false) -- Отключаем прокрутку родительской страницы при манипуляциях с цветом
                     updateCanvasFromMouse()
                 end
             end)
@@ -1366,6 +1419,7 @@ function Library:Init()
             HueSlider.InputBegan:Connect(function(input)
                 if input.UserInputType == Enum.UserInputType.MouseButton1 then
                     isDraggingHue = true
+                    setScrolling(false)
                     updateHueFromMouse()
                 end
             end)
@@ -1373,6 +1427,7 @@ function Library:Init()
             AlphaTrack.InputBegan:Connect(function(input)
                 if input.UserInputType == Enum.UserInputType.MouseButton1 then
                     isDraggingAlpha = true
+                    setScrolling(false)
                     updateAlphaFromMouse()
                 end
             end)
@@ -1391,9 +1446,12 @@ function Library:Init()
 
             UserInputService.InputEnded:Connect(function(input)
                 if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                    isDraggingCanvas = false
-                    isDraggingHue = false
-                    isDraggingAlpha = false
+                    if isDraggingCanvas or isDraggingHue or isDraggingAlpha then
+                        isDraggingCanvas = false
+                        isDraggingHue = false
+                        isDraggingAlpha = false
+                        setScrolling(true) -- Возвращаем скролл списка в исходное состояние
+                    end
                 end
             end)
 
