@@ -1,12 +1,12 @@
--- [[ VOLTECLIPSE / METEOR STYLE CLEAN UI LIBRARY ]] --
+-- [[ VOLTECLIPSE / METEOR STYLE CLEAN UI LIBRARY (FIXED) ]] --
 local Library = {}
 Library.Theme = {
-    Background = Color3.fromRGB(15, 15, 15),       -- Еще более глубокий тёмный тон
-    Card = Color3.fromRGB(22, 22, 22),             -- Фоновые окна
-    Accent = Color3.fromRGB(145, 70, 255),         -- Фиолетовый неон (Volt Цветь)
-    Stroke = Color3.fromRGB(32, 32, 32),           -- Минималистичная тонкая обводка
-    Text = Color3.fromRGB(255, 255, 255),          -- Белый текст
-    TextDim = Color3.fromRGB(140, 140, 140),       -- Спокойный серый текст
+    Background = Color3.fromRGB(15, 15, 15),       
+    Card = Color3.fromRGB(22, 22, 22),             
+    Accent = Color3.fromRGB(145, 70, 255),         
+    Stroke = Color3.fromRGB(32, 32, 32),           
+    Text = Color3.fromRGB(255, 255, 255),          
+    TextDim = Color3.fromRGB(140, 140, 140),       
 }
 
 local UserInputService = game:GetService("UserInputService")
@@ -69,15 +69,13 @@ function Library:Init()
     ScreenGui.ResetOnSpawn = false
     ScreenGui.Parent = ParentContainer
 
-    -- Главный фрейм (Контейнер всего чит-меню)
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
     MainFrame.Size = UDim2.new(0, 800, 0, 480)
-    MainFrame.Position = UDim2.new(0.5, -400, 0, 30) -- Сверху по центру экрана
+    MainFrame.Position = UDim2.new(0.5, -400, 0, 30) 
     MainFrame.BackgroundTransparency = 1
     MainFrame.Parent = ScreenGui
 
-    -- Шапка интерфейса (Header)
     local Header = Instance.new("Frame")
     Header.Name = "Header"
     Header.Size = UDim2.new(1, 0, 0, 48)
@@ -96,7 +94,6 @@ function Library:Init()
 
     makeDraggable(MainFrame, Header)
 
-    -- Логотип проекта (VoltEclipse) - Слева
     local Logo = Instance.new("ImageLabel")
     Logo.Name = "ProjectLogo"
     Logo.Size = UDim2.new(0, 26, 0, 26)
@@ -105,7 +102,6 @@ function Library:Init()
     Logo.Image = "rbxassetid://7015953925"
     Logo.Parent = Header
 
-    -- Контейнер для вкладок (ScrollingFrame - защищает от лимитов!)
     local TabsScroll = Instance.new("ScrollingFrame")
     TabsScroll.Name = "TabsScroll"
     TabsScroll.Size = UDim2.new(0, 410, 1, 0)
@@ -113,7 +109,8 @@ function Library:Init()
     TabsScroll.BackgroundTransparency = 1
     TabsScroll.BorderSizePixel = 0
     TabsScroll.ScrollBarThickness = 0
-    TabsScroll.ScrollingDirection = Enum.ScrollingDirection.Horizontal
+    -- ИСПРАВЛЕНО: Вместо Horizontal теперь Enum.ScrollingDirection.X
+    TabsScroll.ScrollingDirection = Enum.ScrollingDirection.X
     TabsScroll.AutomaticCanvasSize = Enum.AutomaticSize.X
     TabsScroll.Parent = Header
 
@@ -128,7 +125,6 @@ function Library:Init()
     TabsPadding.PaddingLeft = UDim.new(0, 2)
     TabsPadding.Parent = TabsScroll
 
-    -- Правая сторона (Поиск + Шестеренка)
     local RightContainer = Instance.new("Frame")
     RightContainer.Name = "RightContainer"
     RightContainer.Size = UDim2.new(0, 320, 1, 0)
@@ -144,7 +140,6 @@ function Library:Init()
     RightLayout.Padding = UDim.new(0, 8)
     RightLayout.Parent = RightContainer
 
-    -- Поисковая панель CLEAN
     local SearchFrame = Instance.new("Frame")
     SearchFrame.Name = "SearchFrame"
     SearchFrame.Size = UDim2.new(0, 160, 0, 28)
@@ -182,7 +177,6 @@ function Library:Init()
     SearchBox.TextSize = 12
     SearchBox.Parent = SearchFrame
 
-    -- Иконка настроек (Шестеренка ImageButton)
     local SettingsBtn = Instance.new("ImageButton")
     SettingsBtn.Name = "SettingsBtn"
     SettingsBtn.Size = UDim2.new(0, 28, 0, 28)
@@ -201,7 +195,6 @@ function Library:Init()
     SettingsStroke.Thickness = 1
     SettingsStroke.Parent = SettingsBtn
 
-    -- Логика эффекта наведения на шестеренку
     SettingsBtn.MouseEnter:Connect(function()
         tween(SettingsBtn, 0.15, {ImageColor3 = Library.Theme.Text})
     end)
@@ -209,7 +202,6 @@ function Library:Init()
         tween(SettingsBtn, 0.15, {ImageColor3 = Library.Theme.TextDim})
     end)
 
-    -- Папка страниц под хедером
     local PagesFolder = Instance.new("Frame")
     PagesFolder.Name = "PagesFolder"
     PagesFolder.Size = UDim2.new(1, 0, 1, -58)
@@ -217,7 +209,6 @@ function Library:Init()
     PagesFolder.BackgroundTransparency = 1
     PagesFolder.Parent = MainFrame
 
-    -- Функция переключения Окон Вкладок (Подсветка всей плашки!)
     local function showPage(tabName)
         for name, page in pairs(Main.Pages) do
             local tabAsset = Main.Tabs[name]
@@ -235,7 +226,6 @@ function Library:Init()
         end
     end
 
-    -- Умный поиск по названию окон
     SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
         local query = string.lower(SearchBox.Text)
         for _, page in pairs(Main.Pages) do
@@ -254,11 +244,9 @@ function Library:Init()
         end
     end)
 
-    -- [[ МЕТОД: СОЗДАНИЕ ВКЛАДКИ ]] --
     function Main:CreateTab(tabName)
         local Tab = {}
 
-        -- Окно-плашка вкладки
         local TabFrame = Instance.new("Frame")
         TabFrame.Name = tabName .. "TabFrame"
         TabFrame.Size = UDim2.new(0, 95, 0, 28)
@@ -289,7 +277,6 @@ function Library:Init()
         TabBtn.Text = ""
         TabBtn.Parent = TabFrame
 
-        -- Страница для окон (ScrollingFrame, чтобы окна тоже могли идти бесконечно вниз)
         local Page = Instance.new("ScrollingFrame")
         Page.Name = tabName .. "Page"
         Page.Size = UDim2.new(1, 0, 1, 0)
@@ -297,7 +284,8 @@ function Library:Init()
         Page.BorderSizePixel = 0
         Page.ScrollBarThickness = 0
         Page.Visible = false
-        Page.ScrollingDirection = Enum.ScrollingDirection.Vertical
+        -- ИСПРАВЛЕНО: Вместо Vertical теперь Enum.ScrollingDirection.Y
+        Page.ScrollingDirection = Enum.ScrollingDirection.Y
         Page.AutomaticCanvasSize = Enum.AutomaticSize.Y
         Page.Parent = PagesFolder
 
@@ -319,7 +307,6 @@ function Library:Init()
             showPage(tabName)
         end
 
-        -- [[ МЕТОД: СОЗДАНИЕ ОКНА ]] --
         function Tab:CreateWindow(windowName)
             local Window = {}
 
@@ -366,7 +353,6 @@ function Library:Init()
                 WindowFrame.Size = UDim2.new(0, 190, 0, ElementsLayout.AbsoluteContentSize.Y + 42)
             end)
 
-            -- [[ МЕТОД: СОЗДАНИЕ КНОПКИ ]] --
             function Window:CreateButton(btnText, callback)
                 callback = callback or function() end
 
@@ -405,7 +391,6 @@ function Library:Init()
                 end)
             end
 
-            -- [[ МЕТОД: СОЗДАНИЕ СЛАЙДЕРА ]] --
             function Window:CreateSlider(sliderText, min, max, default, callback)
                 callback = callback or function() end
                 local val = default or min
@@ -485,7 +470,6 @@ function Library:Init()
                 end)
             end
 
-            -- [[ МЕТОД: СОЗДАНИЕ ТУГГЛА (Переключателя) ]] --
             function Window:CreateToggle(toggleText, default, callback)
                 callback = callback or function() end
                 local state = default or false
