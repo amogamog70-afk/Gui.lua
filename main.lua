@@ -69,6 +69,30 @@ local function makeDraggable(frame, dragAnchor)
     end)
 end
 
+-- Вспомогательные функции конвертации Hex
+local function rgbToHex(color)
+    local r = math.round(color.R * 255)
+    local g = math.round(color.G * 255)
+    local b = math.round(color.B * 255)
+    return string.format("#%02x%02x%02x", r, g, b)
+end
+
+local function hexToRgb(hex)
+    hex = hex:gsub("#", "")
+    if #hex == 3 then
+        local r = tonumber(hex:sub(1,1), 16) or 255
+        local g = tonumber(hex:sub(2,2), 16) or 255
+        local b = tonumber(hex:sub(3,3), 16) or 255
+        return Color3.fromRGB(r * 17, g * 17, b * 17)
+    elseif #hex == 6 then
+        local r = tonumber(hex:sub(1,2), 16) or 255
+        local g = tonumber(hex:sub(3,4), 16) or 255
+        local b = tonumber(hex:sub(5,6), 16) or 255
+        return Color3.fromRGB(r, g, b)
+    end
+    return Color3.fromRGB(255, 255, 255)
+end
+
 -- Функция транслитерации для поиска на любой раскладке клавиатуры
 local function cleanSearchText(text)
     local query = string.lower(text)
@@ -266,6 +290,7 @@ function Library:Init()
     PagesFolder.BackgroundTransparency = 1
     PagesFolder.Parent = MainFrame
 
+    -- Функция умного центрирования колонок (240px)
     local function updateLayout(tabName)
         local pageInfo = Main.Pages[tabName]
         if not pageInfo then return end
@@ -392,7 +417,7 @@ function Library:Init()
     local function createElementsSystem(container)
         local Elements = {}
 
-        -- Локальный вспомогательный метод для инлайновых инструкций (Tooltip)
+        -- Инлайновые инструкции (Tooltip) - появляются только при желании разработчика (если передан текст)
         local function addTooltip(parentFrame, text, yOffset)
             if not text or text == "" then return end
             
@@ -450,88 +475,6 @@ function Library:Init()
                 InfoFrame.Visible = not InfoFrame.Visible
                 DotsBtn.TextColor3 = InfoFrame.Visible and Library.Theme.Accent or Library.Theme.TextDim
             end)
-        end
-
-        -- Вспомогательный элемент ползунка каналов для ColorPicker
-        local function createColorChannel(name, labelColor, defaultValue, onUpdate)
-            local ChannelFrame = Instance.new("Frame")
-            ChannelFrame.Name = name .. "Channel"
-            ChannelFrame.Size = UDim2.new(1, 0, 0, 16)
-            ChannelFrame.BackgroundTransparency = 1
-            
-            local Label = Instance.new("TextLabel")
-            Label.Size = UDim2.new(0, 15, 1, 0)
-            Label.BackgroundTransparency = 1
-            Label.Text = name
-            Label.TextColor3 = labelColor
-            Label.Font = Enum.Font.GothamBold
-            Label.TextSize = 10
-            Label.TextXAlignment = Enum.TextXAlignment.Left
-            Label.Parent = ChannelFrame
-            
-            local Track = Instance.new("Frame")
-            Track.Size = UDim2.new(1, -55, 0, 3)
-            Track.Position = UDim2.new(0, 20, 0.5, -1)
-            Track.BackgroundColor3 = Color3.fromRGB(34, 34, 42)
-            Track.BorderSizePixel = 0
-            Track.Parent = ChannelFrame
-            
-            local Fill = Instance.new("Frame")
-            Fill.Size = UDim2.new(defaultValue / 255, 0, 1, 0)
-            Fill.BackgroundColor3 = labelColor
-            Fill.BorderSizePixel = 0
-            Fill.Parent = Track
-            
-            local Thumb = Instance.new("Frame")
-            Thumb.Size = UDim2.new(0, 7, 0, 7)
-            Thumb.AnchorPoint = Vector2.new(0.5, 0.5)
-            Thumb.Position = UDim2.new(defaultValue / 255, 0, 0.5, 0)
-            Thumb.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-            Thumb.Parent = Track
-            
-            local ThumbCorner = Instance.new("UICorner")
-            ThumbCorner.CornerRadius = UDim.new(1, 0)
-            ThumbCorner.Parent = Thumb
-            
-            local ValLabel = Instance.new("TextLabel")
-            ValLabel.Size = UDim2.new(0, 25, 1, 0)
-            ValLabel.Position = UDim2.new(1, -25, 0, 0)
-            ValLabel.BackgroundTransparency = 1
-            ValLabel.Text = tostring(math.round(defaultValue))
-            ValLabel.TextColor3 = Library.Theme.TextDim
-            ValLabel.Font = Enum.Font.Gotham
-            ValLabel.TextSize = 9
-            ValLabel.TextXAlignment = Enum.TextXAlignment.Right
-            ValLabel.Parent = ChannelFrame
-            
-            local isDragging = false
-            local function update(input)
-                local percentage = math.clamp((input.Position.X - Track.AbsolutePosition.X) / Track.AbsoluteSize.X, 0, 1)
-                local val = math.round(percentage * 255)
-                Fill.Size = UDim2.new(percentage, 0, 1, 0)
-                Thumb.Position = UDim2.new(percentage, 0, 0.5, 0)
-                ValLabel.Text = tostring(val)
-                onUpdate(val)
-            end
-            
-            ChannelFrame.InputBegan:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                    isDragging = true
-                    update(input)
-                end
-            end)
-            UserInputService.InputChanged:Connect(function(input)
-                if isDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-                    update(input)
-                end
-            end)
-            UserInputService.InputEnded:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                    isDragging = false
-                end
-            end)
-            
-            return ChannelFrame
         end
 
         -- Кнопка (Button)
@@ -869,7 +812,7 @@ function Library:Init()
             return TextFrame
         end
 
-        -- Универсальный Выпадающий список (Dropdown & Multi-Dropdown)
+        -- Выпадающий список (Dropdown)
         function Elements:CreateDropdown(dropdownText, options, isMulti, default, callback, tooltipText)
             callback = callback or function() end
             isMulti = isMulti or false
@@ -1045,7 +988,7 @@ function Library:Init()
             return DropdownFrame
         end
 
-        -- Выбор цвета (Color Picker)
+        -- Современный HSV Выбор цвета (Advanced HSV Color Picker)
         function Elements:CreateColorPicker(pickerText, defaultColor, callback, tooltipText)
             callback = callback or function() end
             defaultColor = defaultColor or Color3.fromRGB(255, 255, 255)
@@ -1090,6 +1033,7 @@ function Library:Init()
             ColorStroke.Thickness = 1
             ColorStroke.Parent = ColorBox
             
+            -- Выдвижная панель меню HSV-выбора
             local PickerContainer = Instance.new("Frame")
             PickerContainer.Name = "PickerContainer"
             PickerContainer.Size = UDim2.new(1, 0, 0, 0)
@@ -1108,59 +1052,281 @@ function Library:Init()
             ContainerStroke.Color = Library.Theme.Stroke
             ContainerStroke.Thickness = 1
             ContainerStroke.Parent = PickerContainer
+
+            -- Переменные HSV и Альфы (Прозрачности)
+            local currentHue, currentSat, currentVal = defaultColor:ToHSV()
+            local currentAlpha = 1 -- По умолчанию полностью непрозрачный
             
-            local ContainerLayout = Instance.new("UIListLayout")
-            ContainerLayout.SortOrder = Enum.SortOrder.LayoutOrder
-            ContainerLayout.Padding = UDim.new(0, 4)
-            ContainerLayout.Parent = PickerContainer
-            
-            local ContainerPadding = Instance.new("UIPadding")
-            ContainerPadding.PaddingTop = UDim.new(0, 6)
-            ContainerPadding.PaddingBottom = UDim.new(0, 6)
-            ContainerPadding.PaddingLeft = UDim.new(0, 8)
-            ContainerPadding.PaddingRight = UDim.new(0, 8)
-            ContainerPadding.Parent = PickerContainer
-            
-            local r, g, b = math.round(defaultColor.R * 255), math.round(defaultColor.G * 255), math.round(defaultColor.B * 255)
-            
-            local function updateColor()
-                local clr = Color3.fromRGB(r, g, b)
-                ColorBox.BackgroundColor3 = clr
-                callback(clr)
+            -- 1. Спектральное поле Sat/Val Canvas
+            local SatValCanvas = Instance.new("ImageButton")
+            SatValCanvas.Name = "SatValCanvas"
+            SatValCanvas.Size = UDim2.new(0, 180, 0, 110)
+            SatValCanvas.Position = UDim2.new(0, 8, 0, 6)
+            SatValCanvas.BackgroundColor3 = Color3.fromHSV(currentHue, 1, 1)
+            SatValCanvas.Image = "rbxassetid://415583266" -- Универсальная текстура наложения Sat/Val
+            SatValCanvas.Parent = PickerContainer
+
+            local CanvasCorner = Instance.new("UICorner")
+            CanvasCorner.CornerRadius = UDim.new(0, 3)
+            CanvasCorner.Parent = SatValCanvas
+
+            -- Круглый курсор на спектральном поле
+            local Cursor = Instance.new("Frame")
+            Cursor.Name = "Cursor"
+            Cursor.Size = UDim2.new(0, 6, 0, 6)
+            Cursor.AnchorPoint = Vector2.new(0.5, 0.5)
+            Cursor.Position = UDim2.new(currentSat, 0, 1 - currentVal, 0)
+            Cursor.BackgroundTransparency = 1
+            Cursor.Parent = SatValCanvas
+
+            local CursorStroke = Instance.new("UIStroke")
+            CursorStroke.Color = Color3.fromRGB(255, 255, 255)
+            CursorStroke.Thickness = 1.5
+            CursorStroke.Parent = Cursor
+
+            local CursorCorner = Instance.new("UICorner")
+            CursorCorner.CornerRadius = UDim.new(1, 0)
+            CursorCorner.Parent = Cursor
+
+            -- 2. Вертикальный Радужный Hue Slider
+            local HueSlider = Instance.new("ImageButton")
+            HueSlider.Name = "HueSlider"
+            HueSlider.Size = UDim2.new(0, 12, 0, 110)
+            HueSlider.Position = UDim2.new(0, 196, 0, 6)
+            HueSlider.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            HueSlider.AutoButtonColor = false
+            HueSlider.Parent = PickerContainer
+
+            local HueCorner = Instance.new("UICorner")
+            HueCorner.CornerRadius = UDim.new(0, 2)
+            HueCorner.Parent = HueSlider
+
+            local HueGradient = Instance.new("UIGradient")
+            HueGradient.Rotation = 90
+            HueGradient.Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+                ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255, 255, 0)),
+                ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0, 255, 0)),
+                ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 255)),
+                ColorSequenceKeypoint.new(0.67, Color3.fromRGB(0, 0, 255)),
+                ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255, 0, 255)),
+                ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0))
+            })
+            HueGradient.Parent = HueSlider
+
+            -- Курсор на Hue Slider
+            local HueCursor = Instance.new("Frame")
+            HueCursor.Name = "HueCursor"
+            HueCursor.Size = UDim2.new(1, 4, 0, 2)
+            HueCursor.Position = UDim2.new(0, -2, 1 - currentHue, 0)
+            HueCursor.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            HueCursor.BorderSizePixel = 0
+            HueCursor.Parent = HueSlider
+
+            local HueCursorStroke = Instance.new("UIStroke")
+            HueCursorStroke.Color = Color3.fromRGB(0, 0, 0)
+            HueCursorStroke.Thickness = 1
+            HueCursorStroke.Parent = HueCursor
+
+            -- 3. Текстовое поле ввода HEX (#00ff8c)
+            local HexInputFrame = Instance.new("Frame")
+            HexInputFrame.Size = UDim2.new(0, 90, 0, 20)
+            HexInputFrame.Position = UDim2.new(0, 8, 0, 124)
+            HexInputFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 36)
+            HexInputFrame.Parent = PickerContainer
+
+            local HexCorner = Instance.new("UICorner")
+            HexCorner.CornerRadius = UDim.new(0, 4)
+            HexCorner.Parent = HexInputFrame
+
+            local HexStroke = Instance.new("UIStroke")
+            HexStroke.Color = Library.Theme.Stroke
+            HexStroke.Thickness = 1
+            HexStroke.Parent = HexInputFrame
+
+            local HexBox = Instance.new("TextBox")
+            HexBox.Size = UDim2.new(1, -10, 1, 0)
+            HexBox.Position = UDim2.new(0, 5, 0, 0)
+            HexBox.BackgroundTransparency = 1
+            HexBox.TextColor3 = Library.Theme.Text
+            HexBox.Font = Enum.Font.Gotham
+            HexBox.TextSize = 10
+            HexBox.TextXAlignment = Enum.TextXAlignment.Left
+            HexBox.Parent = HexInputFrame
+
+            -- 4. Текстовое табло RGB (0, 255, 139)
+            local RgbLabel = Instance.new("TextLabel")
+            RgbLabel.Size = UDim2.new(0, 102, 0, 20)
+            RgbLabel.Position = UDim2.new(0, 106, 0, 124)
+            RgbLabel.BackgroundTransparency = 1
+            RgbLabel.Font = Enum.Font.GothamMedium
+            RgbLabel.TextSize = 10
+            RgbLabel.TextColor3 = Library.Theme.TextDim
+            RgbLabel.TextXAlignment = Enum.TextXAlignment.Right
+            RgbLabel.Parent = PickerContainer
+
+            -- 5. Горизонтальный слайдер прозрачности (Alpha Slider)
+            local AlphaTrack = Instance.new("ImageButton")
+            AlphaTrack.Name = "AlphaTrack"
+            AlphaTrack.Size = UDim2.new(0, 200, 0, 10)
+            AlphaTrack.Position = UDim2.new(0, 8, 0, 150)
+            AlphaTrack.BackgroundColor3 = Color3.fromRGB(30, 30, 36)
+            AlphaTrack.AutoButtonColor = false
+            AlphaTrack.Parent = PickerContainer
+
+            local AlphaCorner = Instance.new("UICorner")
+            AlphaCorner.CornerRadius = UDim.new(0, 3)
+            AlphaCorner.Parent = AlphaTrack
+
+            local AlphaGradient = Instance.new("UIGradient")
+            AlphaGradient.Transparency = NumberSequence.new({
+                NumberSequenceKeypoint.new(0, 1), -- прозрачно на левой стороне
+                NumberSequenceKeypoint.new(1, 0)  -- полностью цветное на правой стороне
+            })
+            AlphaGradient.Parent = AlphaTrack
+
+            -- Курсор слайдера прозрачности
+            local AlphaCursor = Instance.new("Frame")
+            AlphaCursor.Name = "AlphaCursor"
+            AlphaCursor.Size = UDim2.new(0, 4, 1, 4)
+            AlphaCursor.AnchorPoint = Vector2.new(0.5, 0.5)
+            AlphaCursor.Position = UDim2.new(currentAlpha, 0, 0.5, 0)
+            AlphaCursor.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            AlphaCursor.BorderSizePixel = 0
+            AlphaCursor.Parent = AlphaTrack
+
+            local AlphaCursorStroke = Instance.new("UIStroke")
+            AlphaCursorStroke.Color = Color3.fromRGB(0, 0, 0)
+            AlphaCursorStroke.Thickness = 1
+            AlphaCursorStroke.Parent = AlphaCursor
+
+            -- Логика синхронизации и обновления цветов
+            local function updateAllColors(source)
+                local solidColor = Color3.fromHSV(currentHue, currentSat, currentVal)
+                ColorBox.BackgroundColor3 = solidColor
+                
+                -- Обновление RGB-текста
+                local r, g, b = math.round(solidColor.R * 255), math.round(solidColor.G * 255), math.round(solidColor.B * 255)
+                RgbLabel.Text = string.format("%d, %d, %d", r, g, b)
+
+                -- Обновление HEX-текста
+                if source ~= "hex" then
+                    HexBox.Text = rgbToHex(solidColor)
+                end
+
+                -- Обновление фонового цвета Canvas и шкалы прозрачности
+                SatValCanvas.BackgroundColor3 = Color3.fromHSV(currentHue, 1, 1)
+                AlphaGradient.Color = ColorSequence.new(solidColor)
+
+                callback(solidColor, currentAlpha)
             end
-            
-            local RedChannel = createColorChannel("R", Color3.fromRGB(255, 75, 75), r, function(val)
-                r = val
-                updateColor()
+
+            -- Хендлеры нажатий и перемещений мыши
+            local isDraggingCanvas = false
+            local isDraggingHue = false
+            local isDraggingAlpha = false
+
+            local function dragCanvas(input)
+                local percentageX = math.clamp((input.Position.X - SatValCanvas.AbsolutePosition.X) / SatValCanvas.AbsoluteSize.X, 0, 1)
+                local percentageY = math.clamp((input.Position.Y - SatValCanvas.AbsolutePosition.Y) / SatValCanvas.AbsoluteSize.Y, 0, 1)
+                
+                currentSat = percentageX
+                currentVal = 1 - percentageY
+                
+                Cursor.Position = UDim2.new(currentSat, 0, 1 - currentVal, 0)
+                updateAllColors("canvas")
+            end
+
+            local function dragHue(input)
+                local percentageY = math.clamp((input.Position.Y - HueSlider.AbsolutePosition.Y) / HueSlider.AbsoluteSize.Y, 0, 1)
+                
+                currentHue = 1 - percentageY
+                
+                HueCursor.Position = UDim2.new(0, -2, percentageY, 0)
+                updateAllColors("hue")
+            end
+
+            local function dragAlpha(input)
+                local percentageX = math.clamp((input.Position.X - AlphaTrack.AbsolutePosition.X) / AlphaTrack.AbsoluteSize.X, 0, 1)
+                
+                currentAlpha = percentageX
+                
+                AlphaCursor.Position = UDim2.new(currentAlpha, 0, 0.5, 0)
+                updateAllColors("alpha")
+            end
+
+            SatValCanvas.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    isDraggingCanvas = true
+                    dragCanvas(input)
+                end
             end)
-            RedChannel.LayoutOrder = 1
-            RedChannel.Parent = PickerContainer
-            
-            local GreenChannel = createColorChannel("G", Color3.fromRGB(75, 255, 75), g, function(val)
-                g = val
-                updateColor()
+
+            HueSlider.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    isDraggingHue = true
+                    dragHue(input)
+                end
             end)
-            GreenChannel.LayoutOrder = 2
-            GreenChannel.Parent = PickerContainer
-            
-            local BlueChannel = createColorChannel("B", Color3.fromRGB(75, 75, 255), b, function(val)
-                b = val
-                updateColor()
+
+            AlphaTrack.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    isDraggingAlpha = true
+                    dragAlpha(input)
+                end
             end)
-            BlueChannel.LayoutOrder = 3
-            BlueChannel.Parent = PickerContainer
-            
+
+            UserInputService.InputChanged:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseMovement then
+                    if isDraggingCanvas then
+                        dragCanvas(input)
+                    elseif isDraggingHue then
+                        dragHue(input)
+                    elseif isDraggingAlpha then
+                        dragAlpha(input)
+                    end
+                end
+            end)
+
+            UserInputService.InputEnded:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    isDraggingCanvas = false
+                    isDraggingHue = false
+                    isDraggingAlpha = false
+                end
+            end)
+
+            -- Обработчик ввода HEX вручную
+            HexBox.FocusLost:Connect(function()
+                local text = HexBox.Text
+                local success, parsedColor = pcall(function() return hexToRgb(text) end)
+                if success and parsedColor then
+                    currentHue, currentSat, currentVal = parsedColor:ToHSV()
+                    
+                    Cursor.Position = UDim2.new(currentSat, 0, 1 - currentVal, 0)
+                    HueCursor.Position = UDim2.new(0, -2, 1 - currentHue, 0)
+                    
+                    updateAllColors("hex")
+                else
+                    HexBox.Text = rgbToHex(ColorBox.BackgroundColor3)
+                end
+            end)
+
+            -- Показ/скрытие панели
             local isOpen = false
             ColorBox.MouseButton1Click:Connect(function()
                 isOpen = not isOpen
                 PickerContainer.Visible = isOpen
                 if isOpen then
-                    PickerContainer.Size = UDim2.new(1, 0, 0, 68)
+                    PickerContainer.Size = UDim2.new(1, 0, 0, 170)
                 else
                     PickerContainer.Size = UDim2.new(1, 0, 0, 0)
                 end
             end)
-            
+
+            -- Первичная инициализация
+            updateAllColors("init")
+
             if tooltipText then
                 addTooltip(PickerFrame, tooltipText, 5)
             end
