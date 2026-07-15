@@ -534,7 +534,8 @@ function Library:Init()
     local SearchFrame = Instance.new("Frame")
     SearchFrame.Name = "SearchFrame"
     SearchFrame.Size = UDim2.new(0, 110, 0, 24)
-    SearchFrame.BackgroundTransparency = 1 -- Изменено: нет черного фона под поисковым баром
+    SearchFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 36)
+    SearchFrame.BackgroundTransparency = 0.3
     SearchFrame.Parent = RightContainer
 
     local SearchCorner = Instance.new("UICorner")
@@ -544,7 +545,7 @@ function Library:Init()
     local SearchStroke = Instance.new("UIStroke")
     SearchStroke.Color = Library.Theme.Stroke
     SearchStroke.Thickness = 1
-    SearchStroke.Enabled = false -- Изменено: убрана обводка под поиском
+    SearchStroke.Enabled = true
     SearchStroke.Parent = SearchFrame
 
     local SearchIcon = Instance.new("ImageLabel")
@@ -1367,6 +1368,7 @@ function Library:Init()
                     Indicator.Text = "▼"
                     Label.TextColor3 = Library.Theme.TextDim -- FIX #4: Label вместо HeaderBtn
                     OptionsScroll.Size = UDim2.new(1, 0, 0, 0)
+                    DropdownFrame.ZIndex = 1
                     clearPopup(popupId)
                 end
             end
@@ -1379,6 +1381,7 @@ function Library:Init()
                 local itemsCount = #options
                 local calculatedHeight = math.min(itemsCount * 28 + 8, 180)
                 OptionsScroll.Size = UDim2.new(1, 0, 0, calculatedHeight)
+                DropdownFrame.ZIndex = 100
                 popupId = openPopup(DropdownFrame, closeDropdown)
             end
             
@@ -1525,10 +1528,11 @@ function Library:Init()
             local currentHue, currentSat, currentVal = defaultColor:ToHSV()
             local currentAlpha = 1
             
+            -- SatValCanvas: 110x70 (extremely compact!)
             local SatValCanvas = Instance.new("ImageButton")
             SatValCanvas.Name = "SatValCanvas"
-            SatValCanvas.Size = UDim2.new(0, 180, 0, 110)
-            SatValCanvas.Position = UDim2.new(0, 8, 0, 6)
+            SatValCanvas.Size = UDim2.new(0, 110, 0, 70)
+            SatValCanvas.Position = UDim2.new(0, 6, 0, 6)
             SatValCanvas.BackgroundColor3 = Color3.fromHSV(currentHue, 1, 1)
             SatValCanvas.Image = "rbxassetid://415583266"
             SatValCanvas.Parent = PickerContainer
@@ -1537,10 +1541,10 @@ function Library:Init()
             CanvasCorner.CornerRadius = UDim.new(0, 3)
             CanvasCorner.Parent = SatValCanvas
 
-            -- Курсор-кольцо с белым цветом и обводкой
+            -- Курсор-кольцо
             local Cursor = Instance.new("Frame")
             Cursor.Name = "Cursor"
-            Cursor.Size = UDim2.new(0, 10, 0, 10)
+            Cursor.Size = UDim2.new(0, 8, 0, 8)
             Cursor.AnchorPoint = Vector2.new(0.5, 0.5)
             Cursor.Position = UDim2.new(currentSat, 0, 1 - currentVal, 0)
             Cursor.BackgroundTransparency = 1
@@ -1552,13 +1556,14 @@ function Library:Init()
 
             local CursorStroke = Instance.new("UIStroke")
             CursorStroke.Color = Color3.fromRGB(255, 255, 255)
-            CursorStroke.Thickness = 2
+            CursorStroke.Thickness = 1.5
             CursorStroke.Parent = Cursor
 
+            -- HueSlider: vertical, size 10x70
             local HueSlider = Instance.new("ImageButton")
             HueSlider.Name = "HueSlider"
-            HueSlider.Size = UDim2.new(0, 12, 0, 110)
-            HueSlider.Position = UDim2.new(0, 196, 0, 6)
+            HueSlider.Size = UDim2.new(0, 10, 0, 70)
+            HueSlider.Position = UDim2.new(0, 122, 0, 6)
             HueSlider.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
             HueSlider.AutoButtonColor = false
             HueSlider.Parent = PickerContainer
@@ -1580,18 +1585,18 @@ function Library:Init()
             })
             HueGradient.Parent = HueSlider
 
-            -- Курсор оттенка (белая линия с черными краями)
+            -- Курсор оттенка (горизонтальная белая линия)
             local HueCursor = Instance.new("Frame")
             HueCursor.Name = "HueCursor"
-            HueCursor.Size = UDim2.new(1, 4, 0, 4)
-            HueCursor.AnchorPoint = Vector2.new(0, 0.5)
-            HueCursor.Position = UDim2.new(0, -2, currentHue, 0)
+            HueCursor.Size = UDim2.new(1, 4, 0, 3)
+            HueCursor.AnchorPoint = Vector2.new(0.5, 0.5)
+            HueCursor.Position = UDim2.new(0.5, 0, currentHue, 0)
             HueCursor.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
             HueCursor.BorderSizePixel = 0
             HueCursor.Parent = HueSlider
 
             local HueCursorCorner = Instance.new("UICorner")
-            HueCursorCorner.CornerRadius = UDim.new(0, 2)
+            HueCursorCorner.CornerRadius = UDim.new(0, 1)
             HueCursorCorner.Parent = HueCursor
 
             local HueCursorStroke = Instance.new("UIStroke")
@@ -1599,14 +1604,55 @@ function Library:Init()
             HueCursorStroke.Thickness = 1
             HueCursorStroke.Parent = HueCursor
 
+            -- AlphaTrack: vertical, size 10x70
+            local AlphaTrack = Instance.new("ImageButton")
+            AlphaTrack.Name = "AlphaTrack"
+            AlphaTrack.Size = UDim2.new(0, 10, 0, 70)
+            AlphaTrack.Position = UDim2.new(0, 138, 0, 6)
+            AlphaTrack.BackgroundColor3 = Color3.fromRGB(30, 30, 36)
+            AlphaTrack.AutoButtonColor = false
+            AlphaTrack.Parent = PickerContainer
+
+            local AlphaCorner = Instance.new("UICorner")
+            AlphaCorner.CornerRadius = UDim.new(0, 2)
+            AlphaCorner.Parent = AlphaTrack
+
+            local AlphaGradient = Instance.new("UIGradient")
+            AlphaGradient.Rotation = 90
+            AlphaGradient.Transparency = NumberSequence.new({
+                NumberSequenceKeypoint.new(0, 1),
+                NumberSequenceKeypoint.new(1, 0)
+            })
+            AlphaGradient.Parent = AlphaTrack
+
+            -- AlphaCursor: horizontal bar
+            local AlphaCursor = Instance.new("Frame")
+            AlphaCursor.Name = "AlphaCursor"
+            AlphaCursor.Size = UDim2.new(1, 4, 0, 3)
+            AlphaCursor.AnchorPoint = Vector2.new(0.5, 0.5)
+            AlphaCursor.Position = UDim2.new(0.5, 0, currentAlpha, 0)
+            AlphaCursor.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            AlphaCursor.BorderSizePixel = 0
+            AlphaCursor.Parent = AlphaTrack
+
+            local AlphaCursorCorner = Instance.new("UICorner")
+            AlphaCursorCorner.CornerRadius = UDim.new(0, 1)
+            AlphaCursorCorner.Parent = AlphaCursor
+
+            local AlphaCursorStroke = Instance.new("UIStroke")
+            AlphaCursorStroke.Color = Color3.fromRGB(0, 0, 0)
+            AlphaCursorStroke.Thickness = 1
+            AlphaCursorStroke.Parent = AlphaCursor
+
+            -- Right Side Info
             local HexInputFrame = Instance.new("Frame")
-            HexInputFrame.Size = UDim2.new(0, 90, 0, 20)
-            HexInputFrame.Position = UDim2.new(0, 8, 0, 124)
+            HexInputFrame.Size = UDim2.new(0, 64, 0, 18)
+            HexInputFrame.Position = UDim2.new(0, 154, 0, 12)
             HexInputFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 36)
             HexInputFrame.Parent = PickerContainer
 
             local HexCorner = Instance.new("UICorner")
-            HexCorner.CornerRadius = UDim.new(0, 4)
+            HexCorner.CornerRadius = UDim.new(0, 3)
             HexCorner.Parent = HexInputFrame
 
             local HexStroke = Instance.new("UIStroke")
@@ -1615,69 +1661,32 @@ function Library:Init()
             HexStroke.Parent = HexInputFrame
 
             local HexBox = Instance.new("TextBox")
-            HexBox.Size = UDim2.new(1, -10, 1, 0)
-            HexBox.Position = UDim2.new(0, 5, 0, 0)
+            HexBox.Size = UDim2.new(1, -6, 1, 0)
+            HexBox.Position = UDim2.new(0, 3, 0, 0)
             HexBox.BackgroundTransparency = 1
             HexBox.TextColor3 = Library.Theme.Text
             HexBox.Font = Enum.Font.Gotham
-            HexBox.TextSize = 10
-            HexBox.TextXAlignment = Enum.TextXAlignment.Left
+            HexBox.TextSize = 9
+            HexBox.TextXAlignment = Enum.TextXAlignment.Center
             HexBox.Parent = HexInputFrame
 
             local RgbLabel = Instance.new("TextLabel")
-            RgbLabel.Size = UDim2.new(0, 102, 0, 20)
-            RgbLabel.Position = UDim2.new(0, 106, 0, 124)
+            RgbLabel.Size = UDim2.new(0, 64, 0, 18)
+            RgbLabel.Position = UDim2.new(0, 154, 0, 36)
             RgbLabel.BackgroundTransparency = 1
             RgbLabel.Font = Enum.Font.GothamMedium
-            RgbLabel.TextSize = 10
+            RgbLabel.TextSize = 8
             RgbLabel.TextColor3 = Library.Theme.TextDim
-            RgbLabel.TextXAlignment = Enum.TextXAlignment.Right
+            RgbLabel.TextXAlignment = Enum.TextXAlignment.Center
             RgbLabel.Parent = PickerContainer
-
-            local AlphaTrack = Instance.new("ImageButton")
-            AlphaTrack.Name = "AlphaTrack"
-            AlphaTrack.Size = UDim2.new(0, 200, 0, 10)
-            AlphaTrack.Position = UDim2.new(0, 8, 0, 150)
-            AlphaTrack.BackgroundColor3 = Color3.fromRGB(30, 30, 36)
-            AlphaTrack.AutoButtonColor = false
-            AlphaTrack.Parent = PickerContainer
-
-            local AlphaCorner = Instance.new("UICorner")
-            AlphaCorner.CornerRadius = UDim.new(0, 3)
-            AlphaCorner.Parent = AlphaTrack
-
-            local AlphaGradient = Instance.new("UIGradient")
-            AlphaGradient.Transparency = NumberSequence.new({
-                NumberSequenceKeypoint.new(0, 1),
-                NumberSequenceKeypoint.new(1, 0)
-            })
-            AlphaGradient.Parent = AlphaTrack
-
-            local AlphaCursor = Instance.new("Frame")
-            AlphaCursor.Name = "AlphaCursor"
-            AlphaCursor.Size = UDim2.new(0, 4, 1, 4)
-            AlphaCursor.AnchorPoint = Vector2.new(0.5, 0.5)
-            AlphaCursor.Position = UDim2.new(currentAlpha, 0, 0.5, 0)
-            AlphaCursor.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-            AlphaCursor.BorderSizePixel = 0
-            AlphaCursor.Parent = AlphaTrack
-
-            local AlphaCursorCorner = Instance.new("UICorner")
-            AlphaCursorCorner.CornerRadius = UDim.new(0, 2) -- FIX #1: Было AlphaCorner, теперь AlphaCursorCorner
-            AlphaCursorCorner.Parent = AlphaCursor
-
-            local AlphaCursorStroke = Instance.new("UIStroke")
-            AlphaCursorStroke.Color = Color3.fromRGB(0, 0, 0)
-            AlphaCursorStroke.Thickness = 1
-            AlphaCursorStroke.Parent = AlphaCursor
 
             local function updateAllColors(source)
                 local solidColor = Color3.fromHSV(currentHue, currentSat, currentVal)
                 ColorBox.BackgroundColor3 = solidColor
-                ColorBox.BackgroundTransparency = 1 - currentAlpha -- FIX #10: Отображение прозрачности на превью
+                ColorBox.BackgroundTransparency = 1 - currentAlpha
                 
                 local r, g, b = math.round(solidColor.R * 255), math.round(solidColor.G * 255), math.round(solidColor.B * 255)
-                RgbLabel.Text = string.format("%d, %d, %d", r, g, b)
+                RgbLabel.Text = string.format("%d,%d,%d", r, g, b)
 
                 if source ~= "hex" then
                     HexBox.Text = rgbToHex(solidColor)
@@ -1685,8 +1694,8 @@ function Library:Init()
 
                 if source == "hex" or source == "init" then
                     Cursor.Position = UDim2.new(currentSat, 0, 1 - currentVal, 0)
-                    HueCursor.Position = UDim2.new(0, -2, currentHue, 0)
-                    AlphaCursor.Position = UDim2.new(currentAlpha, 0, 0.5, 0)
+                    HueCursor.Position = UDim2.new(0.5, 0, currentHue, 0)
+                    AlphaCursor.Position = UDim2.new(0.5, 0, currentAlpha, 0)
                 end
 
                 SatValCanvas.BackgroundColor3 = Color3.fromHSV(currentHue, 1, 1)
@@ -1717,18 +1726,18 @@ function Library:Init()
                 
                 currentHue = percentageY
                 
-                HueCursor.Position = UDim2.new(0, -2, percentageY, 0)
+                HueCursor.Position = UDim2.new(0.5, 0, percentageY, 0)
                 updateAllColors("hue")
             end
 
             local function updateAlphaFromMouse()
                 local mouseLocation = getMousePosition()
-                local relativeX = mouseLocation.X - AlphaTrack.AbsolutePosition.X
-                local percentageX = math.clamp(relativeX / AlphaTrack.AbsoluteSize.X, 0, 1)
+                local relativeY = mouseLocation.Y - AlphaTrack.AbsolutePosition.Y
+                local percentageY = math.clamp(relativeY / AlphaTrack.AbsoluteSize.Y, 0, 1)
                 
-                currentAlpha = percentageX
+                currentAlpha = percentageY
                 
-                AlphaCursor.Position = UDim2.new(currentAlpha, 0, 0.5, 0)
+                AlphaCursor.Position = UDim2.new(0.5, 0, percentageY, 0)
                 updateAllColors("alpha")
             end
 
@@ -1746,7 +1755,6 @@ function Library:Init()
                 end
             end
 
-            -- Высокоэффективная работа dragging на RenderStepped без подвисаний
             local canvasConnection = nil
             local hueConnection = nil
             local alphaConnection = nil
@@ -1816,6 +1824,7 @@ function Library:Init()
                     isPickerOpen = false
                     PickerContainer.Visible = false
                     PickerContainer.Size = UDim2.new(1, 0, 0, 0)
+                    PickerFrame.ZIndex = 1
                     clearPopup(pickerPopupId)
                 end
             end
@@ -1823,7 +1832,8 @@ function Library:Init()
             local function openPickerPanel()
                 isPickerOpen = true
                 PickerContainer.Visible = true
-                PickerContainer.Size = UDim2.new(1, 0, 0, 170)
+                PickerContainer.Size = UDim2.new(1, 0, 0, 82)
+                PickerFrame.ZIndex = 100
                 pickerPopupId = openPopup(PickerFrame, closePicker)
             end
 
