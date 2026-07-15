@@ -75,6 +75,13 @@ local function isMoveInput(input)
         or input.UserInputType == Enum.UserInputType.Touch
 end
 
+-- FIX: Корректное получение позиции мыши с учётом GuiInset (для IgnoreGuiInset = true)
+local function getMousePosition()
+    local mouse = UserInputService:GetMouseLocation()
+    local inset = GuiService:GetGuiInset()
+    return Vector2.new(mouse.X, mouse.Y + inset.Y)
+end
+
 local function makeDraggable(frame, dragAnchor)
     local dragging, dragInput, dragStart, startPos
     trackConnection(dragAnchor.InputBegan:Connect(function(input)
@@ -442,7 +449,7 @@ function Library:Init()
     trackConnection(UserInputService.InputBegan:Connect(function(input)
         if isClickInput(input) and _currentPopup then
             local popup = _currentPopup
-            local mousePos = UserInputService:GetMouseLocation()
+            local mousePos = getMousePosition()
             local frame = popup.frame
             if frame and frame.Parent then
                 local pos = frame.AbsolutePosition
@@ -1065,7 +1072,7 @@ function Library:Init()
 
             -- Трек ползунка начинается после 40% и занимает оставшуюся часть за вычетом индикатора
             local Track = Instance.new("Frame")
-            Track.Size = UDim2.new(0.6, -85, 0, 4)
+            Track.Size = UDim2.new(0.6, -60, 0, 4)
             Track.Position = UDim2.new(0.4, 5, 0.5, -2)
             Track.BackgroundColor3 = Color3.fromRGB(34, 34, 42)
             Track.BorderSizePixel = 0
@@ -1103,8 +1110,8 @@ function Library:Init()
             ThumbStroke.Parent = Thumb
 
             local ValLabel = Instance.new("TextLabel")
-            ValLabel.Size = UDim2.new(0, 75, 1, 0)
-            ValLabel.Position = UDim2.new(1, -75, 0, 0) -- Выравнивание значения по правому краю
+            ValLabel.Size = UDim2.new(0, 50, 1, 0)
+            ValLabel.Position = UDim2.new(1, -50, 0, 0) -- Выравнивание значения по правому краю
             ValLabel.BackgroundTransparency = 1
             ValLabel.Text = formatValue(val)
             ValLabel.TextColor3 = Library.Theme.Text
@@ -1125,7 +1132,7 @@ function Library:Init()
             end
 
             local function update()
-                local mouseLocation = UserInputService:GetMouseLocation()
+                local mouseLocation = getMousePosition()
                 local percentage = math.clamp((mouseLocation.X - Track.AbsolutePosition.X) / Track.AbsoluteSize.X, 0, 1)
                 val = roundToStep(min + ((max - min) * percentage))
                 val = math.clamp(val, min, max)
@@ -1316,7 +1323,7 @@ function Library:Init()
             OptionsScroll.Visible = false
             OptionsScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
             OptionsScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-            OptionsScroll.Active = false
+            OptionsScroll.Active = true
             OptionsScroll.LayoutOrder = 2
             OptionsScroll.Parent = DropdownFrame
             
@@ -1331,7 +1338,7 @@ function Library:Init()
             
             local ScrollLayout = Instance.new("UIListLayout")
             ScrollLayout.SortOrder = Enum.SortOrder.LayoutOrder
-            ScrollLayout.Padding = UDim.new(0, 2)
+            ScrollLayout.Padding = UDim.new(0, 1)
             ScrollLayout.Parent = OptionsScroll
             
             local ScrollPadding = Instance.new("UIPadding")
@@ -1370,7 +1377,7 @@ function Library:Init()
                 Indicator.Text = "▲"
                 Label.TextColor3 = Library.Theme.Accent -- FIX #4: Label вместо HeaderBtn
                 local itemsCount = #options
-                local calculatedHeight = math.min(itemsCount * 22 + 8, 100)
+                local calculatedHeight = math.min(itemsCount * 28 + 8, 180)
                 OptionsScroll.Size = UDim2.new(1, 0, 0, calculatedHeight)
                 popupId = openPopup(DropdownFrame, closeDropdown)
             end
@@ -1387,7 +1394,7 @@ function Library:Init()
             for i, opt in ipairs(options) do
                 local OptBtn = Instance.new("TextButton")
                 OptBtn.Name = opt .. "Opt"
-                OptBtn.Size = UDim2.new(1, 0, 0, 20)
+                OptBtn.Size = UDim2.new(1, 0, 0, 26)
                 OptBtn.BackgroundTransparency = 1
                 OptBtn.Text = ""
                 OptBtn.Parent = OptionsScroll
@@ -1689,7 +1696,7 @@ function Library:Init()
             end
 
             local function updateCanvasFromMouse()
-                local mouseLocation = UserInputService:GetMouseLocation()
+                local mouseLocation = getMousePosition()
                 local relativeX = mouseLocation.X - SatValCanvas.AbsolutePosition.X
                 local relativeY = mouseLocation.Y - SatValCanvas.AbsolutePosition.Y
 
@@ -1704,7 +1711,7 @@ function Library:Init()
             end
 
             local function updateHueFromMouse()
-                local mouseLocation = UserInputService:GetMouseLocation()
+                local mouseLocation = getMousePosition()
                 local relativeY = mouseLocation.Y - HueSlider.AbsolutePosition.Y
                 local percentageY = math.clamp(relativeY / HueSlider.AbsoluteSize.Y, 0, 1)
                 
@@ -1715,7 +1722,7 @@ function Library:Init()
             end
 
             local function updateAlphaFromMouse()
-                local mouseLocation = UserInputService:GetMouseLocation()
+                local mouseLocation = getMousePosition()
                 local relativeX = mouseLocation.X - AlphaTrack.AbsolutePosition.X
                 local percentageX = math.clamp(relativeX / AlphaTrack.AbsoluteSize.X, 0, 1)
                 
