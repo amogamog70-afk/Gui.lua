@@ -91,6 +91,18 @@ end
 local function isMouseOverPopup(popup)
     local frame = popup.frame
     if not frame or not frame.Parent then return false end
+    local mousePos = getMousePosition()
+    local success, guiObjects = pcall(function()
+        return ParentContainer:GetGuiObjectsAtPosition(mousePos.X, mousePos.Y)
+    end)
+    if success and guiObjects then
+        for _, obj in ipairs(guiObjects) do
+            if obj == frame or obj:IsDescendantOf(frame) then
+                return true
+            end
+        end
+        return false
+    end
     local function checkRecursive(f)
         if f:IsA("GuiObject") then
             if isMouseOverFrame(f) then return true end
@@ -714,6 +726,7 @@ function Library:Init()
     PagesFolder.Position = UDim2.new(0, 0, 0, 46)
     PagesFolder.BackgroundTransparency = 1
     PagesFolder.ClipsDescendants = true
+    PagesFolder.Active = false
     PagesFolder.Parent = MainFrame
 
     -- Глобальная страница результатов поиска (SearchResultsPage)
@@ -763,13 +776,14 @@ function Library:Init()
     SearchRightLayout.Parent = SearchRightColumn
 
     updateSearchResultsLayout = function(windowCount)
-        local availableWidth = MainFrame.AbsoluteSize.X - 24
+        local availableWidth = FRAME_WIDTH - 24
         local columnWidth = math.floor((availableWidth - 10) / 2)
-
+        local totalWidth
         if windowCount <= 1 then
             SearchLeftColumn.Size = UDim2.new(0, columnWidth, 1, 0)
             SearchLeftColumn.Position = UDim2.new(0.5, -math.floor(columnWidth / 2), 0, 0)
             SearchRightColumn.Visible = false
+            totalWidth = columnWidth
         else
             SearchLeftColumn.Size = UDim2.new(0, columnWidth, 1, 0)
             SearchLeftColumn.Position = UDim2.new(0.5, -columnWidth - 5, 0, 0)
@@ -777,7 +791,10 @@ function Library:Init()
             SearchRightColumn.Size = UDim2.new(0, columnWidth, 1, 0)
             SearchRightColumn.Position = UDim2.new(0.5, 5, 0, 0)
             SearchRightColumn.Visible = true
+            totalWidth = columnWidth * 2 + 10
         end
+        SearchResultsPage.Size = UDim2.new(0, totalWidth, 1, 0)
+        SearchResultsPage.Position = UDim2.new(0.5, -totalWidth / 2, 0, 0)
     end
 
     -- FIX #3: Функциональная кнопка настроек — отключена по запросу пользователя
@@ -810,13 +827,15 @@ function Library:Init()
         if not pageInfo then return end
 
         local data = pageInfo.Data
-        local availableWidth = MainFrame.AbsoluteSize.X - 24
+        local availableWidth = FRAME_WIDTH - 24
         local columnWidth = math.floor((availableWidth - 10) / 2)
 
+        local totalWidth
         if data.WindowCount <= 1 then
             data.LeftColumn.Size = UDim2.new(0, columnWidth, 1, 0)
             data.LeftColumn.Position = UDim2.new(0.5, -math.floor(columnWidth / 2), 0, 0)
             data.RightColumn.Visible = false
+            totalWidth = columnWidth
         else
             data.LeftColumn.Size = UDim2.new(0, columnWidth, 1, 0)
             data.LeftColumn.Position = UDim2.new(0.5, -columnWidth - 5, 0, 0)
@@ -824,7 +843,11 @@ function Library:Init()
             data.RightColumn.Size = UDim2.new(0, columnWidth, 1, 0)
             data.RightColumn.Position = UDim2.new(0.5, 5, 0, 0)
             data.RightColumn.Visible = true
+            totalWidth = columnWidth * 2 + 10
         end
+
+        data.Page.Size = UDim2.new(0, totalWidth, 1, 0)
+        data.Page.Position = UDim2.new(0.5, -totalWidth / 2, 0, 0)
     end
 
     trackConnection(MainFrame:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
@@ -1100,7 +1123,7 @@ function Library:Init()
 
             -- Трек ползунка начинается после 30%
             local Track = Instance.new("Frame")
-            Track.Size = UDim2.new(0.7, -115, 0, 4)
+            Track.Size = UDim2.new(0.7, -60, 0, 4)
             Track.Position = UDim2.new(0.3, 2, 0.5, -2)
             Track.BackgroundColor3 = Color3.fromRGB(34, 34, 42)
             Track.BorderSizePixel = 0
@@ -1345,6 +1368,7 @@ function Library:Init()
             OptionsScroll.Size = UDim2.new(1, 0, 0, 0)
             OptionsScroll.Position = UDim2.new(0, 0, 0, 26)
             OptionsScroll.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+            OptionsScroll.BackgroundTransparency = 0.15
             OptionsScroll.BorderSizePixel = 0
             OptionsScroll.ScrollBarThickness = 2
             OptionsScroll.ScrollBarImageColor3 = Library.Theme.Stroke
@@ -1575,6 +1599,7 @@ function Library:Init()
             PickerContainer.Size = UDim2.new(1, 0, 0, 0)
             PickerContainer.Position = UDim2.new(0, 0, 0, 26)
             PickerContainer.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+            PickerContainer.BackgroundTransparency = 0.15
             PickerContainer.BorderSizePixel = 0
             PickerContainer.Visible = false
             PickerContainer.ClipsDescendants = true
@@ -2150,7 +2175,8 @@ function Library:Init()
         local PageData = {
             WindowCount = 0,
             LeftColumn = LeftColumn,
-            RightColumn = RightColumn
+            RightColumn = RightColumn,
+            Page = Page
         }
 
         Main.Tabs[tabName] = {Frame = TabFrame, Stroke = TabStroke, Label = TabLabel}
