@@ -82,6 +82,27 @@ local function getMousePosition()
     return Vector2.new(mouse.X, mouse.Y + inset.Y)
 end
 
+local function isMouseOverFrame(frame)
+    if not frame or not frame.Parent then return false end
+    local mousePos = getMousePosition()
+    local pos = frame.AbsolutePosition
+    local size = frame.AbsoluteSize
+    return mousePos.X >= pos.X and mousePos.X <= pos.X + size.X
+       and mousePos.Y >= pos.Y and mousePos.Y <= pos.Y + size.Y
+end
+
+local function isMouseOverPopup(popup)
+    local frame = popup.frame
+    if not frame or not frame.Parent then return false end
+    if isMouseOverFrame(frame) then return true end
+    for _, child in ipairs(frame:GetChildren()) do
+        if child:IsA("GuiObject") and child.Visible and isMouseOverFrame(child) then
+            return true
+        end
+    end
+    return false
+end
+
 local function makeDraggable(frame, dragAnchor)
     local dragging, dragInput, dragStart, startPos
     trackConnection(dragAnchor.InputBegan:Connect(function(input)
@@ -449,20 +470,13 @@ function Library:Init()
     trackConnection(UserInputService.InputBegan:Connect(function(input)
         if isClickInput(input) and _currentPopup then
             local popup = _currentPopup
-            local mousePos = getMousePosition()
-            local frame = popup.frame
-            if frame and frame.Parent then
-                local pos = frame.AbsolutePosition
-                local size = frame.AbsoluteSize
-                if mousePos.X < pos.X or mousePos.X > pos.X + size.X 
-                   or mousePos.Y < pos.Y or mousePos.Y > pos.Y + size.Y then
-                    task.defer(function()
-                        if _currentPopup and _currentPopup.id == popup.id then
-                            pcall(_currentPopup.close)
-                            _currentPopup = nil
-                        end
-                    end)
-                end
+            if not isMouseOverPopup(popup) then
+                task.defer(function()
+                    if _currentPopup and _currentPopup.id == popup.id then
+                        pcall(_currentPopup.close)
+                        _currentPopup = nil
+                    end
+                end)
             end
         end
     end))
@@ -761,18 +775,9 @@ function Library:Init()
         end
     end
 
-    -- FIX #3: Функциональная кнопка настроек — минимизация/развертывание контента
+    -- FIX #3: Функциональная кнопка настроек — отключена по запросу пользователя
     SettingsBtn.MouseButton1Click:Connect(function()
-        isMinimized = not isMinimized
-        if isMinimized then
-            tween(PagesFolder, 0.2, {Size = UDim2.new(1, 0, 0, 0)})
-            tween(MainFrame, 0.2, {Size = UDim2.new(0, FRAME_WIDTH, 0, 46)})
-            tween(SettingsBtn, 0.1, {ImageColor3 = Library.Theme.Accent})
-        else
-            tween(MainFrame, 0.2, {Size = UDim2.new(0, FRAME_WIDTH, 0, FRAME_HEIGHT)})
-            tween(PagesFolder, 0.2, {Size = UDim2.new(1, 0, 1, -78)})
-            tween(SettingsBtn, 0.1, {ImageColor3 = Library.Theme.TextDim})
-        end
+        -- Do nothing
     end)
 
     -- Создание единого премиум-бара подсказок внизу (Отключено по запросу пользователя)
@@ -991,6 +996,10 @@ function Library:Init()
                 tween(Box, 0.1, {BackgroundColor3 = state and Library.Theme.Accent or Color3.fromRGB(30, 30, 36)})
                 tween(BoxStroke, 0.1, {Color = state and Library.Theme.Accent or Library.Theme.Stroke})
                 tween(Label, 0.1, {TextColor3 = state and Library.Theme.Text or Library.Theme.TextDim})
+                
+                -- English automatic notification
+                Main:Notify(toggleText, state and "Enabled" or "Disabled", 2)
+                
                 callback(state)
             end
 
@@ -1022,7 +1031,14 @@ function Library:Init()
         function Elements:CreateSlider(sliderText, min, max, default, callback, tooltipText, suffix, step)
             callback = callback or function() end
             local val = default or min
-            local displaySuffix = suffix or ""
+            local displaySuffix = ""
+            if suffix then
+                if string.find(suffix, "%%") or string.find(string.lower(suffix), "percent") then
+                    displaySuffix = "%"
+                elseif string.find(string.lower(suffix), "stud") then
+                    displaySuffix = " studs"
+                end
+            end
             step = step or 1
 
             local decimals = 0
@@ -1400,11 +1416,47 @@ function Library:Init()
                 OptBtn.Size = UDim2.new(1, 0, 0, 26)
                 OptBtn.BackgroundTransparency = 1
                 OptBtn.Text = ""
+                OptBtn.AutoButtonColor = false
                 OptBtn.Parent = OptionsScroll
                 
+                local OptCorner = Instance.new("UICorner")
+                OptCorner.CornerRadius = UDim.new(0, 4)
+                OptCorner.Parent = OptBtn
+
+                local IndicatorBox = Instance.new("Frame")
+                IndicatorBox.Name = "IndicatorBox"
+                IndicatorBox.Size = UDim2.new(0, 12, 0, 12)
+                IndicatorBox.Position = UDim2.new(0, 6, 0.5, -6)
+                IndicatorBox.BackgroundColor3 = Color3.fromRGB(30, 30, 36)
+                IndicatorBox.Parent = OptBtn
+
+                local BoxCorner = Instance.new("UICorner")
+                BoxCorner.CornerRadius = isMulti and UDim.new(0, 3) or UDim.new(1, 0)
+                BoxCorner.Parent = IndicatorBox
+
+                local BoxStroke = Instance.new("UIStroke")
+                BoxStroke.Color = Library.Theme.Stroke
+                BoxStroke.Thickness = 1
+                BoxStroke.Parent = IndicatorBox
+
+                local CheckDot = Instance.new("Frame")
+                CheckDot.Name = "CheckDot"
+                CheckDot.AnchorPoint = Vector2.new(0.5, 0.5)
+                CheckDot.Position = UDim2.new(0.5, 0, 0.5, 0)
+                CheckDot.BackgroundColor3 = Library.Theme.Accent
+                CheckDot.BorderSizePixel = 0
+                CheckDot.Visible = selected[opt] or false
+                CheckDot.Parent = IndicatorBox
+
+                local DotCorner = Instance.new("UICorner")
+                DotCorner.CornerRadius = isMulti and UDim.new(0, 2) or UDim.new(1, 0)
+                DotCorner.Parent = CheckDot
+
+                CheckDot.Size = isMulti and UDim2.new(0, 8, 0, 8) or UDim2.new(0, 6, 0, 6)
+
                 local OptLabel = Instance.new("TextLabel")
-                OptLabel.Size = UDim2.new(1, -20, 1, 0)
-                OptLabel.Position = UDim2.new(0, 4, 0, 0)
+                OptLabel.Size = UDim2.new(1, -30, 1, 0)
+                OptLabel.Position = UDim2.new(0, 26, 0, 0)
                 OptLabel.BackgroundTransparency = 1
                 OptLabel.Text = opt
                 OptLabel.TextColor3 = selected[opt] and Library.Theme.Text or Library.Theme.TextDim
@@ -1413,21 +1465,25 @@ function Library:Init()
                 OptLabel.TextXAlignment = Enum.TextXAlignment.Left
                 OptLabel.Parent = OptBtn
                 
-                local Check = Instance.new("TextLabel")
-                Check.Size = UDim2.new(0, 14, 1, 0)
-                Check.Position = UDim2.new(1, -14, 0, 0)
-                Check.BackgroundTransparency = 1
-                Check.Text = selected[opt] and "✓" or ""
-                Check.TextColor3 = Library.Theme.Accent
-                Check.Font = Enum.Font.GothamBold
-                Check.TextSize = 10
-                Check.Parent = OptBtn
-                
+                OptBtn.MouseEnter:Connect(function()
+                    tween(OptBtn, 0.1, {BackgroundTransparency = 0, BackgroundColor3 = Color3.fromRGB(40, 40, 50)})
+                    tween(OptLabel, 0.1, {TextColor3 = Library.Theme.Text})
+                end)
+                OptBtn.MouseLeave:Connect(function()
+                    tween(OptBtn, 0.1, {BackgroundTransparency = 1})
+                    tween(OptLabel, 0.1, {TextColor3 = selected[opt] and Library.Theme.Text or Library.Theme.TextDim})
+                end)
+
+                local function updateOptionState(stateVal)
+                    CheckDot.Visible = stateVal
+                    BoxStroke.Color = stateVal and Library.Theme.Accent or Library.Theme.Stroke
+                    OptLabel.TextColor3 = stateVal and Library.Theme.Text or Library.Theme.TextDim
+                end
+
                 OptBtn.MouseButton1Click:Connect(function()
                     if isMulti then
                         selected[opt] = not selected[opt]
-                        OptLabel.TextColor3 = selected[opt] and Library.Theme.Text or Library.Theme.TextDim
-                        Check.Text = selected[opt] and "✓" or ""
+                        updateOptionState(selected[opt])
                         
                         local currentSelection = {}
                         for k, v in pairs(selected) do
@@ -1437,18 +1493,16 @@ function Library:Init()
                     else
                         for o, btn in pairs(optionButtons) do
                             selected[o] = false
-                            btn.Label.TextColor3 = Library.Theme.TextDim
-                            btn.Check.Text = ""
+                            btn.update(false)
                         end
                         selected[opt] = true
-                        OptLabel.TextColor3 = Library.Theme.Text
-                        Check.Text = "✓"
+                        updateOptionState(true)
                         closeDropdown()
                         callback(opt)
                     end
                 end)
                 
-                optionButtons[opt] = {Label = OptLabel, Check = Check}
+                optionButtons[opt] = {update = updateOptionState}
             end
             
             if tooltipText then
@@ -1460,7 +1514,7 @@ function Library:Init()
             return DropdownFrame
         end
 
-        -- Современный HSV Выбор цвета с блокировкой скролла при перетаскивании — FIX #1, #8, #10
+        -- Современный Выбор цвета с компактным 4-слайдерным интерфейсом (H, S, V, A)
         function Elements:CreateColorPicker(pickerText, defaultColor, callback, tooltipText)
             callback = callback or function() end
             defaultColor = defaultColor or Color3.fromRGB(255, 255, 255)
@@ -1528,138 +1582,179 @@ function Library:Init()
             local currentHue, currentSat, currentVal = defaultColor:ToHSV()
             local currentAlpha = 1
             
-            -- SatValCanvas: 110x70 (extremely compact!)
-            local SatValCanvas = Instance.new("ImageButton")
-            SatValCanvas.Name = "SatValCanvas"
-            SatValCanvas.Size = UDim2.new(0, 110, 0, 70)
-            SatValCanvas.Position = UDim2.new(0, 6, 0, 6)
-            SatValCanvas.BackgroundColor3 = Color3.fromHSV(currentHue, 1, 1)
-            SatValCanvas.Image = "rbxassetid://415583266"
-            SatValCanvas.Parent = PickerContainer
-
-            local CanvasCorner = Instance.new("UICorner")
-            CanvasCorner.CornerRadius = UDim.new(0, 3)
-            CanvasCorner.Parent = SatValCanvas
-
-            -- Курсор-кольцо
-            local Cursor = Instance.new("Frame")
-            Cursor.Name = "Cursor"
-            Cursor.Size = UDim2.new(0, 8, 0, 8)
-            Cursor.AnchorPoint = Vector2.new(0.5, 0.5)
-            Cursor.Position = UDim2.new(currentSat, 0, 1 - currentVal, 0)
-            Cursor.BackgroundTransparency = 1
-            Cursor.Parent = SatValCanvas
-
-            local CursorCorner = Instance.new("UICorner")
-            CursorCorner.CornerRadius = UDim.new(1, 0)
-            CursorCorner.Parent = Cursor
-
-            local CursorStroke = Instance.new("UIStroke")
-            CursorStroke.Color = Color3.fromRGB(255, 255, 255)
-            CursorStroke.Thickness = 1.5
-            CursorStroke.Parent = Cursor
-
-            -- HueSlider: vertical, size 10x70
-            local HueSlider = Instance.new("ImageButton")
-            HueSlider.Name = "HueSlider"
-            HueSlider.Size = UDim2.new(0, 10, 0, 70)
-            HueSlider.Position = UDim2.new(0, 122, 0, 6)
-            HueSlider.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-            HueSlider.AutoButtonColor = false
-            HueSlider.Parent = PickerContainer
-
-            local HueCorner = Instance.new("UICorner")
-            HueCorner.CornerRadius = UDim.new(0, 2)
-            HueCorner.Parent = HueSlider
-
-            local HueGradient = Instance.new("UIGradient")
-            HueGradient.Rotation = 90
-            HueGradient.Color = ColorSequence.new({
-                ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
-                ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255, 255, 0)),
-                ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0, 255, 0)),
-                ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 255)),
-                ColorSequenceKeypoint.new(0.67, Color3.fromRGB(0, 0, 255)),
-                ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255, 0, 255)),
-                ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0))
-            })
-            HueGradient.Parent = HueSlider
-
-            -- Курсор оттенка (горизонтальная белая линия)
-            local HueCursor = Instance.new("Frame")
-            HueCursor.Name = "HueCursor"
-            HueCursor.Size = UDim2.new(1, 4, 0, 3)
-            HueCursor.AnchorPoint = Vector2.new(0.5, 0.5)
-            HueCursor.Position = UDim2.new(0.5, 0, currentHue, 0)
-            HueCursor.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-            HueCursor.BorderSizePixel = 0
-            HueCursor.Parent = HueSlider
-
-            local HueCursorCorner = Instance.new("UICorner")
-            HueCursorCorner.CornerRadius = UDim.new(0, 1)
-            HueCursorCorner.Parent = HueCursor
-
-            local HueCursorStroke = Instance.new("UIStroke")
-            HueCursorStroke.Color = Color3.fromRGB(0, 0, 0)
-            HueCursorStroke.Thickness = 1
-            HueCursorStroke.Parent = HueCursor
-
-            -- AlphaTrack: vertical, size 10x70
-            local AlphaTrack = Instance.new("ImageButton")
-            AlphaTrack.Name = "AlphaTrack"
-            AlphaTrack.Size = UDim2.new(0, 10, 0, 70)
-            AlphaTrack.Position = UDim2.new(0, 138, 0, 6)
-            AlphaTrack.BackgroundColor3 = Color3.fromRGB(30, 30, 36)
-            AlphaTrack.AutoButtonColor = false
-            AlphaTrack.Parent = PickerContainer
-
-            local AlphaCorner = Instance.new("UICorner")
-            AlphaCorner.CornerRadius = UDim.new(0, 2)
-            AlphaCorner.Parent = AlphaTrack
-
-            local AlphaGradient = Instance.new("UIGradient")
-            AlphaGradient.Rotation = 90
-            AlphaGradient.Transparency = NumberSequence.new({
-                NumberSequenceKeypoint.new(0, 1),
-                NumberSequenceKeypoint.new(1, 0)
-            })
-            AlphaGradient.Parent = AlphaTrack
-
-            -- AlphaCursor: horizontal bar
-            local AlphaCursor = Instance.new("Frame")
-            AlphaCursor.Name = "AlphaCursor"
-            AlphaCursor.Size = UDim2.new(1, 4, 0, 3)
-            AlphaCursor.AnchorPoint = Vector2.new(0.5, 0.5)
-            AlphaCursor.Position = UDim2.new(0.5, 0, currentAlpha, 0)
-            AlphaCursor.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-            AlphaCursor.BorderSizePixel = 0
-            AlphaCursor.Parent = AlphaTrack
-
-            local AlphaCursorCorner = Instance.new("UICorner")
-            AlphaCursorCorner.CornerRadius = UDim.new(0, 1)
-            AlphaCursorCorner.Parent = AlphaCursor
-
-            local AlphaCursorStroke = Instance.new("UIStroke")
-            AlphaCursorStroke.Color = Color3.fromRGB(0, 0, 0)
-            AlphaCursorStroke.Thickness = 1
-            AlphaCursorStroke.Parent = AlphaCursor
-
-            -- Right Side Info
+            local sliders = {}
+            local updateAllColors -- Задекларируем
+            
+            local function createMiniSlider(rowName, minVal, maxVal, initVal, suffixText, setupGradientFunc)
+                local RowFrame = Instance.new("Frame")
+                RowFrame.Size = UDim2.new(1, -12, 0, 14)
+                RowFrame.BackgroundTransparency = 1
+                RowFrame.Parent = PickerContainer
+                
+                local RowLabel = Instance.new("TextLabel")
+                RowLabel.Size = UDim2.new(0, 15, 1, 0)
+                RowLabel.BackgroundTransparency = 1
+                RowLabel.Text = rowName
+                RowLabel.TextColor3 = Library.Theme.TextDim
+                RowLabel.Font = Enum.Font.GothamBold
+                RowLabel.TextSize = 9
+                RowLabel.TextXAlignment = Enum.TextXAlignment.Left
+                RowLabel.Parent = RowFrame
+                
+                local Track = Instance.new("ImageButton")
+                Track.Size = UDim2.new(1, -55, 0, 6)
+                Track.Position = UDim2.new(0, 20, 0.5, -3)
+                Track.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+                Track.AutoButtonColor = false
+                Track.Parent = RowFrame
+                
+                local TrackCorner = Instance.new("UICorner")
+                TrackCorner.CornerRadius = UDim.new(0, 3)
+                TrackCorner.Parent = Track
+                
+                local Gradient = Instance.new("UIGradient")
+                Gradient.Parent = Track
+                
+                local Thumb = Instance.new("Frame")
+                Thumb.Size = UDim2.new(0, 10, 0, 10)
+                Thumb.AnchorPoint = Vector2.new(0.5, 0.5)
+                Thumb.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+                Thumb.Parent = Track
+                
+                local ThumbCorner = Instance.new("UICorner")
+                ThumbCorner.CornerRadius = UDim.new(1, 0)
+                ThumbCorner.Parent = Thumb
+                
+                local ThumbStroke = Instance.new("UIStroke")
+                ThumbStroke.Color = Color3.fromRGB(0, 0, 0)
+                ThumbStroke.Thickness = 1
+                ThumbStroke.Parent = Thumb
+                
+                local ValLabel = Instance.new("TextLabel")
+                ValLabel.Size = UDim2.new(0, 30, 1, 0)
+                ValLabel.Position = UDim2.new(1, -30, 0, 0)
+                ValLabel.BackgroundTransparency = 1
+                ValLabel.TextColor3 = Library.Theme.Text
+                ValLabel.Font = Enum.Font.GothamMedium
+                ValLabel.TextSize = 9
+                ValLabel.TextXAlignment = Enum.TextXAlignment.Right
+                ValLabel.Parent = RowFrame
+                
+                local val = initVal
+                local isDragging = false
+                local scrollFrame = nil
+                
+                local function setScrolling(scrollState)
+                    if not scrollFrame then
+                        scrollFrame = getParentScrollingFrame(PickerFrame)
+                    end
+                    if scrollFrame then
+                        scrollFrame.ScrollingEnabled = scrollState
+                    end
+                end
+                
+                local function updateDrag()
+                    local mouseLocation = getMousePosition()
+                    local percentage = math.clamp((mouseLocation.X - Track.AbsolutePosition.X) / Track.AbsoluteSize.X, 0, 1)
+                    val = minVal + ((maxVal - minVal) * percentage)
+                    
+                    local displayPercentage = (val - minVal) / (maxVal - minVal)
+                    Thumb.Position = UDim2.new(displayPercentage, 0, 0.5, 0)
+                    ValLabel.Text = tostring(math.round(val)) .. suffixText
+                    
+                    if rowName == "H" then currentHue = val / 360
+                    elseif rowName == "S" then currentSat = val / 100
+                    elseif rowName == "V" then currentVal = val / 100
+                    elseif rowName == "A" then currentAlpha = val / 100
+                    end
+                    
+                    updateAllColors("slider")
+                end
+                
+                local dragConnection = nil
+                Track.InputBegan:Connect(function(input)
+                    if isClickInput(input) then
+                        isDragging = true
+                        setScrolling(false)
+                        if dragConnection then dragConnection:Disconnect() end
+                        dragConnection = RunService.RenderStepped:Connect(updateDrag)
+                        updateDrag()
+                    end
+                end)
+                
+                trackConnection(UserInputService.InputEnded:Connect(function(input)
+                    if isClickInput(input) and isDragging then
+                        isDragging = false
+                        if dragConnection then dragConnection:Disconnect(); dragConnection = nil end
+                        setScrolling(true)
+                    end
+                end))
+                
+                local function setValue(newVal)
+                    val = newVal
+                    local displayPercentage = (val - minVal) / (maxVal - minVal)
+                    Thumb.Position = UDim2.new(displayPercentage, 0, 0.5, 0)
+                    ValLabel.Text = tostring(math.round(val)) .. suffixText
+                end
+                
+                sliders[rowName] = {setValue = setValue, Track = Track, Gradient = Gradient}
+                setupGradientFunc(Gradient, Track)
+            end
+            
+            -- Инициализируем 4 слайдера
+            -- 1. HUE (0-360)
+            createMiniSlider("H", 0, 360, currentHue * 360, "", function(grad)
+                grad.Color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+                    ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255, 255, 0)),
+                    ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0, 255, 0)),
+                    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 255)),
+                    ColorSequenceKeypoint.new(0.67, Color3.fromRGB(0, 0, 255)),
+                    ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255, 0, 255)),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0))
+                })
+            end)
+            
+            -- 2. SATURATION (0-100)
+            createMiniSlider("S", 0, 100, currentSat * 100, "%", function(grad)
+                grad.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromHSV(currentHue, 1, 1))
+            end)
+            
+            -- 3. VALUE/BRIGHTNESS (0-100)
+            createMiniSlider("V", 0, 100, currentVal * 100, "%", function(grad)
+                grad.Color = ColorSequence.new(Color3.fromRGB(0, 0, 0), Color3.fromHSV(currentHue, 1, 1))
+            end)
+            
+            -- 4. ALPHA (0-100)
+            createMiniSlider("A", 0, 100, currentAlpha * 100, "%", function(grad, track)
+                track.BackgroundColor3 = Color3.fromHSV(currentHue, currentSat, currentVal)
+                grad.Transparency = NumberSequence.new({
+                    NumberSequenceKeypoint.new(0, 1),
+                    NumberSequenceKeypoint.new(1, 0)
+                })
+            end)
+            
+            -- Hex и RGB строка внизу
+            local BottomRow = Instance.new("Frame")
+            BottomRow.Size = UDim2.new(1, -12, 0, 20)
+            BottomRow.BackgroundTransparency = 1
+            BottomRow.Parent = PickerContainer
+            
             local HexInputFrame = Instance.new("Frame")
             HexInputFrame.Size = UDim2.new(0, 64, 0, 18)
-            HexInputFrame.Position = UDim2.new(0, 154, 0, 12)
+            HexInputFrame.Position = UDim2.new(0, 20, 0, 0)
             HexInputFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 36)
-            HexInputFrame.Parent = PickerContainer
-
+            HexInputFrame.Parent = BottomRow
+            
             local HexCorner = Instance.new("UICorner")
             HexCorner.CornerRadius = UDim.new(0, 3)
             HexCorner.Parent = HexInputFrame
-
+            
             local HexStroke = Instance.new("UIStroke")
             HexStroke.Color = Library.Theme.Stroke
             HexStroke.Thickness = 1
             HexStroke.Parent = HexInputFrame
-
+            
             local HexBox = Instance.new("TextBox")
             HexBox.Size = UDim2.new(1, -6, 1, 0)
             HexBox.Position = UDim2.new(0, 3, 0, 0)
@@ -1671,139 +1766,54 @@ function Library:Init()
             HexBox.Parent = HexInputFrame
 
             local RgbLabel = Instance.new("TextLabel")
-            RgbLabel.Size = UDim2.new(0, 64, 0, 18)
-            RgbLabel.Position = UDim2.new(0, 154, 0, 36)
+            RgbLabel.Size = UDim2.new(0, 100, 0, 18)
+            RgbLabel.Position = UDim2.new(0, 90, 0, 0)
             RgbLabel.BackgroundTransparency = 1
             RgbLabel.Font = Enum.Font.GothamMedium
             RgbLabel.TextSize = 8
             RgbLabel.TextColor3 = Library.Theme.TextDim
-            RgbLabel.TextXAlignment = Enum.TextXAlignment.Center
-            RgbLabel.Parent = PickerContainer
+            RgbLabel.TextXAlignment = Enum.TextXAlignment.Left
+            RgbLabel.Parent = BottomRow
 
-            local function updateAllColors(source)
+            -- Разметка контейнера слайдеров
+            local PickerPadding = Instance.new("UIPadding")
+            PickerPadding.PaddingLeft = UDim.new(0, 6)
+            PickerPadding.PaddingRight = UDim.new(0, 6)
+            PickerPadding.PaddingTop = UDim.new(0, 6)
+            PickerPadding.PaddingBottom = UDim.new(0, 6)
+            PickerPadding.Parent = PickerContainer
+            
+            local PickerLayout = Instance.new("UIListLayout")
+            PickerLayout.SortOrder = Enum.SortOrder.LayoutOrder
+            PickerLayout.Padding = UDim.new(0, 4)
+            PickerLayout.Parent = PickerContainer
+
+            updateAllColors = function(source)
                 local solidColor = Color3.fromHSV(currentHue, currentSat, currentVal)
                 ColorBox.BackgroundColor3 = solidColor
                 ColorBox.BackgroundTransparency = 1 - currentAlpha
                 
                 local r, g, b = math.round(solidColor.R * 255), math.round(solidColor.G * 255), math.round(solidColor.B * 255)
-                RgbLabel.Text = string.format("%d,%d,%d", r, g, b)
+                RgbLabel.Text = string.format("RGB: %d, %d, %d", r, g, b)
 
                 if source ~= "hex" then
                     HexBox.Text = rgbToHex(solidColor)
                 end
 
                 if source == "hex" or source == "init" then
-                    Cursor.Position = UDim2.new(currentSat, 0, 1 - currentVal, 0)
-                    HueCursor.Position = UDim2.new(0.5, 0, currentHue, 0)
-                    AlphaCursor.Position = UDim2.new(0.5, 0, currentAlpha, 0)
+                    sliders["H"].setValue(currentHue * 360)
+                    sliders["S"].setValue(currentSat * 100)
+                    sliders["V"].setValue(currentVal * 100)
+                    sliders["A"].setValue(currentAlpha * 100)
                 end
 
-                SatValCanvas.BackgroundColor3 = Color3.fromHSV(currentHue, 1, 1)
-                AlphaGradient.Color = ColorSequence.new(solidColor)
+                -- Динамическое обновление градиентов других слайдеров
+                sliders["S"].Gradient.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromHSV(currentHue, 1, 1))
+                sliders["V"].Gradient.Color = ColorSequence.new(Color3.fromRGB(0, 0, 0), Color3.fromHSV(currentHue, 1, 1))
+                sliders["A"].Track.BackgroundColor3 = solidColor
 
                 callback(solidColor, currentAlpha)
             end
-
-            local function updateCanvasFromMouse()
-                local mouseLocation = getMousePosition()
-                local relativeX = mouseLocation.X - SatValCanvas.AbsolutePosition.X
-                local relativeY = mouseLocation.Y - SatValCanvas.AbsolutePosition.Y
-
-                local percentageX = math.clamp(relativeX / SatValCanvas.AbsoluteSize.X, 0, 1)
-                local percentageY = math.clamp(relativeY / SatValCanvas.AbsoluteSize.Y, 0, 1)
-                
-                currentSat = percentageX
-                currentVal = 1 - percentageY
-                
-                Cursor.Position = UDim2.new(currentSat, 0, percentageY, 0)
-                updateAllColors("canvas")
-            end
-
-            local function updateHueFromMouse()
-                local mouseLocation = getMousePosition()
-                local relativeY = mouseLocation.Y - HueSlider.AbsolutePosition.Y
-                local percentageY = math.clamp(relativeY / HueSlider.AbsoluteSize.Y, 0, 1)
-                
-                currentHue = percentageY
-                
-                HueCursor.Position = UDim2.new(0.5, 0, percentageY, 0)
-                updateAllColors("hue")
-            end
-
-            local function updateAlphaFromMouse()
-                local mouseLocation = getMousePosition()
-                local relativeY = mouseLocation.Y - AlphaTrack.AbsolutePosition.Y
-                local percentageY = math.clamp(relativeY / AlphaTrack.AbsoluteSize.Y, 0, 1)
-                
-                currentAlpha = percentageY
-                
-                AlphaCursor.Position = UDim2.new(0.5, 0, percentageY, 0)
-                updateAllColors("alpha")
-            end
-
-            local isDraggingCanvas = false
-            local isDraggingHue = false
-            local isDraggingAlpha = false
-            
-            local scrollFrame = nil
-            local function setScrolling(scrollState)
-                if not scrollFrame then
-                    scrollFrame = getParentScrollingFrame(PickerFrame)
-                end
-                if scrollFrame then
-                    scrollFrame.ScrollingEnabled = scrollState
-                end
-            end
-
-            local canvasConnection = nil
-            local hueConnection = nil
-            local alphaConnection = nil
-
-            SatValCanvas.InputBegan:Connect(function(input)
-                if isClickInput(input) then
-                    isDraggingCanvas = true
-                    setScrolling(false)
-                    if canvasConnection then canvasConnection:Disconnect() end
-                    canvasConnection = RunService.RenderStepped:Connect(updateCanvasFromMouse)
-                    updateCanvasFromMouse()
-                end
-            end)
-
-            HueSlider.InputBegan:Connect(function(input)
-                if isClickInput(input) then
-                    isDraggingHue = true
-                    setScrolling(false)
-                    if hueConnection then hueConnection:Disconnect() end
-                    hueConnection = RunService.RenderStepped:Connect(updateHueFromMouse)
-                    updateHueFromMouse()
-                end
-            end)
-
-            AlphaTrack.InputBegan:Connect(function(input)
-                if isClickInput(input) then
-                    isDraggingAlpha = true
-                    setScrolling(false)
-                    if alphaConnection then alphaConnection:Disconnect() end
-                    alphaConnection = RunService.RenderStepped:Connect(updateAlphaFromMouse)
-                    updateAlphaFromMouse()
-                end
-            end)
-
-            trackConnection(UserInputService.InputEnded:Connect(function(input)
-                if isClickInput(input) then
-                    if isDraggingCanvas or isDraggingHue or isDraggingAlpha then
-                        isDraggingCanvas = false
-                        isDraggingHue = false
-                        isDraggingAlpha = false
-                        
-                        if canvasConnection then canvasConnection:Disconnect(); canvasConnection = nil end
-                        if hueConnection then hueConnection:Disconnect(); hueConnection = nil end
-                        if alphaConnection then alphaConnection:Disconnect(); alphaConnection = nil end
-                        
-                        setScrolling(true)
-                    end
-                end
-            end))
 
             HexBox.FocusLost:Connect(function()
                 local text = HexBox.Text
@@ -1832,7 +1842,7 @@ function Library:Init()
             local function openPickerPanel()
                 isPickerOpen = true
                 PickerContainer.Visible = true
-                PickerContainer.Size = UDim2.new(1, 0, 0, 82)
+                PickerContainer.Size = UDim2.new(1, 0, 0, 94)
                 PickerFrame.ZIndex = 100
                 pickerPopupId = openPopup(PickerFrame, closePicker)
             end
