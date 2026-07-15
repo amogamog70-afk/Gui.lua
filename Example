@@ -222,7 +222,6 @@ function Library:Init()
     -- FIX #7/#8: Система управления popup-ами (dropdowns, colorpickers)
     local _currentPopup = nil -- {id = number, frame = Frame, close = function}
     local _popupIdCounter = 0
-    local _ignoreNextPopupClose = false -- FIX #DROPDOWN: Flag to prevent popup close on option clicks
 
     local function openPopup(frame, closeFunc)
         _popupIdCounter = _popupIdCounter + 1
@@ -467,13 +466,9 @@ function Library:Init()
         end
     end))
 
-    -- FIX #7/#8/#DROPDOWN: Глобальный обработчик клика для закрытия popup-ов при клике вне них
+    -- FIX #7/#8: Глобальный обработчик клика для закрытия popup-ов при клике вне них
     trackConnection(UserInputService.InputBegan:Connect(function(input)
         if isClickInput(input) and _currentPopup then
-            if _ignoreNextPopupClose then
-                _ignoreNextPopupClose = false
-                return
-            end
             local popup = _currentPopup
             if not isMouseOverPopup(popup) then
                 task.defer(function()
@@ -646,7 +641,7 @@ function Library:Init()
             end
         end
 
-        -- 2. Фильтруем окна: окно отображается в результатах поиска, если в нем есть хотя бы один подходящий эле[...]
+        -- 2. Фильтруем окна: окно отображается в результатах поиска, если в нем есть хотя бы один подходящий элемент,
         --    ИЛИ если само название окна совпадает с запросом (тогда показываем все элементы этого окна!)
         local visibleWindows = {}
         for _, win in ipairs(_allWindows) do
@@ -1001,6 +996,10 @@ function Library:Init()
                 tween(Box, 0.1, {BackgroundColor3 = state and Library.Theme.Accent or Color3.fromRGB(30, 30, 36)})
                 tween(BoxStroke, 0.1, {Color = state and Library.Theme.Accent or Library.Theme.Stroke})
                 tween(Label, 0.1, {TextColor3 = state and Library.Theme.Text or Library.Theme.TextDim})
+                
+                -- English automatic notification
+                Main:Notify(toggleText, state and "Enabled" or "Disabled", 2)
+                
                 callback(state)
             end
 
@@ -1065,7 +1064,7 @@ function Library:Init()
 
             local SliderFrame = Instance.new("Frame")
             SliderFrame.Name = sliderText .. "Slider"
-            SliderFrame.Size = UDim2.new(1, 0, 0, 24)
+            SliderFrame.Size = UDim2.new(1, 0, 0, 24) -- Ровно 24 пикселя высоты
             SliderFrame.BackgroundTransparency = 1
             SliderFrame.Parent = container
 
@@ -1075,6 +1074,7 @@ function Library:Init()
             ContentRow.BackgroundTransparency = 1
             ContentRow.Parent = SliderFrame
 
+            -- Текст названия занимает ровно 40% ширины
             local Label = Instance.new("TextLabel")
             Label.Name = "Label"
             Label.Size = UDim2.new(0.4, 0, 1, 0)
@@ -1084,9 +1084,10 @@ function Library:Init()
             Label.Font = Enum.Font.Gotham
             Label.TextSize = 10
             Label.TextXAlignment = Enum.TextXAlignment.Left
-            Label.TextTruncate = Enum.TextTruncate.AtEnd
+            Label.TextTruncate = Enum.TextTruncate.AtEnd -- Исключает любые наложения текста на трек
             Label.Parent = ContentRow
 
+            -- Трек ползунка начинается после 40% и занимает оставшуюся часть за вычетом индикатора
             local Track = Instance.new("Frame")
             Track.Size = UDim2.new(0.6, -60, 0, 4)
             Track.Position = UDim2.new(0.4, 5, 0.5, -2)
@@ -1127,7 +1128,7 @@ function Library:Init()
 
             local ValLabel = Instance.new("TextLabel")
             ValLabel.Size = UDim2.new(0, 50, 1, 0)
-            ValLabel.Position = UDim2.new(1, -50, 0, 0)
+            ValLabel.Position = UDim2.new(1, -50, 0, 0) -- Выравнивание значения по правому краю
             ValLabel.BackgroundTransparency = 1
             ValLabel.Text = formatValue(val)
             ValLabel.TextColor3 = Library.Theme.Text
@@ -1200,14 +1201,14 @@ function Library:Init()
             return SliderFrame
         end
 
-        -- Текстовое поле (TextBox)
+        -- Поле ввода (TextBox)
         function Elements:CreateTextBox(textBoxText, placeholder, callback, tooltipText)
             callback = callback or function() end
             placeholder = placeholder or "Type..."
 
             local TextFrame = Instance.new("Frame")
             TextFrame.Name = textBoxText .. "TextBox"
-            TextFrame.Size = UDim2.new(1, 0, 0, 24)
+            TextFrame.Size = UDim2.new(1, 0, 0, 24) -- Ровно 24 пикселя высоты
             TextFrame.BackgroundTransparency = 1
             TextFrame.Parent = container
 
@@ -1219,7 +1220,7 @@ function Library:Init()
 
             local Label = Instance.new("TextLabel")
             Label.Name = "Label"
-            Label.Size = UDim2.new(1, -115, 1, 0)
+            Label.Size = UDim2.new(1, -115, 1, 0) -- Автоматическая ширина до инпут-бокса
             Label.BackgroundTransparency = 1
             Label.Text = textBoxText
             Label.TextColor3 = Library.Theme.TextDim
@@ -1231,7 +1232,7 @@ function Library:Init()
 
             local BoxBg = Instance.new("Frame")
             BoxBg.Size = UDim2.new(0, 110, 0, 20)
-            BoxBg.Position = UDim2.new(1, -110, 0.5, -10)
+            BoxBg.Position = UDim2.new(1, -110, 0.5, -10) -- Прижато к правому краю
             BoxBg.BackgroundColor3 = Color3.fromRGB(30, 30, 36)
             BoxBg.Parent = ContentRow
 
@@ -1278,7 +1279,7 @@ function Library:Init()
             return TextFrame
         end
 
-        -- FIX #DROPDOWN: Updated CreateDropdown with _ignoreNextPopupClose flag
+        -- Выпадающий список (Dropdown) — FIX #4, #7
         function Elements:CreateDropdown(dropdownText, options, isMulti, default, callback, tooltipText)
             callback = callback or function() end
             isMulti = isMulti or false
@@ -1286,7 +1287,7 @@ function Library:Init()
             
             local DropdownFrame = Instance.new("Frame")
             DropdownFrame.Name = dropdownText .. "Dropdown"
-            DropdownFrame.Size = UDim2.new(1, 0, 0, 24)
+            DropdownFrame.Size = UDim2.new(1, 0, 0, 24) -- Высота 24px (в закрытом виде)
             DropdownFrame.BackgroundTransparency = 1
             DropdownFrame.AutomaticSize = Enum.AutomaticSize.Y
             DropdownFrame.Parent = container
@@ -1319,25 +1320,27 @@ function Library:Init()
             Label.Parent = HeaderBtn
             
             local Indicator = Instance.new("TextLabel")
-            Indicator.Size = UDim2.new(0, 16, 1, 0)
-            Indicator.Position = UDim2.new(1, -20, 0, 0)
+            Indicator.Size = UDim2.new(0, 20, 1, 0)
+            Indicator.Position = UDim2.new(1, -24, 0, 0)
             Indicator.BackgroundTransparency = 1
             Indicator.Text = "▼"
             Indicator.TextColor3 = Library.Theme.TextDim
-            Indicator.Font = Enum.Font.Gotham
-            Indicator.TextSize = 10
+            Indicator.Font = Enum.Font.GothamBold
+            Indicator.TextSize = 9
             Indicator.Parent = HeaderBtn
             
             local OptionsScroll = Instance.new("ScrollingFrame")
             OptionsScroll.Name = "OptionsScroll"
             OptionsScroll.Size = UDim2.new(1, 0, 0, 0)
-            OptionsScroll.BackgroundColor3 = Library.Theme.Card
+            OptionsScroll.Position = UDim2.new(0, 0, 0, 26)
+            OptionsScroll.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
             OptionsScroll.BorderSizePixel = 0
-            OptionsScroll.LayoutOrder = 2
+            OptionsScroll.ScrollBarThickness = 2
+            OptionsScroll.ScrollBarImageColor3 = Library.Theme.Stroke
             OptionsScroll.Visible = false
             OptionsScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
             OptionsScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-            OptionsScroll.Active = false
+            OptionsScroll.Active = true
             OptionsScroll.LayoutOrder = 2
             OptionsScroll.Parent = DropdownFrame
             
@@ -1352,7 +1355,7 @@ function Library:Init()
             
             local ScrollLayout = Instance.new("UIListLayout")
             ScrollLayout.SortOrder = Enum.SortOrder.LayoutOrder
-            ScrollLayout.Padding = UDim.new(0, 2)
+            ScrollLayout.Padding = UDim.new(0, 1)
             ScrollLayout.Parent = OptionsScroll
             
             local ScrollPadding = Instance.new("UIPadding")
@@ -1379,8 +1382,9 @@ function Library:Init()
                     isOpen = false
                     OptionsScroll.Visible = false
                     Indicator.Text = "▼"
-                    Label.TextColor3 = Library.Theme.TextDim
+                    Label.TextColor3 = Library.Theme.TextDim -- FIX #4: Label вместо HeaderBtn
                     OptionsScroll.Size = UDim2.new(1, 0, 0, 0)
+                    DropdownFrame.ZIndex = 1
                     clearPopup(popupId)
                 end
             end
@@ -1389,10 +1393,11 @@ function Library:Init()
                 isOpen = true
                 OptionsScroll.Visible = true
                 Indicator.Text = "▲"
-                Label.TextColor3 = Library.Theme.Accent
+                Label.TextColor3 = Library.Theme.Accent -- FIX #4: Label вместо HeaderBtn
                 local itemsCount = #options
-                local calculatedHeight = math.min(itemsCount * 22 + 8, 100)
+                local calculatedHeight = math.min(itemsCount * 28 + 8, 180)
                 OptionsScroll.Size = UDim2.new(1, 0, 0, calculatedHeight)
+                DropdownFrame.ZIndex = 100
                 popupId = openPopup(DropdownFrame, closeDropdown)
             end
             
@@ -1408,14 +1413,50 @@ function Library:Init()
             for i, opt in ipairs(options) do
                 local OptBtn = Instance.new("TextButton")
                 OptBtn.Name = opt .. "Opt"
-                OptBtn.Size = UDim2.new(1, 0, 0, 20)
+                OptBtn.Size = UDim2.new(1, 0, 0, 26)
                 OptBtn.BackgroundTransparency = 1
                 OptBtn.Text = ""
+                OptBtn.AutoButtonColor = false
                 OptBtn.Parent = OptionsScroll
                 
+                local OptCorner = Instance.new("UICorner")
+                OptCorner.CornerRadius = UDim.new(0, 4)
+                OptCorner.Parent = OptBtn
+
+                local IndicatorBox = Instance.new("Frame")
+                IndicatorBox.Name = "IndicatorBox"
+                IndicatorBox.Size = UDim2.new(0, 12, 0, 12)
+                IndicatorBox.Position = UDim2.new(0, 6, 0.5, -6)
+                IndicatorBox.BackgroundColor3 = Color3.fromRGB(30, 30, 36)
+                IndicatorBox.Parent = OptBtn
+
+                local BoxCorner = Instance.new("UICorner")
+                BoxCorner.CornerRadius = isMulti and UDim.new(0, 3) or UDim.new(1, 0)
+                BoxCorner.Parent = IndicatorBox
+
+                local BoxStroke = Instance.new("UIStroke")
+                BoxStroke.Color = Library.Theme.Stroke
+                BoxStroke.Thickness = 1
+                BoxStroke.Parent = IndicatorBox
+
+                local CheckDot = Instance.new("Frame")
+                CheckDot.Name = "CheckDot"
+                CheckDot.AnchorPoint = Vector2.new(0.5, 0.5)
+                CheckDot.Position = UDim2.new(0.5, 0, 0.5, 0)
+                CheckDot.BackgroundColor3 = Library.Theme.Accent
+                CheckDot.BorderSizePixel = 0
+                CheckDot.Visible = selected[opt] or false
+                CheckDot.Parent = IndicatorBox
+
+                local DotCorner = Instance.new("UICorner")
+                DotCorner.CornerRadius = isMulti and UDim.new(0, 2) or UDim.new(1, 0)
+                DotCorner.Parent = CheckDot
+
+                CheckDot.Size = isMulti and UDim2.new(0, 8, 0, 8) or UDim2.new(0, 6, 0, 6)
+
                 local OptLabel = Instance.new("TextLabel")
-                OptLabel.Size = UDim2.new(1, -20, 1, 0)
-                OptLabel.Position = UDim2.new(0, 4, 0, 0)
+                OptLabel.Size = UDim2.new(1, -30, 1, 0)
+                OptLabel.Position = UDim2.new(0, 26, 0, 0)
                 OptLabel.BackgroundTransparency = 1
                 OptLabel.Text = opt
                 OptLabel.TextColor3 = selected[opt] and Library.Theme.Text or Library.Theme.TextDim
@@ -1424,24 +1465,25 @@ function Library:Init()
                 OptLabel.TextXAlignment = Enum.TextXAlignment.Left
                 OptLabel.Parent = OptBtn
                 
-                local Check = Instance.new("TextLabel")
-                Check.Size = UDim2.new(0, 14, 1, 0)
-                Check.Position = UDim2.new(1, -14, 0, 0)
-                Check.BackgroundTransparency = 1
-                Check.Text = selected[opt] and "✓" or ""
-                Check.TextColor3 = Library.Theme.Accent
-                Check.Font = Enum.Font.GothamBold
-                Check.TextSize = 10
-                Check.Parent = OptBtn
-                
+                OptBtn.MouseEnter:Connect(function()
+                    tween(OptBtn, 0.1, {BackgroundTransparency = 0, BackgroundColor3 = Color3.fromRGB(40, 40, 50)})
+                    tween(OptLabel, 0.1, {TextColor3 = Library.Theme.Text})
+                end)
+                OptBtn.MouseLeave:Connect(function()
+                    tween(OptBtn, 0.1, {BackgroundTransparency = 1})
+                    tween(OptLabel, 0.1, {TextColor3 = selected[opt] and Library.Theme.Text or Library.Theme.TextDim})
+                end)
+
+                local function updateOptionState(stateVal)
+                    CheckDot.Visible = stateVal
+                    BoxStroke.Color = stateVal and Library.Theme.Accent or Library.Theme.Stroke
+                    OptLabel.TextColor3 = stateVal and Library.Theme.Text or Library.Theme.TextDim
+                end
+
                 OptBtn.MouseButton1Click:Connect(function()
-                    -- FIX #DROPDOWN: Set flag to ignore popup close on this click
-                    _ignoreNextPopupClose = true
-                    
                     if isMulti then
                         selected[opt] = not selected[opt]
-                        OptLabel.TextColor3 = selected[opt] and Library.Theme.Text or Library.Theme.TextDim
-                        Check.Text = selected[opt] and "✓" or ""
+                        updateOptionState(selected[opt])
                         
                         local currentSelection = {}
                         for k, v in pairs(selected) do
@@ -1451,18 +1493,16 @@ function Library:Init()
                     else
                         for o, btn in pairs(optionButtons) do
                             selected[o] = false
-                            btn.Label.TextColor3 = Library.Theme.TextDim
-                            btn.Check.Text = ""
+                            btn.update(false)
                         end
                         selected[opt] = true
-                        OptLabel.TextColor3 = Library.Theme.Text
-                        Check.Text = "✓"
+                        updateOptionState(true)
                         closeDropdown()
                         callback(opt)
                     end
                 end)
                 
-                optionButtons[opt] = {Label = OptLabel, Check = Check}
+                optionButtons[opt] = {update = updateOptionState}
             end
             
             if tooltipText then
@@ -1474,29 +1514,44 @@ function Library:Init()
             return DropdownFrame
         end
 
-        -- Цветовая палетка (ColorPicker)
-        function Elements:CreateColorPicker(pickerText, default, callback, tooltipText)
+        -- Современный Выбор цвета с компактным 4-слайдерным интерфейсом (H, S, V, A)
+        function Elements:CreateColorPicker(pickerText, defaultColor, callback, tooltipText)
             callback = callback or function() end
-            default = default or Color3.fromRGB(145, 70, 255)
-            
-            local currentColor = default
+            defaultColor = defaultColor or Color3.fromRGB(255, 255, 255)
             
             local PickerFrame = Instance.new("Frame")
-            PickerFrame.Name = pickerText .. "Picker"
-            PickerFrame.Size = UDim2.new(1, 0, 0, 24)
+            PickerFrame.Name = pickerText .. "ColorPicker"
+            PickerFrame.Size = UDim2.new(1, 0, 0, 24) -- Высота 24px (в закрытом виде)
             PickerFrame.BackgroundTransparency = 1
             PickerFrame.AutomaticSize = Enum.AutomaticSize.Y
             PickerFrame.Parent = container
             
+            local MainRow = Instance.new("Frame")
+            MainRow.Name = "MainRow"
+            MainRow.Size = UDim2.new(1, 0, 0, 24)
+            MainRow.BackgroundTransparency = 1
+            MainRow.Parent = PickerFrame
+            
+            local Label = Instance.new("TextLabel")
+            Label.Name = "Label"
+            Label.Size = UDim2.new(1, -30, 1, 0)
+            Label.BackgroundTransparency = 1
+            Label.Text = pickerText
+            Label.TextColor3 = Library.Theme.TextDim
+            Label.Font = Enum.Font.Gotham
+            Label.TextSize = 10
+            Label.TextXAlignment = Enum.TextXAlignment.Left
+            Label.Parent = MainRow
+            
             local ColorBox = Instance.new("TextButton")
-            ColorBox.Name = "ColorBox"
-            ColorBox.Size = UDim2.new(1, 0, 0, 24)
-            ColorBox.BackgroundColor3 = currentColor
+            ColorBox.Size = UDim2.new(0, 20, 0, 14)
+            ColorBox.Position = UDim2.new(1, -20, 0.5, -7) -- Прижат к правому краю
+            ColorBox.BackgroundColor3 = defaultColor
             ColorBox.Text = ""
-            ColorBox.Parent = PickerFrame
+            ColorBox.Parent = MainRow
             
             local ColorCorner = Instance.new("UICorner")
-            ColorCorner.CornerRadius = UDim.new(0, 4)
+            ColorCorner.CornerRadius = UDim.new(0, 3)
             ColorCorner.Parent = ColorBox
             
             local ColorStroke = Instance.new("UIStroke")
@@ -1504,26 +1559,223 @@ function Library:Init()
             ColorStroke.Thickness = 1
             ColorStroke.Parent = ColorBox
             
-            local PickerContainer = Instance.new("ScrollingFrame")
+            local PickerContainer = Instance.new("Frame")
             PickerContainer.Name = "PickerContainer"
             PickerContainer.Size = UDim2.new(1, 0, 0, 0)
-            PickerContainer.BackgroundColor3 = Library.Theme.Card
+            PickerContainer.Position = UDim2.new(0, 0, 0, 26)
+            PickerContainer.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
             PickerContainer.BorderSizePixel = 0
-            PickerContainer.LayoutOrder = 2
             PickerContainer.Visible = false
-            PickerContainer.ScrollBarThickness = 0
-            PickerContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
+            PickerContainer.ClipsDescendants = true
+            PickerContainer.LayoutOrder = 2
             PickerContainer.Parent = PickerFrame
             
-            local PickerCorner = Instance.new("UICorner")
-            PickerCorner.CornerRadius = UDim.new(0, 4)
-            PickerCorner.Parent = PickerContainer
+            local ContainerCorner = Instance.new("UICorner")
+            ContainerCorner.CornerRadius = UDim.new(0, 4)
+            ContainerCorner.Parent = PickerContainer
             
-            local PickerStroke = Instance.new("UIStroke")
-            PickerStroke.Color = Library.Theme.Stroke
-            PickerStroke.Thickness = 1
-            PickerStroke.Parent = PickerContainer
+            local ContainerStroke = Instance.new("UIStroke")
+            ContainerStroke.Color = Library.Theme.Stroke
+            ContainerStroke.Thickness = 1
+            ContainerStroke.Parent = PickerContainer
+
+            local currentHue, currentSat, currentVal = defaultColor:ToHSV()
+            local currentAlpha = 1
             
+            local sliders = {}
+            local updateAllColors -- Задекларируем
+            
+            local function createMiniSlider(rowName, minVal, maxVal, initVal, suffixText, setupGradientFunc)
+                local RowFrame = Instance.new("Frame")
+                RowFrame.Size = UDim2.new(1, -12, 0, 14)
+                RowFrame.BackgroundTransparency = 1
+                RowFrame.Parent = PickerContainer
+                
+                local RowLabel = Instance.new("TextLabel")
+                RowLabel.Size = UDim2.new(0, 15, 1, 0)
+                RowLabel.BackgroundTransparency = 1
+                RowLabel.Text = rowName
+                RowLabel.TextColor3 = Library.Theme.TextDim
+                RowLabel.Font = Enum.Font.GothamBold
+                RowLabel.TextSize = 9
+                RowLabel.TextXAlignment = Enum.TextXAlignment.Left
+                RowLabel.Parent = RowFrame
+                
+                local Track = Instance.new("ImageButton")
+                Track.Size = UDim2.new(1, -55, 0, 6)
+                Track.Position = UDim2.new(0, 20, 0.5, -3)
+                Track.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+                Track.AutoButtonColor = false
+                Track.Parent = RowFrame
+                
+                local TrackCorner = Instance.new("UICorner")
+                TrackCorner.CornerRadius = UDim.new(0, 3)
+                TrackCorner.Parent = Track
+                
+                local Gradient = Instance.new("UIGradient")
+                Gradient.Parent = Track
+                
+                local Thumb = Instance.new("Frame")
+                Thumb.Size = UDim2.new(0, 10, 0, 10)
+                Thumb.AnchorPoint = Vector2.new(0.5, 0.5)
+                Thumb.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+                Thumb.Parent = Track
+                
+                local ThumbCorner = Instance.new("UICorner")
+                ThumbCorner.CornerRadius = UDim.new(1, 0)
+                ThumbCorner.Parent = Thumb
+                
+                local ThumbStroke = Instance.new("UIStroke")
+                ThumbStroke.Color = Color3.fromRGB(0, 0, 0)
+                ThumbStroke.Thickness = 1
+                ThumbStroke.Parent = Thumb
+                
+                local ValLabel = Instance.new("TextLabel")
+                ValLabel.Size = UDim2.new(0, 30, 1, 0)
+                ValLabel.Position = UDim2.new(1, -30, 0, 0)
+                ValLabel.BackgroundTransparency = 1
+                ValLabel.TextColor3 = Library.Theme.Text
+                ValLabel.Font = Enum.Font.GothamMedium
+                ValLabel.TextSize = 9
+                ValLabel.TextXAlignment = Enum.TextXAlignment.Right
+                ValLabel.Parent = RowFrame
+                
+                local val = initVal
+                local isDragging = false
+                local scrollFrame = nil
+                
+                local function setScrolling(scrollState)
+                    if not scrollFrame then
+                        scrollFrame = getParentScrollingFrame(PickerFrame)
+                    end
+                    if scrollFrame then
+                        scrollFrame.ScrollingEnabled = scrollState
+                    end
+                end
+                
+                local function updateDrag()
+                    local mouseLocation = getMousePosition()
+                    local percentage = math.clamp((mouseLocation.X - Track.AbsolutePosition.X) / Track.AbsoluteSize.X, 0, 1)
+                    val = minVal + ((maxVal - minVal) * percentage)
+                    
+                    local displayPercentage = (val - minVal) / (maxVal - minVal)
+                    Thumb.Position = UDim2.new(displayPercentage, 0, 0.5, 0)
+                    ValLabel.Text = tostring(math.round(val)) .. suffixText
+                    
+                    if rowName == "H" then currentHue = val / 360
+                    elseif rowName == "S" then currentSat = val / 100
+                    elseif rowName == "V" then currentVal = val / 100
+                    elseif rowName == "A" then currentAlpha = val / 100
+                    end
+                    
+                    updateAllColors("slider")
+                end
+                
+                local dragConnection = nil
+                Track.InputBegan:Connect(function(input)
+                    if isClickInput(input) then
+                        isDragging = true
+                        setScrolling(false)
+                        if dragConnection then dragConnection:Disconnect() end
+                        dragConnection = RunService.RenderStepped:Connect(updateDrag)
+                        updateDrag()
+                    end
+                end)
+                
+                trackConnection(UserInputService.InputEnded:Connect(function(input)
+                    if isClickInput(input) and isDragging then
+                        isDragging = false
+                        if dragConnection then dragConnection:Disconnect(); dragConnection = nil end
+                        setScrolling(true)
+                    end
+                end))
+                
+                local function setValue(newVal)
+                    val = newVal
+                    local displayPercentage = (val - minVal) / (maxVal - minVal)
+                    Thumb.Position = UDim2.new(displayPercentage, 0, 0.5, 0)
+                    ValLabel.Text = tostring(math.round(val)) .. suffixText
+                end
+                
+                sliders[rowName] = {setValue = setValue, Track = Track, Gradient = Gradient}
+                setupGradientFunc(Gradient, Track)
+            end
+            
+            -- Инициализируем 4 слайдера
+            -- 1. HUE (0-360)
+            createMiniSlider("H", 0, 360, currentHue * 360, "", function(grad)
+                grad.Color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+                    ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255, 255, 0)),
+                    ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0, 255, 0)),
+                    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 255)),
+                    ColorSequenceKeypoint.new(0.67, Color3.fromRGB(0, 0, 255)),
+                    ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255, 0, 255)),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0))
+                })
+            end)
+            
+            -- 2. SATURATION (0-100)
+            createMiniSlider("S", 0, 100, currentSat * 100, "%", function(grad)
+                grad.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromHSV(currentHue, 1, 1))
+            end)
+            
+            -- 3. VALUE/BRIGHTNESS (0-100)
+            createMiniSlider("V", 0, 100, currentVal * 100, "%", function(grad)
+                grad.Color = ColorSequence.new(Color3.fromRGB(0, 0, 0), Color3.fromHSV(currentHue, 1, 1))
+            end)
+            
+            -- 4. ALPHA (0-100)
+            createMiniSlider("A", 0, 100, currentAlpha * 100, "%", function(grad, track)
+                track.BackgroundColor3 = Color3.fromHSV(currentHue, currentSat, currentVal)
+                grad.Transparency = NumberSequence.new({
+                    NumberSequenceKeypoint.new(0, 1),
+                    NumberSequenceKeypoint.new(1, 0)
+                })
+            end)
+            
+            -- Hex и RGB строка внизу
+            local BottomRow = Instance.new("Frame")
+            BottomRow.Size = UDim2.new(1, -12, 0, 20)
+            BottomRow.BackgroundTransparency = 1
+            BottomRow.Parent = PickerContainer
+            
+            local HexInputFrame = Instance.new("Frame")
+            HexInputFrame.Size = UDim2.new(0, 64, 0, 18)
+            HexInputFrame.Position = UDim2.new(0, 20, 0, 0)
+            HexInputFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 36)
+            HexInputFrame.Parent = BottomRow
+            
+            local HexCorner = Instance.new("UICorner")
+            HexCorner.CornerRadius = UDim.new(0, 3)
+            HexCorner.Parent = HexInputFrame
+            
+            local HexStroke = Instance.new("UIStroke")
+            HexStroke.Color = Library.Theme.Stroke
+            HexStroke.Thickness = 1
+            HexStroke.Parent = HexInputFrame
+            
+            local HexBox = Instance.new("TextBox")
+            HexBox.Size = UDim2.new(1, -6, 1, 0)
+            HexBox.Position = UDim2.new(0, 3, 0, 0)
+            HexBox.BackgroundTransparency = 1
+            HexBox.TextColor3 = Library.Theme.Text
+            HexBox.Font = Enum.Font.Gotham
+            HexBox.TextSize = 9
+            HexBox.TextXAlignment = Enum.TextXAlignment.Center
+            HexBox.Parent = HexInputFrame
+
+            local RgbLabel = Instance.new("TextLabel")
+            RgbLabel.Size = UDim2.new(0, 100, 0, 18)
+            RgbLabel.Position = UDim2.new(0, 90, 0, 0)
+            RgbLabel.BackgroundTransparency = 1
+            RgbLabel.Font = Enum.Font.GothamMedium
+            RgbLabel.TextSize = 8
+            RgbLabel.TextColor3 = Library.Theme.TextDim
+            RgbLabel.TextXAlignment = Enum.TextXAlignment.Left
+            RgbLabel.Parent = BottomRow
+
+            -- Разметка контейнера слайдеров
             local PickerPadding = Instance.new("UIPadding")
             PickerPadding.PaddingLeft = UDim.new(0, 6)
             PickerPadding.PaddingRight = UDim.new(0, 6)
@@ -1535,23 +1787,54 @@ function Library:Init()
             PickerLayout.SortOrder = Enum.SortOrder.LayoutOrder
             PickerLayout.Padding = UDim.new(0, 4)
             PickerLayout.Parent = PickerContainer
-            
-            local function updateAllColors(mode)
-                if mode == "init" then
-                    currentColor = default
-                    ColorBox.BackgroundColor3 = currentColor
-                    callback(currentColor)
+
+            updateAllColors = function(source)
+                local solidColor = Color3.fromHSV(currentHue, currentSat, currentVal)
+                ColorBox.BackgroundColor3 = solidColor
+                ColorBox.BackgroundTransparency = 1 - currentAlpha
+                
+                local r, g, b = math.round(solidColor.R * 255), math.round(solidColor.G * 255), math.round(solidColor.B * 255)
+                RgbLabel.Text = string.format("RGB: %d, %d, %d", r, g, b)
+
+                if source ~= "hex" then
+                    HexBox.Text = rgbToHex(solidColor)
                 end
+
+                if source == "hex" or source == "init" then
+                    sliders["H"].setValue(currentHue * 360)
+                    sliders["S"].setValue(currentSat * 100)
+                    sliders["V"].setValue(currentVal * 100)
+                    sliders["A"].setValue(currentAlpha * 100)
+                end
+
+                -- Динамическое обновление градиентов других слайдеров
+                sliders["S"].Gradient.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromHSV(currentHue, 1, 1))
+                sliders["V"].Gradient.Color = ColorSequence.new(Color3.fromRGB(0, 0, 0), Color3.fromHSV(currentHue, 1, 1))
+                sliders["A"].Track.BackgroundColor3 = solidColor
+
+                callback(solidColor, currentAlpha)
             end
-            
+
+            HexBox.FocusLost:Connect(function()
+                local text = HexBox.Text
+                local success, parsedColor = pcall(function() return hexToRgb(text) end)
+                if success and parsedColor then
+                    currentHue, currentSat, currentVal = parsedColor:ToHSV()
+                    updateAllColors("hex")
+                else
+                    HexBox.Text = rgbToHex(ColorBox.BackgroundColor3)
+                end
+            end)
+
             local isPickerOpen = false
             local pickerPopupId = nil
-            
+
             local function closePicker()
                 if isPickerOpen then
                     isPickerOpen = false
                     PickerContainer.Visible = false
                     PickerContainer.Size = UDim2.new(1, 0, 0, 0)
+                    PickerFrame.ZIndex = 1
                     clearPopup(pickerPopupId)
                 end
             end
@@ -1559,7 +1842,8 @@ function Library:Init()
             local function openPickerPanel()
                 isPickerOpen = true
                 PickerContainer.Visible = true
-                PickerContainer.Size = UDim2.new(1, 0, 0, 170)
+                PickerContainer.Size = UDim2.new(1, 0, 0, 94)
+                PickerFrame.ZIndex = 100
                 pickerPopupId = openPopup(PickerFrame, closePicker)
             end
 
@@ -1594,6 +1878,7 @@ function Library:Init()
         TabFrame.BackgroundColor3 = Library.Theme.Header
         TabFrame.Text = ""
         TabFrame.AutoButtonColor = false
+        TabFrame.AutomaticSize = Enum.AutomaticSize.X
         TabFrame.Parent = TabsScroll
 
         local TabCorner = Instance.new("UICorner")
@@ -1605,18 +1890,48 @@ function Library:Init()
         TabStroke.Thickness = 1
         TabStroke.Parent = TabFrame
 
-        local TabLabel = Instance.new("TextLabel")
-        TabLabel.Size = UDim2.new(1, -18, 1, 0)
-        TabLabel.Position = UDim2.new(0, 4, 0, 0)
-        TabLabel.BackgroundTransparency = 1
-        TabLabel.Text = tabName
-        TabLabel.TextColor3 = Library.Theme.TextDim
-        TabLabel.Font = Enum.Font.GothamMedium
-        TabLabel.TextSize = 10
-        TabLabel.TextXAlignment = Enum.TextXAlignment.Center
-        TabLabel.Parent = TabFrame
+        local TabPadding = Instance.new("UIPadding")
+        TabPadding.PaddingLeft = UDim.new(0, 8)
+        TabPadding.PaddingRight = UDim.new(0, 8)
+        TabPadding.Parent = TabFrame
 
-        TabFrame.AutomaticSize = Enum.AutomaticSize.X
+        local TabListLayout = Instance.new("UIListLayout")
+        TabListLayout.FillDirection = Enum.FillDirection.Horizontal
+        TabListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        TabListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+        TabListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+        TabListLayout.Padding = UDim.new(0, 5)
+        TabListLayout.Parent = TabFrame
+
+        local matchedIcon = nil
+        for name, id in pairs(TabIcons) do
+            if string.lower(name) == string.lower(tabName) then
+                matchedIcon = id
+                break
+            end
+        end
+
+        if matchedIcon then
+            local TabIcon = Instance.new("ImageLabel")
+            TabIcon.Name = "TabIcon"
+            TabIcon.Size = UDim2.new(0, 12, 0, 12)
+            TabIcon.BackgroundTransparency = 1
+            TabIcon.Image = matchedIcon
+            TabIcon.ImageColor3 = Library.Theme.TextDim
+            TabIcon.LayoutOrder = 1
+            TabIcon.Parent = TabFrame
+        end
+
+        local TabLabel = Instance.new("TextLabel")
+        TabLabel.Size = UDim2.new(0, 0, 1, 0)
+        TabLabel.AutomaticSize = Enum.AutomaticSize.X
+        TabLabel.BackgroundTransparency = 1
+        TabLabel.Text = string.upper(tabName)
+        TabLabel.TextColor3 = Library.Theme.TextDim
+        TabLabel.Font = Enum.Font.GothamBold
+        TabLabel.TextSize = 9
+        TabLabel.LayoutOrder = 2
+        TabLabel.Parent = TabFrame
 
         local Page = Instance.new("ScrollingFrame")
         Page.Name = tabName .. "Page"
@@ -1629,7 +1944,7 @@ function Library:Init()
         Page.ScrollingDirection = Enum.ScrollingDirection.Y
         Page.CanvasSize = UDim2.new(0, 0, 0, 0)
         Page.AutomaticCanvasSize = Enum.AutomaticSize.Y
-        Page.Active = true
+        Page.Active = false
         Page.Parent = PagesFolder
 
         local PagePadding = Instance.new("UIPadding")
@@ -1688,14 +2003,23 @@ function Library:Init()
 
             local WindowFrame = Instance.new("Frame")
             WindowFrame.Name = windowName .. "Window"
-            WindowFrame.Size = UDim2.new(1, 0, 0, 0)
+            WindowFrame.Size = UDim2.new(1, 0, 0, 0) 
             WindowFrame.BackgroundColor3 = Library.Theme.Card
-            WindowFrame.BorderSizePixel = 0
             WindowFrame.AutomaticSize = Enum.AutomaticSize.Y
-            WindowFrame.Parent = myWindowIndex % 2 == 1 and LeftColumn or RightColumn
+            WindowFrame.ClipsDescendants = false -- Чтобы тени и выпадающие списки не обрезались внизу
+            local originalParent = (PageData.WindowCount % 2 == 1) and LeftColumn or RightColumn
+            WindowFrame.Parent = originalParent
+
+            table.insert(_allWindows, {
+                frame = WindowFrame,
+                originalParent = originalParent,
+                name = windowName
+            })
+
+            updateLayout(tabName)
 
             local WindowCorner = Instance.new("UICorner")
-            WindowCorner.CornerRadius = UDim.new(0, 6)
+            WindowCorner.CornerRadius = UDim.new(0, 5)
             WindowCorner.Parent = WindowFrame
 
             local WindowStroke = Instance.new("UIStroke")
@@ -1703,112 +2027,241 @@ function Library:Init()
             WindowStroke.Thickness = 1
             WindowStroke.Parent = WindowFrame
 
-            local WindowHeader = Instance.new("TextLabel")
-            WindowHeader.Name = "Header"
-            WindowHeader.Size = UDim2.new(1, 0, 0, 32)
-            WindowHeader.BackgroundColor3 = Library.Theme.Section
-            WindowHeader.BorderSizePixel = 0
-            WindowHeader.Text = windowName
-            WindowHeader.TextColor3 = Library.Theme.Text
-            WindowHeader.Font = Enum.Font.GothamBold
-            WindowHeader.TextSize = 11
-            WindowHeader.TextXAlignment = Enum.TextXAlignment.Left
-            WindowHeader.Parent = WindowFrame
+            local WindowLayout = Instance.new("UIListLayout")
+            WindowLayout.SortOrder = Enum.SortOrder.LayoutOrder
+            WindowLayout.Padding = UDim.new(0, 0)
+            WindowLayout.Parent = WindowFrame
 
-            local WindowHeaderPadding = Instance.new("UIPadding")
-            WindowHeaderPadding.PaddingLeft = UDim.new(0, 12)
-            WindowHeaderPadding.Parent = WindowHeader
+            -- Шапка окна
+            local TitleBar = Instance.new("Frame")
+            TitleBar.Name = "TitleBar"
+            TitleBar.Size = UDim2.new(1, 0, 0, 28)
+            TitleBar.BackgroundTransparency = 1
+            TitleBar.LayoutOrder = 1
+            TitleBar.Parent = WindowFrame
 
-            local HeaderCorner = Instance.new("UICorner")
-            HeaderCorner.CornerRadius = UDim.new(0, 6)
-            HeaderCorner.Parent = WindowHeader
+            local TitleIndicator = Instance.new("Frame")
+            TitleIndicator.Name = "Indicator"
+            TitleIndicator.Size = UDim2.new(0, 2, 0, 10)
+            TitleIndicator.Position = UDim2.new(0, 8, 0.5, -5)
+            TitleIndicator.BackgroundColor3 = Library.Theme.Accent
+            TitleIndicator.BorderSizePixel = 0
+            TitleIndicator.Parent = TitleBar
 
-            local WindowContent = Instance.new("Frame")
-            WindowContent.Name = "Content"
-            WindowContent.Size = UDim2.new(1, 0, 0, 0)
-            WindowContent.BackgroundTransparency = 1
-            WindowContent.BorderSizePixel = 0
-            WindowContent.AutomaticSize = Enum.AutomaticSize.Y
-            WindowContent.Parent = WindowFrame
+            local WindowTitle = Instance.new("TextLabel")
+            WindowTitle.Name = "WindowTitle"
+            WindowTitle.Size = UDim2.new(1, -20, 1, 0)
+            WindowTitle.Position = UDim2.new(0, 14, 0, 0)
+            WindowTitle.BackgroundTransparency = 1
+            WindowTitle.Text = windowName
+            WindowTitle.TextColor3 = Library.Theme.Text
+            WindowTitle.Font = Enum.Font.GothamBold
+            WindowTitle.TextSize = 11
+            WindowTitle.TextXAlignment = Enum.TextXAlignment.Left
+            WindowTitle.Parent = TitleBar
 
-            local ContentLayout = Instance.new("UIListLayout")
-            ContentLayout.SortOrder = Enum.SortOrder.LayoutOrder
-            ContentLayout.Padding = UDim.new(0, 4)
-            ContentLayout.Parent = WindowContent
+            local ElementsContainer = Instance.new("Frame")
+            ElementsContainer.Name = "Elements"
+            ElementsContainer.Size = UDim2.new(1, 0, 0, 0) -- Ширина во всю карточку
+            ElementsContainer.BackgroundTransparency = 1
+            ElementsContainer.AutomaticSize = Enum.AutomaticSize.Y
+            ElementsContainer.ClipsDescendants = false
+            ElementsContainer.LayoutOrder = 2
+            ElementsContainer.Parent = WindowFrame
 
-            local ContentPadding = Instance.new("UIPadding")
-            ContentPadding.PaddingLeft = UDim.new(0, 12)
-            ContentPadding.PaddingRight = UDim.new(0, 12)
-            ContentPadding.PaddingTop = UDim.new(0, 12)
-            ContentPadding.PaddingBottom = UDim.new(0, 12)
-            ContentPadding.Parent = WindowContent
+            -- Симметричные внутренние отступы для всех элементов карточки
+            local ElementsPadding = Instance.new("UIPadding")
+            ElementsPadding.PaddingLeft = UDim.new(0, 8)
+            ElementsPadding.PaddingRight = UDim.new(0, 8)
+            ElementsPadding.PaddingBottom = UDim.new(0, 8)
+            ElementsPadding.Parent = ElementsContainer
 
-            local Elements = createElementsSystem(WindowContent, tabName)
+            local ElementsLayout = Instance.new("UIListLayout")
+            ElementsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+            ElementsLayout.Padding = UDim.new(0, 5)
+            ElementsLayout.Parent = ElementsContainer
 
-            table.insert(_allWindows, {name = windowName, frame = WindowFrame, originalParent = WindowFrame.Parent})
-
-            function Window:GetElement(name)
-                return Elements[name]
+            local WindowElements = createElementsSystem(ElementsContainer, tabName)
+            for k, v in pairs(WindowElements) do
+                Window[k] = v
             end
 
-            return Window, Elements
+            function Window:CreateSection(sectionName)
+                local SectionFrame = Instance.new("Frame")
+                SectionFrame.Name = sectionName .. "Section"
+                SectionFrame.Size = UDim2.new(1, 0, 0, 0)
+                SectionFrame.BackgroundColor3 = Library.Theme.Section
+                SectionFrame.AutomaticSize = Enum.AutomaticSize.Y
+                SectionFrame.Parent = ElementsContainer
+
+                local SectionCorner = Instance.new("UICorner")
+                SectionCorner.CornerRadius = UDim.new(0, 4)
+                SectionCorner.Parent = SectionFrame
+
+                local SectionStroke = Instance.new("UIStroke")
+                SectionStroke.Color = Color3.fromRGB(34, 34, 42)
+                SectionStroke.Thickness = 1
+                SectionStroke.Parent = SectionFrame
+
+                local SectionTitle = Instance.new("TextLabel")
+                SectionTitle.Name = "SectionTitle"
+                SectionTitle.Size = UDim2.new(1, -12, 0, 20)
+                SectionTitle.Position = UDim2.new(0, 6, 0, 3)
+                SectionTitle.BackgroundTransparency = 1
+                SectionTitle.Text = string.upper(sectionName)
+                SectionTitle.TextColor3 = Library.Theme.Accent
+                SectionTitle.Font = Enum.Font.GothamBold
+                SectionTitle.TextSize = 9
+                SectionTitle.TextXAlignment = Enum.TextXAlignment.Left
+                SectionTitle.Parent = SectionFrame
+
+                local SecElementsContainer = Instance.new("Frame")
+                SecElementsContainer.Name = "SecElements"
+                SecElementsContainer.Size = UDim2.new(1, 0, 0, 0) -- Ширина во весь раздел
+                SecElementsContainer.Position = UDim2.new(0, 0, 0, 20) -- Сразу под SectionTitle
+                SecElementsContainer.BackgroundTransparency = 1
+                SecElementsContainer.AutomaticSize = Enum.AutomaticSize.Y
+                SecElementsContainer.Parent = SectionFrame
+
+                -- Симметричные внутренние отступы для элементов подраздела
+                local SecPadding = Instance.new("UIPadding")
+                SecPadding.PaddingBottom = UDim.new(0, 6)
+                SecPadding.PaddingLeft = UDim.new(0, 6)
+                SecPadding.PaddingRight = UDim.new(0, 6)
+                SecPadding.Parent = SecElementsContainer
+
+                local SecElementsLayout = Instance.new("UIListLayout")
+                SecElementsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+                SecElementsLayout.Padding = UDim.new(0, 5)
+                SecElementsLayout.Parent = SecElementsContainer
+
+                return createElementsSystem(SecElementsContainer, tabName)
+            end
+
+            -- FIX #16: Метод удаления окна
+            function Window:Remove()
+                PageData.WindowCount = math.max(0, PageData.WindowCount - 1)
+                for i, win in ipairs(_allWindows) do
+                    if win.frame == WindowFrame then
+                        table.remove(_allWindows, i)
+                        break
+                    end
+                end
+                if WindowFrame and WindowFrame.Parent then
+                    WindowFrame:Destroy()
+                end
+                updateLayout(tabName)
+            end
+
+            return Window
         end
 
         return Tab
     end
 
-    function Main:Notify(title, message, duration)
-        duration = duration or 3
+    -- FIX #6: Метод полной очистки UI и всех подключений
+    function Main:Destroy()
+        -- Отключить все отслеживаемые подключения
+        for _, conn in ipairs(_connections) do
+            pcall(function() conn:Disconnect() end)
+        end
+        _connections = {}
+        _activeTweens = setmetatable({}, {__mode = "k"})
+        _searchableItems = {}
+        _allWindows = {}
+        _currentPopup = nil
         
+        if ScreenGui and ScreenGui.Parent then
+            ScreenGui:Destroy()
+        end
+    end
+
+    -- FIX #13: Система уведомлений
+    function Main:Notify(title, text, duration)
+        duration = duration or 3
+
         local NotifFrame = Instance.new("Frame")
-        NotifFrame.Name = "Notification"
-        NotifFrame.Size = UDim2.new(0, 240, 0, 60)
+        NotifFrame.Size = UDim2.new(1, 0, 0, 0)
+        NotifFrame.AutomaticSize = Enum.AutomaticSize.Y
         NotifFrame.BackgroundColor3 = Library.Theme.Card
-        NotifFrame.BorderSizePixel = 0
+        NotifFrame.BackgroundTransparency = 1
         NotifFrame.Parent = NotifContainer
 
-        local NotifCorner = Instance.new("UICorner")
-        NotifCorner.CornerRadius = UDim.new(0, 6)
-        NotifCorner.Parent = NotifFrame
+        local NCorner = Instance.new("UICorner")
+        NCorner.CornerRadius = UDim.new(0, 6)
+        NCorner.Parent = NotifFrame
 
-        local NotifStroke = Instance.new("UIStroke")
-        NotifStroke.Color = Library.Theme.Accent
-        NotifStroke.Thickness = 1.5
-        NotifStroke.Parent = NotifFrame
+        local NStroke = Instance.new("UIStroke")
+        NStroke.Color = Library.Theme.Accent
+        NStroke.Thickness = 1
+        NStroke.Transparency = 1
+        NStroke.Parent = NotifFrame
+
+        local NPadding = Instance.new("UIPadding")
+        NPadding.PaddingTop = UDim.new(0, 8)
+        NPadding.PaddingBottom = UDim.new(0, 8)
+        NPadding.PaddingLeft = UDim.new(0, 10)
+        NPadding.PaddingRight = UDim.new(0, 10)
+        NPadding.Parent = NotifFrame
+
+        local NLayout = Instance.new("UIListLayout")
+        NLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        NLayout.Padding = UDim.new(0, 2)
+        NLayout.Parent = NotifFrame
 
         local TitleLabel = Instance.new("TextLabel")
-        TitleLabel.Name = "Title"
-        TitleLabel.Size = UDim2.new(1, -12, 0, 20)
-        TitleLabel.Position = UDim2.new(0, 6, 0, 6)
+        TitleLabel.Size = UDim2.new(1, 0, 0, 14)
         TitleLabel.BackgroundTransparency = 1
-        TitleLabel.Text = title
+        TitleLabel.Text = title or "Notification"
         TitleLabel.TextColor3 = Library.Theme.Text
         TitleLabel.Font = Enum.Font.GothamBold
-        TitleLabel.TextSize = 10
+        TitleLabel.TextSize = 11
         TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+        TitleLabel.TextTransparency = 1
+        TitleLabel.LayoutOrder = 1
         TitleLabel.Parent = NotifFrame
 
-        local MessageLabel = Instance.new("TextLabel")
-        MessageLabel.Name = "Message"
-        MessageLabel.Size = UDim2.new(1, -12, 1, -32)
-        MessageLabel.Position = UDim2.new(0, 6, 0, 28)
-        MessageLabel.BackgroundTransparency = 1
-        MessageLabel.Text = message
-        MessageLabel.TextColor3 = Library.Theme.TextDim
-        MessageLabel.Font = Enum.Font.Gotham
-        MessageLabel.TextSize = 9
-        MessageLabel.TextWrapped = true
-        MessageLabel.TextXAlignment = Enum.TextXAlignment.Left
-        MessageLabel.TextYAlignment = Enum.TextYAlignment.Top
-        MessageLabel.Parent = NotifFrame
+        local BodyLabel = nil
+        if text and text ~= "" then
+            BodyLabel = Instance.new("TextLabel")
+            BodyLabel.Size = UDim2.new(1, 0, 0, 0)
+            BodyLabel.AutomaticSize = Enum.AutomaticSize.Y
+            BodyLabel.BackgroundTransparency = 1
+            BodyLabel.Text = text
+            BodyLabel.TextColor3 = Library.Theme.TextDim
+            BodyLabel.Font = Enum.Font.Gotham
+            BodyLabel.TextSize = 10
+            BodyLabel.TextXAlignment = Enum.TextXAlignment.Left
+            BodyLabel.TextWrapped = true
+            BodyLabel.TextTransparency = 1
+            BodyLabel.LayoutOrder = 2
+            BodyLabel.Parent = NotifFrame
+        end
 
-        task.wait(duration)
-        tween(NotifFrame, 0.3, {BackgroundTransparency = 1})
-        tween(NotifStroke, 0.3, {Transparency = 1})
-        tween(TitleLabel, 0.3, {TextTransparency = 1})
-        tween(MessageLabel, 0.3, {TextTransparency = 1})
-        task.wait(0.3)
-        NotifFrame:Destroy()
+        -- Анимация появления
+        tween(NotifFrame, 0.2, {BackgroundTransparency = 0.05})
+        tween(NStroke, 0.2, {Transparency = 0})
+        tween(TitleLabel, 0.2, {TextTransparency = 0})
+        if BodyLabel then
+            tween(BodyLabel, 0.2, {TextTransparency = 0})
+        end
+
+        -- Автоудаление через duration секунд
+        task.delay(duration, function()
+            if NotifFrame and NotifFrame.Parent then
+                tween(NotifFrame, 0.3, {BackgroundTransparency = 1})
+                tween(NStroke, 0.3, {Transparency = 1})
+                tween(TitleLabel, 0.3, {TextTransparency = 1})
+                if BodyLabel and BodyLabel.Parent then
+                    tween(BodyLabel, 0.3, {TextTransparency = 1})
+                end
+                task.delay(0.35, function()
+                    if NotifFrame and NotifFrame.Parent then
+                        NotifFrame:Destroy()
+                    end
+                end)
+            end
+        end)
     end
 
     return Main
