@@ -1947,12 +1947,13 @@ function Library:Init()
             end
 
             local function getBindName(key)
-                if key == Enum.KeyCode.Unknown then
-                    return "[None]"
-                elseif typeof(key) == "EnumItem" then
+                if typeof(key) == "EnumItem" then
                     if key.EnumType == Enum.KeyCode then
+                        if key == Enum.KeyCode.Unknown then
+                            return "[None]"
+                        end
                         return "[" .. key.Name .. "]"
-                    else
+                    elseif key.EnumType == Enum.UserInputType then
                         local mName = key.Name
                         mName = mName:gsub("MouseButton", "M")
                         return "[" .. mName .. "]"
@@ -2096,7 +2097,7 @@ function Library:Init()
             end)
 
             trackConnection(UserInputService.InputBegan:Connect(function(input, gp)
-                if gp then return end
+                if gp and not isBinding then return end
                 if isBinding then
                     local boundInput = nil
                     if input.UserInputType == Enum.UserInputType.Keyboard then
