@@ -88,32 +88,7 @@ local function isMouseOverFrame(frame)
        and mousePos.Y >= pos.Y and mousePos.Y <= pos.Y + size.Y
 end
 
-local function isMouseOverPopup(popup)
-    local frame = popup.frame
-    if not frame or not frame.Parent then return false end
-    local mousePos = getMousePosition()
-    local success, guiObjects = pcall(function()
-        return ParentContainer:GetGuiObjectsAtPosition(mousePos.X, mousePos.Y)
-    end)
-    if success and guiObjects then
-        for _, obj in ipairs(guiObjects) do
-            if obj == frame or obj:IsDescendantOf(frame) then
-                return true
-            end
-        end
-        return false
-    end
-    local function checkRecursive(f)
-        if f:IsA("GuiObject") then
-            if isMouseOverFrame(f) then return true end
-        end
-        for _, child in ipairs(f:GetChildren()) do
-            if checkRecursive(child) then return true end
-        end
-        return false
-    end
-    return checkRecursive(frame)
-end
+-- Removed old isMouseOverPopup check. Popups now use fullscreen backdrop buttons.
 
 local function makeDraggable(frame, dragAnchor)
     local dragging, dragInput, dragStart, startPos
@@ -231,29 +206,9 @@ function Library:Init()
     local SearchRightColumn = nil
     local updateSearchResultsLayout = nil
 
-    -- FIX #7/#8: Система управления popup-ами (dropdowns, colorpickers)
-    local _currentPopup = nil -- {id = number, frame = Frame, close = function}
-    local _popupIdCounter = 0
-    local _popupOpenTime = 0
+    -- popups now use fullscreen backdrop buttons
     local _resizeScheduled = false
     local WmScreenGui = nil
-
-    local function openPopup(frame, closeFunc)
-        _popupIdCounter = _popupIdCounter + 1
-        local id = _popupIdCounter
-        if _currentPopup then
-            pcall(_currentPopup.close)
-        end
-        _currentPopup = {id = id, frame = frame, close = closeFunc}
-        _popupOpenTime = tick()
-        return id
-    end
-
-    local function clearPopup(id)
-        if _currentPopup and (id == nil or _currentPopup.id == id) then
-            _currentPopup = nil
-        end
-    end
 
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "VoltEclipseLibrary"
@@ -482,21 +437,7 @@ function Library:Init()
         end
     end))
 
-    -- FIX #7/#8: Глобальный обработчик клика для закрытия popup-ов при клике вне них
-    trackConnection(UserInputService.InputBegan:Connect(function(input)
-        if isClickInput(input) and _currentPopup then
-            if (tick() - _popupOpenTime) < 0.2 then return end
-            local popup = _currentPopup
-            if not isMouseOverPopup(popup) then
-                task.defer(function()
-                    if _currentPopup and _currentPopup.id == popup.id then
-                        pcall(_currentPopup.close)
-                        _currentPopup = nil
-                    end
-                end)
-            end
-        end
-    end))
+    -- popups now use fullscreen backdrop buttons
 
     -- Хедер
     local Header = Instance.new("Frame")
@@ -1377,6 +1318,7 @@ function Library:Init()
             OptionsScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
             OptionsScroll.Active = true
             OptionsScroll.LayoutOrder = 2
+            OptionsScroll.ZIndex = 100
             OptionsScroll.Parent = DropdownFrame
             
             local ScrollCorner = Instance.new("UICorner")
@@ -1410,17 +1352,20 @@ function Library:Init()
             end
             
             local isOpen = false
-            local popupId = nil
+            local Backdrop = nil
 
             local function closeDropdown()
                 if isOpen then
                     isOpen = false
                     OptionsScroll.Visible = false
                     Indicator.Text = "▼"
-                    Label.TextColor3 = Library.Theme.TextDim -- FIX #4: Label вместо HeaderBtn
+                    Label.TextColor3 = Library.Theme.TextDim
                     OptionsScroll.Size = UDim2.new(1, 0, 0, 0)
                     DropdownFrame.ZIndex = 1
-                    clearPopup(popupId)
+                    if Backdrop then
+                        Backdrop:Destroy()
+                        Backdrop = nil
+                    end
                 end
             end
 
@@ -1428,12 +1373,21 @@ function Library:Init()
                 isOpen = true
                 OptionsScroll.Visible = true
                 Indicator.Text = "▲"
-                Label.TextColor3 = Library.Theme.Accent -- FIX #4: Label вместо HeaderBtn
+                Label.TextColor3 = Library.Theme.Accent
                 local itemsCount = #options
                 local calculatedHeight = math.min(itemsCount * 28 + 8, 180)
                 OptionsScroll.Size = UDim2.new(1, 0, 0, calculatedHeight)
                 DropdownFrame.ZIndex = 100
-                popupId = openPopup(DropdownFrame, closeDropdown)
+                
+                Backdrop = Instance.new("TextButton")
+                Backdrop.Name = "DropdownBackdrop"
+                Backdrop.Size = UDim2.new(1, 0, 1, 0)
+                Backdrop.BackgroundTransparency = 1
+                Backdrop.Text = ""
+                Backdrop.ZIndex = 99
+                Backdrop.Parent = ScreenGui
+                
+                Backdrop.MouseButton1Click:Connect(closeDropdown)
             end
             
             HeaderBtn.MouseButton1Click:Connect(function()
@@ -1452,6 +1406,7 @@ function Library:Init()
                 OptBtn.BackgroundTransparency = 1
                 OptBtn.Text = ""
                 OptBtn.AutoButtonColor = false
+                OptBtn.ZIndex = 100
                 OptBtn.Parent = OptionsScroll
                 
                 local OptCorner = Instance.new("UICorner")
@@ -1463,6 +1418,7 @@ function Library:Init()
                 IndicatorBox.Size = UDim2.new(0, 12, 0, 12)
                 IndicatorBox.Position = UDim2.new(0, 6, 0.5, -6)
                 IndicatorBox.BackgroundColor3 = Color3.fromRGB(30, 30, 36)
+                IndicatorBox.ZIndex = 100
                 IndicatorBox.Parent = OptBtn
 
                 local BoxCorner = Instance.new("UICorner")
@@ -1481,6 +1437,7 @@ function Library:Init()
                 CheckDot.BackgroundColor3 = Library.Theme.Accent
                 CheckDot.BorderSizePixel = 0
                 CheckDot.Visible = selected[opt] or false
+                CheckDot.ZIndex = 100
                 CheckDot.Parent = IndicatorBox
 
                 local DotCorner = Instance.new("UICorner")
@@ -1498,6 +1455,7 @@ function Library:Init()
                 OptLabel.Font = Enum.Font.Gotham
                 OptLabel.TextSize = 10
                 OptLabel.TextXAlignment = Enum.TextXAlignment.Left
+                OptLabel.ZIndex = 100
                 OptLabel.Parent = OptBtn
                 
                 OptBtn.MouseEnter:Connect(function()
@@ -1604,6 +1562,7 @@ function Library:Init()
             PickerContainer.Visible = false
             PickerContainer.ClipsDescendants = true
             PickerContainer.LayoutOrder = 2
+            PickerContainer.ZIndex = 100
             PickerContainer.Parent = PickerFrame
             
             local ContainerCorner = Instance.new("UICorner")
@@ -1626,6 +1585,7 @@ function Library:Init()
                 local RowFrame = Instance.new("Frame")
                 RowFrame.Size = UDim2.new(1, -12, 0, 14)
                 RowFrame.BackgroundTransparency = 1
+                RowFrame.ZIndex = 100
                 RowFrame.Parent = PickerContainer
                 
                 local RowLabel = Instance.new("TextLabel")
@@ -1636,6 +1596,7 @@ function Library:Init()
                 RowLabel.Font = Enum.Font.GothamBold
                 RowLabel.TextSize = 9
                 RowLabel.TextXAlignment = Enum.TextXAlignment.Left
+                RowLabel.ZIndex = 100
                 RowLabel.Parent = RowFrame
                 
                 local Track = Instance.new("ImageButton")
@@ -1643,6 +1604,7 @@ function Library:Init()
                 Track.Position = UDim2.new(0, 20, 0.5, -3)
                 Track.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
                 Track.AutoButtonColor = false
+                Track.ZIndex = 100
                 Track.Parent = RowFrame
                 
                 local TrackCorner = Instance.new("UICorner")
@@ -1656,6 +1618,7 @@ function Library:Init()
                 Thumb.Size = UDim2.new(0, 10, 0, 10)
                 Thumb.AnchorPoint = Vector2.new(0.5, 0.5)
                 Thumb.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+                Thumb.ZIndex = 100
                 Thumb.Parent = Track
                 
                 local ThumbCorner = Instance.new("UICorner")
@@ -1675,6 +1638,7 @@ function Library:Init()
                 ValLabel.Font = Enum.Font.GothamMedium
                 ValLabel.TextSize = 9
                 ValLabel.TextXAlignment = Enum.TextXAlignment.Right
+                ValLabel.ZIndex = 100
                 ValLabel.Parent = RowFrame
                 
                 local val = initVal
@@ -1699,12 +1663,11 @@ function Library:Init()
                     Thumb.Position = UDim2.new(displayPercentage, 0, 0.5, 0)
                     ValLabel.Text = tostring(math.round(val)) .. suffixText
                     
-                    if rowName == "H" then currentHue = val / 360
-                    elseif rowName == "S" then currentSat = val / 100
-                    elseif rowName == "V" then currentVal = val / 100
-                    elseif rowName == "A" then currentAlpha = val / 100
+                    if rowName == "H" then
+                        currentHue = val / 360
+                    elseif rowName == "S" then
+                        currentSat = val / 100
                     end
-                    
                     updateAllColors("slider")
                 end
                 
@@ -1713,7 +1676,9 @@ function Library:Init()
                     if isClickInput(input) then
                         isDragging = true
                         setScrolling(false)
-                        if dragConnection then dragConnection:Disconnect() end
+                        if dragConnection then
+                            dragConnection:Disconnect()
+                        end
                         dragConnection = RunService.RenderStepped:Connect(updateDrag)
                         updateDrag()
                     end
@@ -1722,7 +1687,10 @@ function Library:Init()
                 trackConnection(UserInputService.InputEnded:Connect(function(input)
                     if isClickInput(input) and isDragging then
                         isDragging = false
-                        if dragConnection then dragConnection:Disconnect(); dragConnection = nil end
+                        if dragConnection then
+                            dragConnection:Disconnect()
+                            dragConnection = nil
+                        end
                         setScrolling(true)
                     end
                 end))
@@ -1738,7 +1706,7 @@ function Library:Init()
                 setupGradientFunc(Gradient, Track)
             end
             
-            -- Инициализируем 4 слайдера
+            -- Инициализируем 2 слайдера
             -- 1. HUE (0-360)
             createMiniSlider("H", 0, 360, currentHue * 360, "", function(grad)
                 grad.Color = ColorSequence.new({
@@ -1761,12 +1729,14 @@ function Library:Init()
             local BottomRow = Instance.new("Frame")
             BottomRow.Size = UDim2.new(1, -12, 0, 20)
             BottomRow.BackgroundTransparency = 1
+            BottomRow.ZIndex = 100
             BottomRow.Parent = PickerContainer
             
             local HexInputFrame = Instance.new("Frame")
             HexInputFrame.Size = UDim2.new(0, 64, 0, 18)
             HexInputFrame.Position = UDim2.new(0, 20, 0, 0)
             HexInputFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 36)
+            HexInputFrame.ZIndex = 100
             HexInputFrame.Parent = BottomRow
             
             local HexCorner = Instance.new("UICorner")
@@ -1786,6 +1756,7 @@ function Library:Init()
             HexBox.Font = Enum.Font.Gotham
             HexBox.TextSize = 9
             HexBox.TextXAlignment = Enum.TextXAlignment.Center
+            HexBox.ZIndex = 100
             HexBox.Parent = HexInputFrame
 
             local RgbLabel = Instance.new("TextLabel")
@@ -1796,6 +1767,7 @@ function Library:Init()
             RgbLabel.TextSize = 8
             RgbLabel.TextColor3 = Library.Theme.TextDim
             RgbLabel.TextXAlignment = Enum.TextXAlignment.Left
+            RgbLabel.ZIndex = 100
             RgbLabel.Parent = BottomRow
 
             -- Разметка контейнера слайдеров
@@ -1847,7 +1819,7 @@ function Library:Init()
             end)
 
             local isPickerOpen = false
-            local pickerPopupId = nil
+            local Backdrop = nil
 
             local function closePicker()
                 if isPickerOpen then
@@ -1951,7 +1923,7 @@ function Library:Init()
             local KeyBtn = Instance.new("TextButton")
             KeyBtn.Size = UDim2.new(0, 55, 0, 18)
             KeyBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 36)
-            KeyBtn.Text = currentKey == Enum.KeyCode.Unknown and "[None]" or "[" .. currentKey.Name .. "]"
+            KeyBtn.Text = ""
             KeyBtn.TextColor3 = Library.Theme.Text
             KeyBtn.Font = Enum.Font.GothamBold
             KeyBtn.TextSize = 8
@@ -1967,7 +1939,6 @@ function Library:Init()
             KeyStroke.Parent = KeyBtn
 
             local isBinding = false
-            local modes = {"Always", "Hold", "Toggle"}
             local state = false
 
             local function trigger(active)
@@ -1975,6 +1946,94 @@ function Library:Init()
                 callback(active)
             end
 
+            local function getBindName(key)
+                if key == Enum.KeyCode.Unknown then
+                    return "[None]"
+                elseif typeof(key) == "EnumItem" then
+                    if key.EnumType == Enum.KeyCode then
+                        return "[" .. key.Name .. "]"
+                    else
+                        local mName = key.Name
+                        mName = mName:gsub("MouseButton", "M")
+                        return "[" .. mName .. "]"
+                    end
+                end
+                return "[None]"
+            end
+
+            KeyBtn.Text = getBindName(currentKey)
+
+            -- Dropdown для модов
+            local ModeScroll = Instance.new("Frame")
+            ModeScroll.Name = "ModeScroll"
+            ModeScroll.Size = UDim2.new(0, 50, 0, 53)
+            ModeScroll.Position = UDim2.new(1, -115, 0, 22)
+            ModeScroll.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+            ModeScroll.BackgroundTransparency = 0.15
+            ModeScroll.BorderSizePixel = 0
+            ModeScroll.Visible = false
+            ModeScroll.ZIndex = 100
+            ModeScroll.Parent = KeybindFrame
+
+            local ModeScrollCorner = Instance.new("UICorner")
+            ModeScrollCorner.CornerRadius = UDim.new(0, 4)
+            ModeScrollCorner.Parent = ModeScroll
+
+            local ModeScrollStroke = Instance.new("UIStroke")
+            ModeScrollStroke.Color = Library.Theme.Stroke
+            ModeScrollStroke.Thickness = 1
+            ModeScrollStroke.Parent = ModeScroll
+
+            local ModeScrollLayout = Instance.new("UIListLayout")
+            ModeScrollLayout.SortOrder = Enum.SortOrder.LayoutOrder
+            ModeScrollLayout.Padding = UDim.new(0, 1)
+            ModeScrollLayout.Parent = ModeScroll
+
+            local ModeScrollPadding = Instance.new("UIPadding")
+            ModeScrollPadding.PaddingTop = UDim.new(0, 1)
+            ModeScrollPadding.PaddingBottom = UDim.new(0, 1)
+            ModeScrollPadding.Parent = ModeScroll
+
+            local kbBackdrop = nil
+            local isModeOpen = false
+
+            local function closeModeMenu()
+                if isModeOpen then
+                    isModeOpen = false
+                    ModeScroll.Visible = false
+                    KeybindFrame.ZIndex = 1
+                    if kbBackdrop then
+                        kbBackdrop:Destroy()
+                        kbBackdrop = nil
+                    end
+                end
+            end
+
+            local function openModeMenu()
+                isModeOpen = true
+                ModeScroll.Visible = true
+                KeybindFrame.ZIndex = 100
+                
+                kbBackdrop = Instance.new("TextButton")
+                kbBackdrop.Name = "KeybindModeBackdrop"
+                kbBackdrop.Size = UDim2.new(1, 0, 1, 0)
+                kbBackdrop.BackgroundTransparency = 1
+                kbBackdrop.Text = ""
+                kbBackdrop.ZIndex = 99
+                kbBackdrop.Parent = ScreenGui
+                
+                kbBackdrop.MouseButton1Click:Connect(closeModeMenu)
+            end
+
+            ModeBtn.MouseButton1Click:Connect(function()
+                if isModeOpen then
+                    closeModeMenu()
+                else
+                    openModeMenu()
+                end
+            end)
+
+            local modeOptions = {}
             local function updateModeText()
                 ModeBtn.Text = currentMode
                 if currentMode == "Always" then
@@ -1982,22 +2041,52 @@ function Library:Init()
                 else
                     ModeBtn.TextColor3 = Library.Theme.TextDim
                 end
-            end
-            updateModeText()
-
-            ModeBtn.MouseButton1Click:Connect(function()
-                local idx = table.find(modes, currentMode) or 3
-                idx = idx + 1
-                if idx > #modes then idx = 1 end
-                currentMode = modes[idx]
-                updateModeText()
-                
-                if currentMode == "Always" then
-                    trigger(true)
-                else
-                    trigger(false)
+                for name, opt in pairs(modeOptions) do
+                    opt.TextColor3 = name == currentMode and Library.Theme.Accent or Library.Theme.TextDim
                 end
-            end)
+            end
+
+            local function createModeOption(mName, layoutOrder)
+                local Opt = Instance.new("TextButton")
+                Opt.Size = UDim2.new(1, 0, 0, 17)
+                Opt.BackgroundTransparency = 1
+                Opt.Text = mName
+                Opt.TextColor3 = mName == currentMode and Library.Theme.Accent or Library.Theme.TextDim
+                Opt.Font = Enum.Font.GothamMedium
+                Opt.TextSize = 8
+                Opt.LayoutOrder = layoutOrder
+                Opt.ZIndex = 100
+                Opt.Parent = ModeScroll
+
+                Opt.MouseEnter:Connect(function()
+                    tween(Opt, 0.1, {BackgroundTransparency = 0, BackgroundColor3 = Color3.fromRGB(30, 30, 36)})
+                    Opt.TextColor3 = Library.Theme.Text
+                end)
+                Opt.MouseLeave:Connect(function()
+                    tween(Opt, 0.1, {BackgroundTransparency = 1})
+                    Opt.TextColor3 = currentMode == mName and Library.Theme.Accent or Library.Theme.TextDim
+                end)
+
+                Opt.MouseButton1Click:Connect(function()
+                    currentMode = mName
+                    updateModeText()
+                    closeModeMenu()
+                    
+                    if currentMode == "Always" then
+                        trigger(true)
+                    else
+                        trigger(false)
+                    end
+                end)
+                
+                modeOptions[mName] = Opt
+            end
+
+            createModeOption("Always", 1)
+            createModeOption("Hold", 2)
+            createModeOption("Toggle", 3)
+            
+            updateModeText()
 
             KeyBtn.MouseButton1Click:Connect(function()
                 if isBinding then return end
@@ -2009,19 +2098,27 @@ function Library:Init()
             trackConnection(UserInputService.InputBegan:Connect(function(input, gp)
                 if gp then return end
                 if isBinding then
-                    local key = nil
+                    local boundInput = nil
                     if input.UserInputType == Enum.UserInputType.Keyboard then
                         if input.KeyCode == Enum.KeyCode.Escape then
-                            key = Enum.KeyCode.Unknown
+                            boundInput = Enum.KeyCode.Unknown
                         else
-                            key = input.KeyCode
+                            boundInput = input.KeyCode
                         end
+                    elseif input.UserInputType == Enum.UserInputType.MouseButton1 
+                        or input.UserInputType == Enum.UserInputType.MouseButton2 
+                        or input.UserInputType == Enum.UserInputType.MouseButton3 
+                        or input.UserInputType == Enum.UserInputType.MouseButton4 
+                        or input.UserInputType == Enum.UserInputType.MouseButton5 then
+                        boundInput = input.UserInputType
                     end
-                    if key then
+                    
+                    if boundInput then
                         isBinding = false
-                        currentKey = key
-                        KeyBtn.Text = currentKey == Enum.KeyCode.Unknown and "[None]" or "[" .. currentKey.Name .. "]"
+                        currentKey = boundInput
+                        KeyBtn.Text = getBindName(currentKey)
                         KeyStroke.Color = Library.Theme.Stroke
+                        
                         if currentMode == "Always" then
                             trigger(true)
                         else
@@ -2029,7 +2126,16 @@ function Library:Init()
                         end
                     end
                 else
-                    if input.KeyCode == currentKey and currentKey ~= Enum.KeyCode.Unknown then
+                    local isPressed = false
+                    if typeof(currentKey) == "EnumItem" then
+                        if currentKey.EnumType == Enum.KeyCode then
+                            isPressed = (input.KeyCode == currentKey)
+                        else
+                            isPressed = (input.UserInputType == currentKey)
+                        end
+                    end
+                    
+                    if isPressed and currentKey ~= Enum.KeyCode.Unknown then
                         if currentMode == "Toggle" then
                             trigger(not state)
                         elseif currentMode == "Hold" then
@@ -2040,8 +2146,18 @@ function Library:Init()
             end))
 
             trackConnection(UserInputService.InputEnded:Connect(function(input, gp)
-                if not isBinding and currentMode == "Hold" and input.KeyCode == currentKey and currentKey ~= Enum.KeyCode.Unknown then
-                    trigger(false)
+                if not isBinding and currentMode == "Hold" then
+                    local isReleased = false
+                    if typeof(currentKey) == "EnumItem" then
+                        if currentKey.EnumType == Enum.KeyCode then
+                            isReleased = (input.KeyCode == currentKey)
+                        else
+                            isReleased = (input.UserInputType == currentKey)
+                        end
+                    end
+                    if isReleased and currentKey ~= Enum.KeyCode.Unknown then
+                        trigger(false)
+                    end
                 end
             end))
 
