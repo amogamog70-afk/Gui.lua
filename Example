@@ -2136,7 +2136,8 @@ function Library:Init()
                         end
                     end
                     
-                    if isPressed and currentKey ~= Enum.KeyCode.Unknown then
+                    local isUnknown = (typeof(currentKey) == "EnumItem" and currentKey.EnumType == Enum.KeyCode and currentKey == Enum.KeyCode.Unknown)
+                    if isPressed and not isUnknown then
                         if currentMode == "Toggle" then
                             trigger(not state)
                         elseif currentMode == "Hold" then
@@ -2156,7 +2157,8 @@ function Library:Init()
                             isReleased = (input.UserInputType == currentKey)
                         end
                     end
-                    if isReleased and currentKey ~= Enum.KeyCode.Unknown then
+                    local isUnknown = (typeof(currentKey) == "EnumItem" and currentKey.EnumType == Enum.KeyCode and currentKey == Enum.KeyCode.Unknown)
+                    if isReleased and not isUnknown then
                         trigger(false)
                     end
                 end
