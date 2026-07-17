@@ -205,6 +205,7 @@ function Library:Init()
     local SearchLeftColumn = nil
     local SearchRightColumn = nil
     local updateSearchResultsLayout = nil
+    local updateLayout = nil
 
     -- popups now use fullscreen backdrop buttons
     local _resizeScheduled = false
@@ -391,6 +392,9 @@ function Library:Init()
         
         -- Появление основного меню
         MainFrame.Visible = true
+        if Main.CurrentTab then
+            updateLayout(Main.CurrentTab)
+        end
         MainFrame.Size = UDim2.new(0, FRAME_WIDTH, 0, FRAME_HEIGHT - 40)
         tween(MainFrame, 0.15, {Size = UDim2.new(0, FRAME_WIDTH, 0, FRAME_HEIGHT)})
     end)
@@ -403,6 +407,9 @@ function Library:Init()
         Main.Visible = state
         if state then
             ScreenGui.Enabled = true
+            if Main.CurrentTab then
+                updateLayout(Main.CurrentTab)
+            end
             MainFrame.Size = UDim2.new(0, FRAME_WIDTH, 0, FRAME_HEIGHT - 40)
             tween(MainFrame, 0.15, {Size = UDim2.new(0, FRAME_WIDTH, 0, FRAME_HEIGHT)})
         else
@@ -638,6 +645,9 @@ function Library:Init()
         if updateSearchResultsLayout then
             updateSearchResultsLayout(#visibleWindows)
         end
+        if Main.CurrentTab then
+            updateLayout(Main.CurrentTab)
+        end
     end
 
     SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
@@ -663,7 +673,7 @@ function Library:Init()
 
     local PagesFolder = Instance.new("Frame")
     PagesFolder.Name = "PagesFolder"
-    PagesFolder.Size = UDim2.new(1, 0, 1, -78) -- Оставляем ровно 32px снизу для статус-бара подсказок
+    PagesFolder.Size = UDim2.new(1, 0, 1, -46)
     PagesFolder.Position = UDim2.new(0, 0, 0, 46)
     PagesFolder.BackgroundTransparency = 1
     PagesFolder.ClipsDescendants = true
@@ -716,6 +726,19 @@ function Library:Init()
     SearchRightLayout.Padding = UDim.new(0, 8)
     SearchRightLayout.Parent = SearchRightColumn
 
+    -- Добавляем автоматический перерасчет высоты при изменении результатов поиска
+    trackConnection(SearchLeftLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        if SearchResultsPage.Visible and Main.CurrentTab then
+            updateLayout(Main.CurrentTab)
+        end
+    end))
+
+    trackConnection(SearchRightLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        if SearchResultsPage.Visible and Main.CurrentTab then
+            updateLayout(Main.CurrentTab)
+        end
+    end))
+
     updateSearchResultsLayout = function(windowCount)
         local availableWidth = FRAME_WIDTH - 24
         local columnWidth = math.floor((availableWidth - 10) / 2)
@@ -762,8 +785,8 @@ function Library:Init()
     NotifListLayout.Padding = UDim.new(0, 6)
     NotifListLayout.Parent = NotifContainer
 
-    -- FIX #15: Функция адаптивного центрирования колонок
-    local function updateLayout(tabName)
+    -- Функция адаптивного центрирования колонок и динамической высоты меню
+    updateLayout = function(tabName)
         local pageInfo = Main.Pages[tabName]
         if not pageInfo then return end
 
@@ -789,6 +812,42 @@ function Library:Init()
 
         data.Page.Size = UDim2.new(0, totalWidth, 1, 0)
         data.Page.Position = UDim2.new(0.5, -totalWidth / 2, 0, 0)
+
+        -- Вычисление требуемой высоты контента
+        local maxContentHeight = 0
+        if SearchResultsPage and SearchResultsPage.Visible then
+            local leftHeight = SearchLeftLayout.AbsoluteContentSize.Y
+            local rightHeight = SearchRightLayout.AbsoluteContentSize.Y
+            maxContentHeight = math.max(leftHeight, rightHeight)
+        else
+            local leftHeight = data.LeftColumn:FindFirstChildOfClass("UIListLayout") and data.LeftColumn:FindFirstChildOfClass("UIListLayout").AbsoluteContentSize.Y or 0
+            local rightHeight = data.RightColumn:FindFirstChildOfClass("UIListLayout") and data.RightColumn:FindFirstChildOfClass("UIListLayout").AbsoluteContentSize.Y or 0
+            maxContentHeight = math.max(leftHeight, rightHeight)
+        end
+
+        -- Высота: Хедер (40) + Отступ (6) + Паддинг верх (6) + Паддинг низ (12) = 64px + высота колонок
+        local targetMenuHeight = 64 + maxContentHeight
+
+        -- Ограничение максимальной высоты под размер экрана
+        local maxAllowedHeight = 420
+        pcall(function()
+            local viewport = workspace.CurrentCamera.ViewportSize
+            maxAllowedHeight = math.min(420, viewport.Y - 60)
+        end)
+
+        if targetMenuHeight > maxAllowedHeight then
+            targetMenuHeight = maxAllowedHeight
+        end
+
+        -- Минимальная высота меню
+        if targetMenuHeight < 100 then
+            targetMenuHeight = 100
+        end
+
+        FRAME_HEIGHT = targetMenuHeight
+        if Main.Visible then
+            MainFrame.Size = UDim2.new(0, FRAME_WIDTH, 0, FRAME_HEIGHT)
+        end
     end
 
     trackConnection(MainFrame:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
@@ -2300,6 +2359,19 @@ function Library:Init()
 
         Main.Tabs[tabName] = {Frame = TabFrame, Stroke = TabStroke, Label = TabLabel}
         Main.Pages[tabName] = {Page = Page, Data = PageData}
+
+        -- Добавляем автоматический перерасчет высоты при изменении элементов колонок
+        trackConnection(LeftLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+            if Main.CurrentTab == tabName then
+                updateLayout(tabName)
+            end
+        end))
+
+        trackConnection(RightLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+            if Main.CurrentTab == tabName then
+                updateLayout(tabName)
+            end
+        end))
 
         TabFrame.MouseButton1Click:Connect(function()
             showPage(tabName)
