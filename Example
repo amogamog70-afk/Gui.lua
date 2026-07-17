@@ -813,38 +813,14 @@ function Library:Init()
         data.Page.Size = UDim2.new(0, totalWidth, 1, 0)
         data.Page.Position = UDim2.new(0.5, -totalWidth / 2, 0, 0)
 
-        -- Вычисление требуемой высоты контента
-        local maxContentHeight = 0
-        if SearchResultsPage and SearchResultsPage.Visible then
-            local leftHeight = SearchLeftLayout.AbsoluteContentSize.Y
-            local rightHeight = SearchRightLayout.AbsoluteContentSize.Y
-            maxContentHeight = math.max(leftHeight, rightHeight)
-        else
-            local leftHeight = data.LeftColumn:FindFirstChildOfClass("UIListLayout") and data.LeftColumn:FindFirstChildOfClass("UIListLayout").AbsoluteContentSize.Y or 0
-            local rightHeight = data.RightColumn:FindFirstChildOfClass("UIListLayout") and data.RightColumn:FindFirstChildOfClass("UIListLayout").AbsoluteContentSize.Y or 0
-            maxContentHeight = math.max(leftHeight, rightHeight)
-        end
-
-        -- Высота: Хедер (40) + Отступ (6) + Паддинг верх (6) + Паддинг низ (12) = 64px + высота колонок
-        local targetMenuHeight = 64 + maxContentHeight
-
-        -- Ограничение максимальной высоты под размер экрана
+        -- Фиксированная высота окна под размер экрана (не зависит от высоты контента вкладки)
         local maxAllowedHeight = 420
         pcall(function()
             local viewport = workspace.CurrentCamera.ViewportSize
             maxAllowedHeight = math.min(420, viewport.Y - 60)
         end)
 
-        if targetMenuHeight > maxAllowedHeight then
-            targetMenuHeight = maxAllowedHeight
-        end
-
-        -- Минимальная высота меню
-        if targetMenuHeight < 100 then
-            targetMenuHeight = 100
-        end
-
-        FRAME_HEIGHT = targetMenuHeight
+        FRAME_HEIGHT = maxAllowedHeight
         if Main.Visible then
             MainFrame.Size = UDim2.new(0, FRAME_WIDTH, 0, FRAME_HEIGHT)
         end
