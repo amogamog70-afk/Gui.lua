@@ -472,7 +472,7 @@ function Library:Init()
     TabsScroll.Position = UDim2.new(0, 42, 0.5, -13)
     TabsScroll.BackgroundTransparency = 1
     TabsScroll.BorderSizePixel = 0
-    TabsScroll.ScrollBarThickness = 2 -- FIX #22: Видимый скроллбар вкладок
+    TabsScroll.ScrollBarThickness = 0
     TabsScroll.ScrollBarImageColor3 = Library.Theme.Stroke
     TabsScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
     TabsScroll.ScrollingDirection = Enum.ScrollingDirection.X
@@ -676,7 +676,7 @@ function Library:Init()
     SearchResultsPage.Size = UDim2.new(1, 0, 1, 0)
     SearchResultsPage.BackgroundTransparency = 1
     SearchResultsPage.BorderSizePixel = 0
-    SearchResultsPage.ScrollBarThickness = 2
+    SearchResultsPage.ScrollBarThickness = 0
     SearchResultsPage.ScrollBarImageColor3 = Library.Theme.Stroke
     SearchResultsPage.Visible = false
     SearchResultsPage.ScrollingDirection = Enum.ScrollingDirection.Y
@@ -2251,7 +2251,7 @@ function Library:Init()
         Page.Size = UDim2.new(1, 0, 1, 0)
         Page.BackgroundTransparency = 1
         Page.BorderSizePixel = 0
-        Page.ScrollBarThickness = 2
+        Page.ScrollBarThickness = 0
         Page.ScrollBarImageColor3 = Library.Theme.Stroke
         Page.Visible = false
         Page.ScrollingDirection = Enum.ScrollingDirection.Y
@@ -2913,6 +2913,41 @@ function Library:Init()
 
     makeDraggable(KBFrame, KBFrame)
     makeDraggable(WmFrame, WmFrame)
+
+    -- Dynamic ScrollingEnabled toggle based on mouse hover over Windows to allow camera zooming
+    local scrollUpdateConn = RunService.RenderStepped:Connect(function()
+        if not loadingFinished or not Main.Visible then return end
+        
+        local mousePos = getMousePosition()
+        
+        local function isMouseOver(frame)
+            if not frame or not frame.Parent or not frame.Visible then return false end
+            local pos = frame.AbsolutePosition
+            local size = frame.AbsoluteSize
+            return mousePos.X >= pos.X and mousePos.X <= pos.X + size.X
+               and mousePos.Y >= pos.Y and mousePos.Y <= pos.Y + size.Y
+        end
+
+        local hoverWindow = false
+        for _, win in ipairs(_allWindows) do
+            if win.frame and win.frame.Parent and win.frame.Visible then
+                if isMouseOver(win.frame) then
+                    hoverWindow = true
+                    break
+                end
+            end
+        end
+
+        if SearchResultsPage and SearchResultsPage.Visible then
+            SearchResultsPage.ScrollingEnabled = hoverWindow
+        else
+            local currentPage = Main.CurrentTab and Main.Pages[Main.CurrentTab]
+            if currentPage and currentPage.Page and currentPage.Page.Visible then
+                currentPage.Page.ScrollingEnabled = hoverWindow
+            end
+        end
+    end)
+    trackConnection(scrollUpdateConn)
 
     return Main
 end
