@@ -168,23 +168,22 @@ local function cleanSearchText(text)
     local query = string.lower(text)
     
     local ru_to_en = {
-        ["й"]="q", ["ц"]="w", ["у"]="e", ["к"]="r", ["е"]="t", ["н"]="y", ["г"]="u", ["ш"]="i", ["щ"]="o", ["з"]="p", ["х"]="[", ["ъ"]="]",
-        ["ф"]="a", ["ы"]="s", ["в"]="d", ["а"]="f", ["п"]="g", ["р"]="h", ["о"]="j", ["л"]="k", ["д"]="l", ["ж"]=";", ["э"]="'",
-        ["я"]="z", ["ч"]="x", ["с"]="c", ["м"]="v", ["и"]="b", ["т"]="n", ["ь"]="m", ["б"]=",", ["ю"]="."
+        [1081]="q", [1094]="w", [1091]="e", [1082]="r", [1077]="t", [1085]="y", [1075]="u", [1096]="i", [1097]="o", [1079]="p", [1093]="[", [1098]="]",
+        [1092]="a", [1099]="s", [1074]="d", [1072]="f", [1087]="g", [1088]="h", [1086]="j", [1083]="k", [1076]="l", [1078]=";", [1101]="'",
+        [1103]="z", [1095]="x", [1089]="c", [1084]="v", [1080]="b", [1090]="n", [1100]="m", [1073]=",", [1102]="."
     }
     
     local cyr_to_lat = {
-        ["а"]="a", ["в"]="b", ["с"]="c", ["е"]="e", ["н"]="h", ["к"]="k", 
-        ["м"]="m", ["о"]="o", ["р"]="p", ["т"]="t", ["у"]="y", ["х"]="x"
+        [1072]="a", [1074]="b", [1089]="c", [1077]="e", [1085]="h", [1082]="k", 
+        [1084]="m", [1086]="o", [1088]="p", [1090]="t", [1091]="y", [1093]="x"
     }
     
     local layout_query = ""
     local visual_query = ""
     
     for _, code in ipairs({utf8.codepoint(query, 1, -1)}) do
-        local char = utf8.char(code)
-        layout_query = layout_query .. (ru_to_en[char] or char)
-        visual_query = visual_query .. (cyr_to_lat[char] or char)
+        layout_query = layout_query .. (ru_to_en[code] or utf8.char(code))
+        visual_query = visual_query .. (cyr_to_lat[code] or utf8.char(code))
     end
     
     return query, layout_query, visual_query
