@@ -2131,7 +2131,6 @@ function Library:Init()
             end)
 
             trackConnection(UserInputService.InputBegan:Connect(function(input, gp)
-                if gp and not isBinding then return end
                 if isBinding then
                     local boundInput = nil
                     if input.UserInputType == Enum.UserInputType.Keyboard then
@@ -2252,7 +2251,7 @@ function Library:Init()
 
         local matchedIcon = nil
         for name, id in pairs(TabIcons) do
-            if string.lower(name) == string.lower(tabName) then
+            if string.lower(name) == string.lower(tabName) or string.find(string.lower(tabName), string.lower(name)) ~= nil then
                 matchedIcon = id
                 break
             end
