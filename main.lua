@@ -2408,7 +2408,17 @@ function library:init()
                     end
 
                     -- // Toggle Addons
-                    function toggle:AddColor(data)
+                    function toggle:AddColor(data, trans, callback)
+                        if typeof(data) == 'Color3' then
+                            data = {
+                                color = data,
+                                trans = trans or 0,
+                                callback = callback or function() end
+                            }
+                        elseif typeof(data) ~= 'table' then
+                            data = {}
+                        end
+
                         local color = {
                             class = 'color';
                             flag = data.flag;
@@ -3761,7 +3771,17 @@ function library:init()
                 end
 
                 -- // Color Picker
-                function section:AddColor(data)
+                function section:AddColor(data, trans, callback)
+                    if typeof(data) == 'Color3' then
+                        data = {
+                            color = data,
+                            trans = trans or 0,
+                            callback = callback or function() end
+                        }
+                    elseif typeof(data) ~= 'table' then
+                        data = {}
+                    end
+
                     local color = {
                         class = 'color';
                         flag = data.flag;
