@@ -208,11 +208,23 @@ local library = {
     signal = SignalModule;
     open = false;
     opening = false;
-    hasInit = false;
     cheatname = startupArgs.cheatname or 'Clanware';
     gamename = startupArgs.gamename or 'Universal';
     fileext = startupArgs.fileext or '.txt';
+    customComponents = {};
 }
+
+function library:RegisterComponent(name, constructor)
+    if typeof(name) ~= 'string' or typeof(constructor) ~= 'function' then return end
+    library.customComponents[name] = constructor
+    library.customComponents['Add'..name] = constructor
+end
+
+function library:UnregisterComponent(name)
+    if typeof(name) ~= 'string' then return end
+    library.customComponents[name] = nil
+    library.customComponents['Add'..name] = nil
+end
 
 library.themes = {
     {
@@ -574,7 +586,7 @@ do
     end
 
     function utility:GetHoverObject()
-        if library.isDragging then return nil end
+        if library.isDragging or library.draggingSlider ~= nil then return nil end
         local mousePos = inputservice:GetMouseLocation()
         local mx, my = mousePos.X, mousePos.Y
         local bestObj = nil
@@ -582,9 +594,9 @@ do
         for _, v in next, library.interactiveDrawings do
             if v.Visible and v.Class == 'Square' then
                 local obj = v.Object
-                if obj.Visible then
-                    local pos = obj.Position
-                    local size = obj.Size
+                if obj and obj.Visible then
+                    local pos = v.AbsolutePosition or obj.Position
+                    local size = v.AbsoluteSize or obj.Size
                     local x1, y1 = pos.X, pos.Y
                     if mx >= x1 and mx <= x1 + size.X and my >= y1 and my <= y1 + size.Y then
                         local z = obj.ZIndex
@@ -631,12 +643,21 @@ do
         drawing.MouseEnter._owner = drawing;
         drawing.MouseLeave._owner = drawing;
 
+        local function hideTree(d)
+            for child in next, d.Children do
+                if child.Object and child.Object.Visible then
+                    child.Object.Visible = false
+                end
+                hideTree(child)
+            end
+        end
+
         function drawing:Update()
             local parent = drawing.Parent ~= nil and library.drawings[drawing.Parent.Object] or nil
             local parentSize,parentPos,parentVis = workspace.CurrentCamera.ViewportSize, Vector2.new(0,0), true;
             if parent ~= nil then
-                parentSize = (parent.Class == 'Square' or parent.Class == 'Image') and parent.Object.Size or parent.Class == 'Text' and parent.TextBounds or workspace.CurrentCamera.ViewportSize
-                parentPos = parent.Object.Position
+                parentSize = (parent.Class == 'Square' or parent.Class == 'Image') and (parent.AbsoluteSize or parent.Object.Size) or parent.Class == 'Text' and parent.TextBounds or workspace.CurrentCamera.ViewportSize
+                parentPos = parent.AbsolutePosition or parent.Object.Position
                 parentVis = parent.Object.Visible
             end
 
@@ -644,20 +665,18 @@ do
             drawing.Object.Visible = isVis
 
             if not isVis then
-                for child in next, drawing.Children do
-                    if child.Object.Visible then
-                        child.Object.Visible = false
-                    end
-                end
+                hideTree(drawing)
                 return
             end
 
             if drawing.Class == 'Square' or drawing.Class == 'Image' then
                 drawing.Object.Size = typeof(drawing.Size) == 'Vector2' and drawing.Size or typeof(drawing.Size) == 'UDim2' and utility:UDim2ToVector2(drawing.Size,parentSize)
+                drawing.AbsoluteSize = drawing.Object.Size
             end
 
             if drawing.Class == 'Square' or drawing.Class == 'Image' or drawing.Class == 'Circle' or drawing.Class == 'Text' then
                 drawing.Object.Position = parentPos + (typeof(drawing.Position) == 'Vector2' and drawing.Position or utility:UDim2ToVector2(drawing.Position,parentSize))
+                drawing.AbsolutePosition = drawing.Object.Position
             end
 
             drawing:UpdateChildren()
@@ -1618,8 +1637,10 @@ function library:init()
             end)
 
             utility:Connection(button1up, function()
-                dragging = false;
-                library.isDragging = false;
+                if dragging then
+                    dragging = false;
+                    library.isDragging = false;
+                end
             end)
 
             utility:Connection(runservice.RenderStepped, function()
@@ -1633,9 +1654,6 @@ function library:init()
                         lastDragPx, lastDragPy = px, py
                         objs.background.Position = newUDim2(0, px, 0, py)
                     end
-                else
-                    dragging = false;
-                    library.isDragging = false;
                 end
             end)
 
@@ -2177,16 +2195,19 @@ function library:init()
 
                 utility:Connection(objs.mainDetector.MouseButton1Down, function(pos)
                     draggingSat = true;
+                    library.isDragging = true;
                     updateSatVal(pos)
                 end)
 
                 utility:Connection(objs.hueDetector.MouseButton1Down, function(pos)
                     draggingHue = true;
+                    library.isDragging = true;
                     updateHue(pos)
                 end)
 
                 utility:Connection(objs.transDetector.MouseButton1Down, function(pos)
                     draggingTrans = true;
+                    library.isDragging = true;
                     updateTrans(pos)
                 end)
 
@@ -2203,9 +2224,12 @@ function library:init()
                 end)
 
                 utility:Connection(button1up, function()
-                    draggingSat = false;
-                    draggingHue = false;
-                    draggingTrans = false;
+                    if draggingSat or draggingHue or draggingTrans then
+                        draggingSat = false;
+                        draggingHue = false;
+                        draggingTrans = false;
+                        library.isDragging = false;
+                    end
                 end)
 
             end
@@ -2643,10 +2667,11 @@ function library:init()
                         return a.order < b.order
                     end)
 
+                    local isSecVis = (self.objects.background.Visible and self.enabled) and true or false;
                     local ySize, padding = 15, 0;
                     for i,option in next, self.options do
-                        option.objects.holder.Visible = option.enabled
-                        if option.enabled then
+                        option.objects.holder.Visible = option.enabled and isSecVis;
+                        if option.enabled and isSecVis then
                             option.objects.holder.Position = newUDim2(0,0,0,ySize-15);
                             ySize += option.objects.holder.Object.Size.Y + padding;
                         end
@@ -2795,10 +2820,11 @@ function library:init()
                             return a.order < b.order
                         end)
 
+                        local isTogVis = (self.objects.holder.Visible and self.enabled) and true or false;
                         local x, y = 0, 0
                         for i,option in next, self.options do
-                            option.objects.holder.Visible = option.enabled
-                            if option.enabled then
+                            option.objects.holder.Visible = option.enabled and isTogVis;
+                            if option.enabled and isTogVis then
                                 if option.class == 'color' or option.class == 'bind' then
                                     option.objects.holder.Position = newUDim2(1,-option.objects.holder.Object.Size.X-x,0,0);
                                     x = x + option.objects.holder.Object.Size.X;
@@ -2969,6 +2995,7 @@ function library:init()
                     end
 
                     function toggle:AddBind(data)
+                        local userCallback = data.callback;
                         local bind = {
                             class = 'bind';
                             flag = data.flag;
@@ -2977,7 +3004,12 @@ function library:init()
                             bind = 'none';
                             mode = 'toggle';
                             order = #self.options+1;
-                            callback = function() end;
+                            callback = function(state)
+                                toggle:SetState(state);
+                                if userCallback then
+                                    userCallback(state);
+                                end
+                            end;
                             keycallback = function() end;
                             indicatorValue = library.keyIndicator:AddValue({value = 'value', key = 'key', enabled = false});
                             noindicator = false;
@@ -2989,7 +3021,7 @@ function library:init()
                             objects = {};
                         };
     
-                        local blacklist = {'objects'};
+                        local blacklist = {'objects', 'callback'};
                         for i,v in next, data do
                             if not table.find(blacklist, i) and bind[i] ~= nil then
                                 bind[i] = v
@@ -3116,7 +3148,8 @@ function library:init()
                                 local display = bind.state; if bind.invertindicator then display = not bind.state; end
                                 bind.indicatorValue:SetEnabled(display and not bind.noindicator)
                             elseif (inp.KeyCode == bind.bind or inp.UserInputType == bind.bind) and not bind.binding then
-                                if bind.mode == 'toggle' then
+                                local mode = string.lower(tostring(bind.mode or 'toggle'))
+                                if mode == 'toggle' then
                                     bind.state = not bind.state
                                     if bind.flag then
                                         library.flags[bind.flag] = bind.state;
@@ -3124,16 +3157,15 @@ function library:init()
                                     bind.callback(bind.state)
                                     local display = bind.state; if bind.invertindicator then display = not bind.state; end
                                     bind.indicatorValue:SetEnabled(display and not bind.noindicator);
-                                elseif bind.mode == 'hold' then
+                                elseif mode == 'hold' then
+                                    bind.state = true
                                     if bind.flag then
                                         library.flags[bind.flag] = true;
                                     end
                                     bind.indicatorValue:SetEnabled((not bind.invertindicator and true or false) and not bind.noindicator);
-                                    c = utility:Connection(runservice.RenderStepped, function()
-                                        if bind.callback then
-                                            bind.callback(true);
-                                        end
-                                    end)
+                                    if bind.callback then
+                                        bind.callback(true);
+                                    end
                                 end
                             end
                         end)
@@ -3141,8 +3173,9 @@ function library:init()
                         utility:Connection(inputservice.InputEnded, function(inp)
                             if bind.bind ~= 'none' then
                                 if inp.KeyCode == bind.bind or inp.UserInputType == bind.bind then
-                                    if c then
-                                        c:Disconnect();
+                                    local mode = string.lower(tostring(bind.mode or 'toggle'))
+                                    if mode == 'hold' then
+                                        bind.state = false
                                         if bind.flag then
                                             library.flags[bind.flag] = false;
                                         end
@@ -3296,13 +3329,17 @@ function library:init()
                                 else
                                     slider.dragging = true;
                                     library.draggingSlider = slider;
+                                    library.isDragging = true;
                                 end
                             end)
     
                             utility:Connection(button1up, function()
                                 objs.border1.ThemeColor = objs.holder.Hover and 'Accent' or 'Option Border 1';
-                                slider.dragging = false;
-                                library.draggingSlider = nil;
+                                if slider.dragging then
+                                    slider.dragging = false;
+                                    library.draggingSlider = nil;
+                                    library.isDragging = false;
+                                end
                             end)
     
                         end
@@ -3320,8 +3357,13 @@ function library:init()
                                     pos = newUDim2((0 - self.min) / (self.max - self.min), 0, 0, 0);
                                 end
     
-                                utility:Tween(self.objects.slider, 'Size', size, .05, Enum.EasingDirection.Out, Enum.EasingStyle.Quad);
-                                utility:Tween(self.objects.slider, 'Position', pos, .05, Enum.EasingDirection.Out, Enum.EasingStyle.Quad);
+                                if self.dragging then
+                                    self.objects.slider.Size = size;
+                                    self.objects.slider.Position = pos;
+                                else
+                                    utility:Tween(self.objects.slider, 'Size', size, .05, Enum.EasingDirection.Out, Enum.EasingStyle.Quad);
+                                    utility:Tween(self.objects.slider, 'Position', pos, .05, Enum.EasingDirection.Out, Enum.EasingStyle.Quad);
+                                end
     
                                 self.value = newValue;
                                 library.flags[self.flag] = newValue;
@@ -3739,13 +3781,17 @@ function library:init()
                             else
                                 slider.dragging = true;
                                 library.draggingSlider = slider;
+                                library.isDragging = true;
                             end
                         end)
 
                         utility:Connection(button1up, function()
                             objs.border1.ThemeColor = objs.holder.Hover and 'Accent' or 'Option Border 1';
-                            slider.dragging = false;
-                            library.draggingSlider = nil;
+                            if slider.dragging then
+                                slider.dragging = false;
+                                library.draggingSlider = nil;
+                                library.isDragging = false;
+                            end
                         end)
 
                     end
@@ -3763,8 +3809,13 @@ function library:init()
                                 pos = newUDim2((0 - self.min) / (self.max - self.min), 0, 0, 0);
                             end
 
-                            utility:Tween(self.objects.slider, 'Size', size, .05, Enum.EasingDirection.Out, Enum.EasingStyle.Quad);
-                            utility:Tween(self.objects.slider, 'Position', pos, .05, Enum.EasingDirection.Out, Enum.EasingStyle.Quad);
+                            if self.dragging then
+                                self.objects.slider.Size = size;
+                                self.objects.slider.Position = pos;
+                            else
+                                utility:Tween(self.objects.slider, 'Size', size, .05, Enum.EasingDirection.Out, Enum.EasingStyle.Quad);
+                                utility:Tween(self.objects.slider, 'Position', pos, .05, Enum.EasingDirection.Out, Enum.EasingStyle.Quad);
+                            end
 
                             self.value = newValue;
                             library.flags[self.flag] = newValue;
@@ -4756,34 +4807,39 @@ function library:init()
                             bind.state = true
                             library.flags[bind.flag] = bind.state
                         elseif (inp.KeyCode == bind.bind or inp.UserInputType == bind.bind) and not bind.binding then
-                            if bind.mode == 'toggle' then
+                            local mode = string.lower(tostring(bind.mode or 'toggle'))
+                            if mode == 'toggle' then
                                 bind.state = not bind.state
                                 if bind.flag then
                                     library.flags[bind.flag] = bind.state;
                                 end
                                 bind.callback(bind.state)
                                 bind.indicatorValue:SetEnabled(bind.state and not bind.noindicator);
-                            elseif bind.mode == 'hold' then
+                            elseif mode == 'hold' then
+                                bind.state = true
                                 if bind.flag then
                                     library.flags[bind.flag] = true;
                                 end
                                 bind.indicatorValue:SetEnabled(true and not bind.noindicator);
-                                c = utility:Connection(runservice.RenderStepped, function()
+                                if bind.callback then
                                     bind.callback(true);
-                                end)
+                                end
                             end
                         end
                     end)
 
                     utility:Connection(inputservice.InputEnded, function(inp)
                         if bind.bind ~= 'none' then
-                            if inp.KeyCode == bind.bind or inp.UserInputType == bind.key then
-                                if c then
-                                    c:Disconnect();
+                            if inp.KeyCode == bind.bind or inp.UserInputType == bind.bind then
+                                local mode = string.lower(tostring(bind.mode or 'toggle'))
+                                if mode == 'hold' then
+                                    bind.state = false
                                     if bind.flag then
                                         library.flags[bind.flag] = false;
                                     end
-                                    bind.callback(false);
+                                    if bind.callback then
+                                        bind.callback(false);
+                                    end
                                     bind.indicatorValue:SetEnabled(false);
                                 end
                             end
@@ -5064,6 +5120,88 @@ function library:init()
                     return text
                 end
 
+                function section:AddCustom(data, builder)
+                    if typeof(data) == 'function' and builder == nil then
+                        builder = data
+                        data = {}
+                    end
+                    data = data or {}
+                    local custom = {
+                        class = 'custom';
+                        flag = data.flag;
+                        order = data.order or (#self.options + 1);
+                        enabled = true;
+                        height = data.height or 24;
+                        objects = {};
+                    }
+
+                    local z = library.zindexOrder.window + 25;
+                    custom.objects.holder = utility:Draw('Square', {
+                        Size = newUDim2(1, 0, 0, custom.height);
+                        Transparency = 0;
+                        ZIndex = z + 4;
+                        Parent = section.objects.optionholder;
+                    })
+
+                    function custom:SetHeight(h)
+                        self.height = h
+                        self.objects.holder.Size = newUDim2(1, 0, 0, h)
+                        section:UpdateOptions()
+                    end
+
+                    function custom:SetEnabled(bool)
+                        self.enabled = bool
+                        section:UpdateOptions()
+                    end
+
+                    function custom:Remove()
+                        for i, opt in next, section.options do
+                            if opt == custom then
+                                table.remove(section.options, i)
+                                break
+                            end
+                        end
+                        for _, obj in next, self.objects do
+                            pcall(function()
+                                if obj.Remove then obj:Remove() end
+                            end)
+                        end
+                        section:UpdateOptions()
+                    end
+
+                    table.insert(self.options, custom)
+
+                    if custom.flag then
+                        library.options[custom.flag] = custom
+                    end
+
+                    if builder then
+                        builder(custom, custom.objects.holder, z, utility, library)
+                    end
+
+                    self:UpdateOptions()
+                    return custom
+                end
+
+                setmetatable(section, {
+                    __index = function(tbl, key)
+                        if library.customComponents[key] then
+                            return function(s, ...)
+                                return library.customComponents[key](s, ...)
+                            end
+                        end
+                        if typeof(key) == 'string' and key:sub(1, 3) == 'Add' then
+                            local compName = key:sub(4)
+                            if library.customComponents[compName] then
+                                return function(s, ...)
+                                    return library.customComponents[compName](s, ...)
+                                end
+                            end
+                        end
+                        return nil
+                    end
+                })
+
                 -----------------------
 
                 section:UpdateOptions();
@@ -5077,30 +5215,35 @@ function library:init()
                     return a.order < b.order
                 end)
 
+                local isTabSelected = (self == window.selectedTab)
                 local last1,last2;
                 local padding = 15;
                 for _,section in next, self.sections do
 
-                    if section.objects.background.Visible ~= (section.enabled and tab.selected) then
-                        section.objects.background.Visible = section.enabled and tab.selected
-                        section:UpdateOptions();
+                    local isVisible = section.enabled and isTabSelected
+                    if section.objects.background.Visible ~= isVisible then
+                        section.objects.background.Visible = isVisible
                     end
+                    section:UpdateOptions();
                     
-                    if section.enabled then
+                    if isVisible then
                         if section.side == 1 then
                             if last1 then
                                 section.objects.background.Position = last1.objects.background.Position + newUDim2(0,0,0,last1.objects.background.Object.Size.Y + padding);
+                            else
+                                section.objects.background.Position = newUDim2(0,0,0,0);
                             end
                             last1 = section;
                         elseif section.side == 2 then
                             if last2 then
                                 section.objects.background.Position = last2.objects.background.Position + newUDim2(0,0,0,last2.objects.background.Object.Size.Y + padding);
+                            else
+                                section.objects.background.Position = newUDim2(0,0,0,0);
                             end
                             last2 = section;
                         end
+                        section:SetText(section.text)
                     end
-
-                    section:SetText(section.text)
                     
                 end
             end
@@ -5114,6 +5257,20 @@ function library:init()
             end
 
             function tab:Select()
+                if window.dropdown and window.dropdown.selected then
+                    window.dropdown.selected.open = false;
+                    if window.dropdown.selected.objects and window.dropdown.selected.objects.openText then
+                        window.dropdown.selected.objects.openText.Text = '+';
+                    end
+                    window.dropdown.selected = nil;
+                    window.dropdown.objects.background.Visible = false;
+                end
+                if window.colorpicker and window.colorpicker.selected then
+                    window.colorpicker.selected.open = false;
+                    window.colorpicker.selected = nil;
+                    window.colorpicker.objects.background.Visible = false;
+                    window.colorpicker.objects.background.Parent = window.objects.background;
+                end
                 window.selectedTab = tab;
                 window:UpdateTabs();
                 for i,v in next, window.tabs do
