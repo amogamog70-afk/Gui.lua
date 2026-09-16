@@ -555,16 +555,28 @@ do
     end
 
     function utility:GetHoverObject()
-        local objects = {}
-        for i,v in next, library.drawings do
-            if v.Object.Visible and v.Class == 'Square' and self:MouseOver(v.Object) then
-                table.insert(objects,v.Object)
+        local mousePos = inputservice:GetMouseLocation()
+        local mx, my = mousePos.X, mousePos.Y
+        local bestObj = nil
+        local bestZ = -999999
+        for _, v in next, library.drawings do
+            if v.Visible and v.Class == 'Square' then
+                local obj = v.Object
+                if obj.Visible then
+                    local pos = obj.Position
+                    local size = obj.Size
+                    local x1, y1 = pos.X, pos.Y
+                    if mx >= x1 and mx <= x1 + size.X and my >= y1 and my <= y1 + size.Y then
+                        local z = obj.ZIndex
+                        if z > bestZ then
+                            bestZ = z
+                            bestObj = obj
+                        end
+                    end
+                end
             end
         end
-        table.sort(objects,function(a,b)
-            return a.ZIndex > b.ZIndex
-        end)
-        return objects[1]
+        return bestObj
     end
 
     function utility:Draw(class, properties)
@@ -956,35 +968,38 @@ function library:init()
         end
     end)
 
+    local lastHoverData = nil
     utility:Connection(inputservice.InputChanged, function(input, gpe)
         if input.UserInputType == Enum.UserInputType.MouseMovement then
             if library.open then
-                mousemove:Fire(inputservice:GetMouseLocation());
+                local mousePos = inputservice:GetMouseLocation()
+                mousemove:Fire(mousePos);
                 updateCursor();
 
                 if library.CurrentTooltip ~= nil then
-                    local mousePos = inputservice:GetMouseLocation()
                     tooltipObjects.background.Position = UDim2.new(0,mousePos.X + 15,0,mousePos.Y + 15)
                     tooltipObjects.background.Size = UDim2.new(0,tooltipObjects.text.TextBounds.X + 6 + (library.CurrentTooltip.risky and 60 or 0),0,tooltipObjects.text.TextBounds.Y + 2)
                 end
 
                 local hoverObj = utility:GetHoverObject();
-                for _,v in next, library.drawings do
-                    local hover = hoverObj == v.Object;
-                    if hover and not v.Hover then
-                        v.Hover = true;
-                        v.MouseEnter:Fire(inputservice:GetMouseLocation());
-                    elseif not hover and v.Hover then
-                        v.Hover = false;
-                        v.MouseLeave:Fire(inputservice:GetMouseLocation());
+                local hoverData = hoverObj and library.drawings[hoverObj]
+                if hoverData ~= lastHoverData then
+                    if lastHoverData and lastHoverData.Hover then
+                        lastHoverData.Hover = false
+                        lastHoverData.MouseLeave:Fire(mousePos)
                     end
+                    if hoverData and not hoverData.Hover then
+                        hoverData.Hover = true
+                        hoverData.MouseEnter:Fire(mousePos)
+                    end
+                    lastHoverData = hoverData
                 end
 
                 if mb1down then
 
                     -- // Update Sliders Drag
                     if library.draggingSlider ~= nil then
-                        local rel = inputservice:GetMouseLocation() - library.draggingSlider.objects.background.Object.Position;
+                        local rel = mousePos - library.draggingSlider.objects.background.Object.Position;
                         local val = utility:ConvertNumberRange(rel.X, 0 , library.draggingSlider.objects.background.Object.Size.X, library.draggingSlider.min, library.draggingSlider.max);
                         library.draggingSlider:SetValue(val)
                     end
@@ -1480,8 +1495,8 @@ function library:init()
             })
 
             objs.tabHolder = utility:Draw('Square', {
-                Size = newUDim2(1,0,0,20);
-                Position = newUDim2(0,0,0,-21);
+                Size = newUDim2(1,0,0,24);
+                Position = newUDim2(0,0,0,-25);
                 Parent = objs.groupBackground;
                 Transparency = 0;
                 ZIndex = z+1;
@@ -2103,7 +2118,7 @@ function library:init()
                 local z = library.zindexOrder.window + 5;
 
                 objs.background = utility:Draw('Square', {
-                    Size = newUDim2(0,50,1,0);
+                    Size = newUDim2(0,65,1,0);
                     Parent = self.objects.tabHolder;
                     ThemeColor = 'Unselected Tab Background';
                     ZIndex = z;
@@ -2294,14 +2309,14 @@ function library:init()
                         local z = library.zindexOrder.window+25;
 
                         objs.holder = utility:Draw('Square', {
-                            Size = newUDim2(1,0,0,17);
+                            Size = newUDim2(1,0,0,23);
                             Transparency = 0;
                             ZIndex = z+5;
                             Parent = section.objects.optionholder;
                         })
 
                         objs.background = utility:Draw('Square', {
-                            Size = newUDim2(0,8,0,8);
+                            Size = newUDim2(0,14,0,14);
                             Position = newUDim2(0,2,0,4);
                             ThemeColor = 'Option Background';
                             ZIndex = z+3;
@@ -2333,7 +2348,7 @@ function library:init()
                         })
 
                         objs.text = utility:Draw('Text', {
-                            Position = newUDim2(0,19,0,1);
+                            Position = newUDim2(0,24,0,3);
                             ThemeColor = 'Option Text 3';
                             Size = 13;
                             Font = 2;
@@ -2402,7 +2417,7 @@ function library:init()
                             end
                         end
 
-                        self.objects.holder.Size = newUDim2(1,0,0,17 + y);
+                        self.objects.holder.Size = newUDim2(1,0,0,23 + y);
                         section:UpdateOptions()
 
                     end
@@ -2453,14 +2468,14 @@ function library:init()
                             local z = library.zindexOrder.window+25;
     
                             objs.holder = utility:Draw('Square', {
-                                Size = newUDim2(0,21,0,17);
+                                Size = newUDim2(0,25,0,23);
                                 Transparency = 0;
                                 ZIndex = z+6;
                                 Parent = self.objects.holder;
                             })
     
                             objs.background = utility:Draw('Square', {
-                                Size = newUDim2(0,15,0,8);
+                                Size = newUDim2(0,18,0,13);
                                 Position = newUDim2(0,4,0,5);
                                 ZIndex = z+3;
                                 Parent = objs.holder;
@@ -2613,13 +2628,14 @@ function library:init()
                             local z = library.zindexOrder.window+25;
     
                             objs.holder = utility:Draw('Square', {
-                                Size = newUDim2(0,0,0,17);
+                                Size = newUDim2(0,0,0,23);
                                 Transparency = 0;
                                 ZIndex = z+6;
                                 Parent = self.objects.holder;
                             })
     
                             objs.keyText = utility:Draw('Text', {
+                                Position = newUDim2(0,0,0,3);
                                 ThemeColor = 'Option Text 3';
                                 Size = 13;
                                 Font = 2;
@@ -2791,15 +2807,15 @@ function library:init()
                             local z = library.zindexOrder.window+25;
 
                             objs.holder = utility:Draw('Square', {
-                                Size = newUDim2(1,0,0,20);
+                                Size = newUDim2(1,0,0,26);
                                 Transparency = 0;
                                 ZIndex = z+6;
                                 Parent = toggle.objects.holder;
                             })
 
                             objs.background = utility:Draw('Square', {
-                                Size = newUDim2(1,-4,1,-8);
-                                Position = newUDim2(0,2,0,4);
+                                Size = newUDim2(1,-4,0,15);
+                                Position = newUDim2(0,2,0,5);
                                 ThemeColor = 'Option Background';
                                 ZIndex = z+2;
                                 Parent = objs.holder;
@@ -3165,15 +3181,15 @@ function library:init()
                         local z = library.zindexOrder.window+25;
 
                         objs.holder = utility:Draw('Square', {
-                            Size = newUDim2(1,0,0,32);
+                            Size = newUDim2(1,0,0,38);
                             Transparency = 0;
                             ZIndex = z+4;
                             Parent = section.objects.optionholder;
                         })
 
                         objs.background = utility:Draw('Square', {
-                            Size = newUDim2(1,-4,0,11);
-                            Position = newUDim2(0,2,1,-14);
+                            Size = newUDim2(1,-4,0,16);
+                            Position = newUDim2(0,2,1,-19);
                             ThemeColor = 'Option Background';
                             ZIndex = z+2;
                             Parent = objs.holder;
@@ -3221,16 +3237,16 @@ function library:init()
                         })
 
                         objs.plusDetector = utility:Draw('Square', {
-                            Size = newUDim2(0,14,0,14);
-                            Position = newUDim2(1,-28,0,1);
+                            Size = newUDim2(0,16,0,16);
+                            Position = newUDim2(1,-32,0,0);
                             Transparency = 0;
                             ZIndex = z+5;
                             Parent = objs.holder;
                         })
 
                         objs.minusDetector = utility:Draw('Square', {
-                            Size = newUDim2(0,14,0,14);
-                            Position = newUDim2(1,-14,0,1);
+                            Size = newUDim2(0,16,0,16);
+                            Position = newUDim2(1,-16,0,0);
                             Transparency = 0;
                             ZIndex = z+5;
                             Parent = objs.holder;
@@ -3402,14 +3418,14 @@ function library:init()
                         local z = library.zindexOrder.window+25;
 
                         objs.holder = utility:Draw('Square', {
-                            Size = newUDim2(1,0,0,22);
+                            Size = newUDim2(1,0,0,28);
                             Transparency = 0;
                             ZIndex = z+4;
                             Parent = section.objects.optionholder;
                         })
 
                         objs.background = utility:Draw('Square', {
-                            Size = newUDim2(1,-4,0,14);
+                            Size = newUDim2(1,-4,0,20);
                             Position = newUDim2(0,2,0,4);
                             ThemeColor = 'Option Background';
                             ZIndex = z+2;
@@ -3817,15 +3833,15 @@ function library:init()
                         local z = library.zindexOrder.window+25;
 
                         objs.holder = utility:Draw('Square', {
-                            Size = newUDim2(1,0,0,19);
+                            Size = newUDim2(1,0,0,24);
                             Transparency = 0;
                             ZIndex = z+5;
                             Parent = section.objects.optionholder;
                         })
 
                         objs.background = utility:Draw('Square', {
-                            Size = newUDim2(0,15,0,8);
-                            Position = newUDim2(1,-16,0,5);
+                            Size = newUDim2(0,20,0,14);
+                            Position = newUDim2(1,-22,0,5);
                             ZIndex = z+3;
                             Parent = objs.holder;
                         })
@@ -3977,15 +3993,15 @@ function library:init()
                         local z = library.zindexOrder.window+25;
 
                         objs.holder = utility:Draw('Square', {
-                            Size = newUDim2(1,0,0,37);
+                            Size = newUDim2(1,0,0,44);
                             Transparency = 0;
                             ZIndex = z+4;
                             Parent = section.objects.optionholder;
                         })
 
                         objs.background = utility:Draw('Square', {
-                            Size = newUDim2(1,-4,0,15);
-                            Position = newUDim2(0,2,1,-17);
+                            Size = newUDim2(1,-4,0,22);
+                            Position = newUDim2(0,2,1,-24);
                             ThemeColor = 'Option Background';
                             ZIndex = z+2;
                             Parent = objs.holder;
@@ -4026,7 +4042,7 @@ function library:init()
                         })
 
                         objs.inputText = utility:Draw('Text', {
-                            Position = newUDim2(0,2,0,0);
+                            Position = newUDim2(0,6,0,3);
                             ThemeColor = 'Option Text 2';
                             Size = 13;
                             Font = 2;
@@ -4205,14 +4221,14 @@ function library:init()
                         local z = library.zindexOrder.window+25;
 
                         objs.holder = utility:Draw('Square', {
-                            Size = newUDim2(1,0,0,19);
+                            Size = newUDim2(1,0,0,24);
                             Transparency = 0;
                             ZIndex = z+5;
                             Parent = section.objects.optionholder;
                         })
 
                         objs.text = utility:Draw('Text', {
-                            Position = newUDim2(0,2,0,2);
+                            Position = newUDim2(0,2,0,4);
                             ThemeColor = bind.risky and 'Risky Text' or 'Option Text 2';
                             Size = 13;
                             Font = 2;
@@ -4375,15 +4391,15 @@ function library:init()
                         local z = library.zindexOrder.window+25;
 
                         objs.holder = utility:Draw('Square', {
-                            Size = newUDim2(1,0,0,40);
+                            Size = newUDim2(1,0,0,46);
                             Transparency = 0;
                             ZIndex = z+4;
                             Parent = section.objects.optionholder;
                         })
 
                         objs.background = utility:Draw('Square', {
-                            Size = newUDim2(1,-4,0,15);
-                            Position = newUDim2(0,2,1,-19);
+                            Size = newUDim2(1,-4,0,22);
+                            Position = newUDim2(0,2,1,-24);
                             ThemeColor = 'Option Background';
                             ZIndex = z+2;
                             Parent = objs.holder;
@@ -4424,7 +4440,7 @@ function library:init()
                         })
 
                         objs.inputText = utility:Draw('Text', {
-                            Position = newUDim2(0,4,0,0);
+                            Position = newUDim2(0,6,0,3);
                             ThemeColor = 'Option Text 2';
                             Text = 'none',
                             Size = 13;
@@ -4435,7 +4451,7 @@ function library:init()
                         })
 
                         objs.openText = utility:Draw('Text', {
-                            Position = newUDim2(1,-10,0,0);
+                            Position = newUDim2(1,-14,0,3);
                             ThemeColor = 'Option Text 3';
                             Text = '+';
                             Size = 13;
