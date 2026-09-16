@@ -454,7 +454,7 @@ do
     function utility:Connection(signal, func)
         local c = signal:Connect(func)
         table.insert(library.connections, c)
-        if signal and signal._owner and signal._owner.Object then
+        if typeof(signal) == 'table' and signal._owner and signal._owner.Object then
             library.interactiveDrawings[signal._owner.Object] = signal._owner
         end
         return c
