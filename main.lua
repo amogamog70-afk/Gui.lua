@@ -169,7 +169,14 @@ end
 local library = {
     windows = {};
     indicators = {};
-    flags = {};
+    flags = {
+        ['watermark_enabled'] = false;
+        ['watermark_x'] = 6;
+        ['watermark_y'] = 1;
+        ['keybind_indicator'] = true;
+        ['keybind_indicator_x'] = 0.5;
+        ['keybind_indicator_y'] = 30;
+    };
     options = {};
     connections = {};
     drawings = {};
@@ -4951,7 +4958,7 @@ function library:init()
                         self.lock == 'Bottom Right' and newUDim2(0, screensize.X - size.X - 15, 0, screensize.Y - size.Y - 15) or
                         self.lock == 'Bottom Left' and newUDim2(0, 15, 0, screensize.Y - size.Y - 15) or
                         self.lock == 'Top' and newUDim2(0, screensize.X / 2 - size.X / 2, 0, 15) or
-                        newUDim2(library.flags.watermark_x / 100, 0, library.flags.watermark_y / 100, 0)
+                        newUDim2((library.flags.watermark_x or 6) / 100, 0, (library.flags.watermark_y or 1) / 100, 0)
                     )
                 end
 
@@ -5159,10 +5166,14 @@ function library:CreateSettingsTab(menu)
         library.keyIndicator:SetEnabled(bool);
     end})
     mainSection:AddSlider({text = 'Position X', flag = 'keybind_indicator_x', min = 0, max = 100, increment = .1, value = .5, callback = function()
-        library.keyIndicator:SetPosition(newUDim2(library.flags.keybind_indicator_x / 100, 0, library.flags.keybind_indicator_y / 100, 0));    
+        local kx = (library.flags.keybind_indicator_x or 0.5) / 100
+        local ky = (library.flags.keybind_indicator_y or 30) / 100
+        library.keyIndicator:SetPosition(newUDim2(kx, 0, ky, 0));    
     end});
     mainSection:AddSlider({text = 'Position Y', flag = 'keybind_indicator_y', min = 0, max = 100, increment = .1, value = 30, callback = function()
-        library.keyIndicator:SetPosition(newUDim2(library.flags.keybind_indicator_x / 100, 0, library.flags.keybind_indicator_y / 100, 0));    
+        local kx = (library.flags.keybind_indicator_x or 0.5) / 100
+        local ky = (library.flags.keybind_indicator_y or 30) / 100
+        library.keyIndicator:SetPosition(newUDim2(kx, 0, ky, 0));    
     end});
 
 
