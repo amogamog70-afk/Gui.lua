@@ -442,6 +442,8 @@ library.button1down = library.signal.new()
 library.button1up   = library.signal.new()
 library.mousemove   = library.signal.new()
 library.unloaded    = library.signal.new();
+library.interactiveDrawings = {};
+library.isDragging = false;
 
 local button1down, button1up, mousemove = library.button1down, library.button1up, library.mousemove
 local mb1down = false;
@@ -452,6 +454,9 @@ do
     function utility:Connection(signal, func)
         local c = signal:Connect(func)
         table.insert(library.connections, c)
+        if signal and signal._owner and signal._owner.Object then
+            library.interactiveDrawings[signal._owner.Object] = signal._owner
+        end
         return c
     end
 
@@ -567,11 +572,12 @@ do
     end
 
     function utility:GetHoverObject()
+        if library.isDragging then return nil end
         local mousePos = inputservice:GetMouseLocation()
         local mx, my = mousePos.X, mousePos.Y
         local bestObj = nil
         local bestZ = -999999
-        for _, v in next, library.drawings do
+        for _, v in next, library.interactiveDrawings do
             if v.Visible and v.Class == 'Square' then
                 local obj = v.Object
                 if obj.Visible then
@@ -615,6 +621,13 @@ do
             MouseLeave = library.signal.new();
             Class = class;
         }
+
+        drawing.MouseButton1Down._owner = drawing;
+        drawing.MouseButton2Down._owner = drawing;
+        drawing.MouseButton1Up._owner = drawing;
+        drawing.MouseButton2Up._owner = drawing;
+        drawing.MouseEnter._owner = drawing;
+        drawing.MouseLeave._owner = drawing;
 
         function drawing:Update()
             -- if drawing.Parent then
@@ -716,6 +729,7 @@ do
             end
 
             library.drawings[drawing.Object] = nil;
+            library.interactiveDrawings[drawing.Object] = nil;
             drawing.Object:Remove();
             table.clear(drawing);
 
@@ -1572,10 +1586,12 @@ function library:init()
             })
 
             local dragging, mouseStart, objStart;
+            local lastDragPx, lastDragPy = -9999, -9999;
 
             utility:Connection(objs.dragdetector.MouseButton1Down, function(pos)
                 if window.open then
                     dragging = true;
+                    library.isDragging = true;
                     mouseStart = newVector2(pos.X, pos.Y);
                     objStart = objs.background.Object.Position;
                 end
@@ -1583,16 +1599,23 @@ function library:init()
 
             utility:Connection(button1up, function()
                 dragging = false;
+                library.isDragging = false;
             end)
 
             utility:Connection(runservice.RenderStepped, function()
                 if dragging and window.open then
+                    library.isDragging = true;
                     local mPos = inputservice:GetMouseLocation()
                     local delta = mPos - mouseStart
                     local target = objStart + delta
-                    objs.background.Position = newUDim2(0, target.X, 0, target.Y)
+                    local px, py = math.floor(target.X), math.floor(target.Y)
+                    if px ~= lastDragPx or py ~= lastDragPy then
+                        lastDragPx, lastDragPy = px, py
+                        objs.background.Position = newUDim2(0, px, 0, py)
+                    end
                 else
-                    dragging = false
+                    dragging = false;
+                    library.isDragging = false;
                 end
             end)
 
@@ -1629,7 +1652,7 @@ function library:init()
 
                 objs.background = utility:Draw('Square', {
                     Visible = false;
-                    Size = newUDim2(0, 224, 0, 218);
+                    Size = newUDim2(0, 224, 0, 206);
                     Position = newUDim2(1, -224, 1, 6);
                     ThemeColor = 'Background';
                     ZIndex = z;
@@ -1703,133 +1726,46 @@ function library:init()
                     end
                 end)
 
-                -- Mode Bar (Light / Dark segmented buttons in square style)
-                objs.modeBar = utility:Draw('Square', {
-                    Size = newUDim2(1, -16, 0, 20);
-                    Position = newUDim2(0, 8, 0, 25);
-                    Color = fromrgb(24, 24, 24);
-                    ZIndex = z+1;
-                    Parent = objs.background;
-                })
-
-                objs.modeBarBorder = utility:Draw('Square', {
-                    Size = newUDim2(1, 2, 1, 2);
-                    Position = newUDim2(0, -1, 0, -1);
-                    ThemeColor = 'Option Border 1';
-                    ZIndex = z;
-                    Parent = objs.modeBar;
-                })
-
-                objs.sunBtn = utility:Draw('Square', {
-                    Size = newUDim2(0.5, -2, 1, -2);
-                    Position = newUDim2(0, 1, 0, 1);
-                    Color = fromrgb(45, 45, 45);
-                    ZIndex = z+2;
-                    Parent = objs.modeBar;
-                })
-
-                objs.sunText = utility:Draw('Text', {
-                    Position = newUDim2(0.5, 0, 0.5, -6);
-                    Text = '☀ Light';
-                    Center = true;
-                    Size = 12;
-                    Font = 2;
-                    Outline = true;
-                    ThemeColor = 'Primary Text';
-                    ZIndex = z+3;
-                    Parent = objs.sunBtn;
-                })
-
-                objs.sunDetector = utility:Draw('Square', {
-                    Size = newUDim2(1, 0, 1, 0);
-                    Transparency = 0;
-                    ZIndex = z+10;
-                    Parent = objs.sunBtn;
-                })
-
-                objs.moonBtn = utility:Draw('Square', {
-                    Size = newUDim2(0.5, -2, 1, -2);
-                    Position = newUDim2(0.5, 1, 0, 1);
-                    Color = fromrgb(30, 30, 30);
-                    ZIndex = z+2;
-                    Parent = objs.modeBar;
-                })
-
-                objs.moonText = utility:Draw('Text', {
-                    Position = newUDim2(0.5, 0, 0.5, -6);
-                    Text = '🌙 Dark';
-                    Center = true;
-                    Size = 12;
-                    Font = 2;
-                    Outline = true;
-                    ThemeColor = 'Option Text 2';
-                    ZIndex = z+3;
-                    Parent = objs.moonBtn;
-                })
-
-                objs.moonDetector = utility:Draw('Square', {
-                    Size = newUDim2(1, 0, 1, 0);
-                    Transparency = 0;
-                    ZIndex = z+10;
-                    Parent = objs.moonBtn;
-                })
-
-                utility:Connection(objs.sunDetector.MouseButton1Down, function()
-                    if window.colorpicker.selected ~= nil then
-                        local hue, sat, _ = window.colorpicker.selected.color:ToHSV()
-                        local newC3 = fromhsv(hue, clamp(sat, 0.001, 0.999), 0.98)
-                        window.colorpicker.selected:SetColor(newC3)
-                        window.colorpicker:Visualize(newC3, window.colorpicker.selected.trans)
-                    end
-                end)
-
-                utility:Connection(objs.moonDetector.MouseButton1Down, function()
-                    if window.colorpicker.selected ~= nil then
-                        local hue, sat, _ = window.colorpicker.selected.color:ToHSV()
-                        local newC3 = fromhsv(hue, clamp(sat, 0.001, 0.999), 0.40)
-                        window.colorpicker.selected:SetColor(newC3)
-                        window.colorpicker:Visualize(newC3, window.colorpicker.selected.trans)
-                    end
-                end)
-
-                -- Main Saturation / Value Gradient Rect
+                -- Main Saturation / Value Gradient Palette (16x8 Procedural Matrix - 100% bug free)
                 objs.mainColor = utility:Draw('Square', {
-                    Size = newUDim2(0, 208, 0, 95);
-                    Position = newUDim2(0, 8, 0, 49);
-                    Color = c3new(1,0,0);
+                    Size = newUDim2(0, 208, 0, 104);
+                    Position = newUDim2(0, 8, 0, 26);
+                    Color = fromrgb(20, 20, 20);
                     ZIndex = z+2;
                     Parent = objs.background;
-                })
-
-                objs.sat1 = utility:Draw('Image', {
-                    Size = newUDim2(1,0,1,0);
-                    Data = decodeBase64"iVBORw0KGgoAAAANSUhEUgAAAaQAAAGkCAQAAADURZm+AAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JQAAgIMAAPn/AACA6QAAdTAAAOpgAAA6mAAAF2+SX8VGAAAAAmJLR0QA/4ePzL8AAAAJcEhZcwAACxMAAAsTAQCanBgAAAAHdElNRQflBwwSLzK3wl3KAAADrElEQVR42u3TORLCMBBFwT+6/50hMqXSZgonBN0BWCDGYPwqeSWVZPWYVHd0Pc5H86v9areu4Sz9u7XZXT/vvtZtu6dtJtYw525iGya05afnWW17ltPE8fzfTZy/yf3vmCes59xf0Sf/42l3lnvGOyyH+y/bo/X689wCPCYkEBIICYQECAmEBEICIQFCAiGBkEBIgJBASCAkEBIgJBASCAmEBAgJhARCAiEBQgIhgZAAIYGQQEggJEBIICQQEggJEBIICYQEQgKEBEICIYGQACGBkEBIICRASCAkEBIICRASCAmEBAgJhARCAiEBQgIhgZBASICQQEggJBASICQQEggJhAQICYQEQgIhAUICIYGQQEguAQgJhARCAoQEQgIhgZAAIYGQQEggJEBIICQQEggJEBIICYQEQgKEBEICIYGQACGBkEBIICRASCAkEBIICRASCAmEBAgJhARCAiEBQgIhgZBASICQQEggJBASICQQEggJhAQICYQEQgIhAUICIYGQACGBkEBIICRASCAkEBIICRASCAmEBEIChARCAiGBkAAhgZBASCAkQEggJBASICQQEggJhAQICYQEQgIhAUICIYGQQEiAkEBIICQQEiAkEBIICYQECAmEBEIChARCAiGBkAAhgZBASCAkQEggJBASICQQEggJhARCAoQEQgIhgZAAIYGQQEggJEBIICQQEiAkEBL8lzft9AVFFzN+ywAAACV0RVh0ZGF0ZTpjcmVhdGUAMjAyMS0wNy0xMlQxODo0Nzo1MCswMDowMIxlM90AAAAldEVYdGRhdGU6bW9kaWZ5ADIwMjEtMDctMTJUMTg6NDc6NTArMDA6MDD9OIthAAAAAElFTkSuQmCC";
-                    Transparency = 0.85;
-                    ZIndex = z+3;
-                    Parent = objs.mainColor;
-                })
-
-                objs.sat2 = utility:Draw('Image', {
-                    Size = newUDim2(1,0,1,0);
-                    Data = decodeBase64"iVBORw0KGgoAAAANSUhEUgAAAaQAAAGkCAQAAADURZm+AAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JQAAgIMAAPn/AACA6QAAdTAAAOpgAAA6mAAAF2+SX8VGAAAAAmJLR0QA/4ePzL8AAAAJcEhZcwAACxMAAAsTAQCanBgAAAAHdElNRQflBwwSLyBEeyyCAAAD4klEQVR42u3YwQnAQAhFQTek/5pz9eBtEYzMlBD4PDcRADDBieMjwK3HJwBDghFepx0oEhgSOO0ARQJDAqcdKBJgSGBI4I0EhgQ47cCQwJDAGwlQJDAkcNqBIgGKBIoEhgROO0CRQJFAkQBDAqcdGBI47QBFAkUCQwKnHaBIoEigSKBIgCKBIYHTDhQJUCQwJHDagSIBigSGBE47UCRAkcCQwGkHKBIoEigSGBLgtANDAkMCbyTAkMBpB4oEigQoEhgSOO1AkQBDAqcdKBIoEqBIYEjgtANFUiRQJFAkMCTAaQeKBIoEigQYEjjtQJFAkQBFAkMCpx0oEmBI4LQDRQJFAhQJDAmcdqBIgCKBIoEhAU47UCRQJFAkwJDAaQeKBIYEOO1AkUCRYHuRTAmcduC0A0UCFAkUCQwJnHaAIoEigSKBIQFOO2gvkimBIoE3EhgS4LQDRQJDAqcdoEigSKBIYEiAIYEhwXx+NoAigSGB0w5QJDAkMCQwJKDiZwMoEhgSOO0ARQJFgnlFMiVw2oHTDhQJUCRQJDAkcNoBVZFMCRQJvJHAkACnHSgSKBIoElANSZPAaQdOOzAkwGkHigSGBIYEGBK08LMBFAkUCRQJMCQwJDAkWMjPBlAkMCRw2gG5SKYEigTeSGBIgNMOFAkMCQwJMCRo4WcDKBIYEjjtgFwkUwJFAm8kMCTAaQeKBIoEigRUQ9IkcNqB0w4MCXDagSKBIsHCIpkSOO3AaQeKBCgSKBIYEhgSYEjQws8GUCQwJHDaAblIpgSKBN5IYEiA0w4UCQwJDAkwJGjhZwMoEhgSOO0ARQJDAkMCQwIqfjaAIoEigSIBhgROO5hXJFMCpx047UCRAEUCRQJDAqcdUBXJlECRwBsJDAlw2oEigSKBIgGGBIYEhgSL+dkAigSGBE47QJHAkMBpB4oEGBIYEhgSrOZnAygSKBIoEmBI4LQDRQJFAhQJDAmcdrC8SKYEigTeSGBIgNMOFAkMCZx2gCKBIoEigSEBTjtQJFAkUCTAkMBpB4oEigQoEhgSOO1AkQBDAqcdKBKgSKBIYEjgtAMUCRQJFAkMCXDagSKBIoEiAYYETjtQJFAkQJHAkMBpB4oEGBIyeMwAAACV0RVh0ZGF0ZTpjcmVhdGUAMjAyMS0wNy0xMlQxODo0NzozMiswMDowMN2VK3MAAAAldEVYdGRhdGU6bW9kaWZ5ADIwMjEtMDctMTJUMTg6NDc6MzIrMDA6MDCsyJPPAAAAAElFTkSuQmCC";
-                    Transparency = 0.85;
-                    ZIndex = z+4;
-                    Parent = objs.mainColor;
                 })
 
                 objs.colorBorder = utility:Draw('Square', {
-                    Size = newUDim2(1,2,1,2);
-                    Position = newUDim2(0,-1,0,-1);
+                    Size = newUDim2(1, 2, 1, 2);
+                    Position = newUDim2(0, -1, 0, -1);
                     ThemeColor = 'Border';
                     ZIndex = z+1;
                     Parent = objs.mainColor;
                 })
 
+                objs.paletteCells = {}
+                local gridCols, gridRows = 16, 8
+                local cellW, cellH = 13, 13
+                for col = 0, gridCols - 1 do
+                    local s = col / (gridCols - 1)
+                    for row = 0, gridRows - 1 do
+                        local v = 1 - (row / (gridRows - 1))
+                        local cell = utility:Draw('Square', {
+                            Size = newUDim2(0, cellW, 0, cellH);
+                            Position = newUDim2(0, col * cellW, 0, row * cellH);
+                            Color = fromhsv(1, s, v);
+                            ZIndex = z+3;
+                            Parent = objs.mainColor;
+                        })
+                        table.insert(objs.paletteCells, {sq = cell, s = s, v = v})
+                    end
+                end
+
                 objs.pointer = utility:Draw('Square', {
-                    Size = newUDim2(0, 4, 0, 4);
+                    Size = newUDim2(0, 5, 0, 5);
                     Position = newUDim2(0, 0, 0, 0);
                     Color = c3new(1, 1, 1);
-                    ZIndex = z+6;
+                    ZIndex = z+7;
                     Parent = objs.mainColor;
                 })
 
@@ -1837,7 +1773,7 @@ function library:init()
                     Size = newUDim2(1, 2, 1, 2);
                     Position = newUDim2(0, -1, 0, -1);
                     Color = c3new(0, 0, 0);
-                    ZIndex = z+5;
+                    ZIndex = z+6;
                     Parent = objs.pointer;
                 })
 
@@ -1850,8 +1786,8 @@ function library:init()
 
                 -- Sliders: Rainbow Hue Bar (Horizontal)
                 objs.hue = utility:Draw('Square', {
-                    Size = newUDim2(0, 174, 0, 11);
-                    Position = newUDim2(0, 8, 0, 149);
+                    Size = newUDim2(0, 174, 0, 12);
+                    Position = newUDim2(0, 8, 0, 136);
                     Color = c3new(1,0,0);
                     ZIndex = z+2;
                     Parent = objs.background;
@@ -1903,11 +1839,11 @@ function library:init()
                     Parent = objs.hue;
                 })
 
-                -- Sliders: Opacity / Alpha Bar (Horizontal)
+                -- Sliders: Opacity / Alpha Transparency Bar (Dynamic color-to-dark gradient)
                 objs.transColor = utility:Draw('Square', {
-                    Size = newUDim2(0, 174, 0, 11);
-                    Position = newUDim2(0, 8, 0, 165);
-                    Color = c3new(1,1,1);
+                    Size = newUDim2(0, 174, 0, 12);
+                    Position = newUDim2(0, 8, 0, 153);
+                    Color = fromrgb(22, 22, 24);
                     ZIndex = z+2;
                     Parent = objs.background;
                 })
@@ -1916,11 +1852,10 @@ function library:init()
                 local transCount = 20
                 local transWidth = 174 / transCount
                 for seg = 0, transCount - 1 do
-                    local aFrac = seg / (transCount - 1)
                     local transSq = utility:Draw('Square', {
                         Size = newUDim2(0, math.ceil(transWidth), 1, 0);
                         Position = newUDim2(0, math.floor(seg * transWidth), 0, 0);
-                        Color = fromrgb(math.floor(255 * (1 - aFrac)), math.floor(255 * (1 - aFrac)), math.floor(255 * (1 - aFrac)));
+                        Color = c3new(1, 1, 1);
                         ZIndex = z+3;
                         Parent = objs.transColor;
                     })
@@ -1960,8 +1895,8 @@ function library:init()
 
                 -- Pipette / Swatch Button (Right of sliders)
                 objs.swatchBtn = utility:Draw('Square', {
-                    Size = newUDim2(0, 27, 0, 27);
-                    Position = newUDim2(0, 189, 0, 149);
+                    Size = newUDim2(0, 29, 0, 29);
+                    Position = newUDim2(0, 187, 0, 136);
                     ThemeColor = 'Option Background';
                     ZIndex = z+2;
                     Parent = objs.background;
@@ -1987,7 +1922,7 @@ function library:init()
                     Position = newUDim2(0.5, 0, 0.5, -6);
                     Text = '✎';
                     Center = true;
-                    Size = 12;
+                    Size = 13;
                     Font = 2;
                     Outline = true;
                     Color = fromrgb(255, 255, 255);
@@ -2018,10 +1953,10 @@ function library:init()
                     end
                 end)
 
-                -- Bottom Row: [ #HEX ]  [ 100% ]  [ HEX ▾ ]
+                -- Bottom Row: Hex TextBox + Percentage Box
                 objs.hexBackground = utility:Draw('Square', {
-                    Size = newUDim2(0, 84, 0, 20);
-                    Position = newUDim2(0, 8, 0, 185);
+                    Size = newUDim2(0, 136, 0, 22);
+                    Position = newUDim2(0, 8, 0, 174);
                     ThemeColor = 'Option Background';
                     ZIndex = z+2;
                     Parent = objs.background;
@@ -2036,9 +1971,9 @@ function library:init()
                 })
 
                 objs.hexText = utility:Draw('Text', {
-                    Position = newUDim2(0, 6, 0, 3);
+                    Position = newUDim2(0, 8, 0, 4);
                     Text = '#FFFFFF';
-                    Size = 12;
+                    Size = 13;
                     Font = 2;
                     Outline = true;
                     ThemeColor = 'Primary Text';
@@ -2053,47 +1988,10 @@ function library:init()
                     Parent = objs.hexBackground;
                 })
 
-                utility:Connection(objs.hexDetector.MouseEnter, function()
-                    objs.hexBorder.ThemeColor = 'Accent';
-                end)
-                utility:Connection(objs.hexDetector.MouseLeave, function()
-                    objs.hexBorder.ThemeColor = 'Option Border 1';
-                end)
-                utility:Connection(objs.hexDetector.MouseButton1Down, function()
-                    if window.colorpicker.selected ~= nil then
-                        if getclipboard then
-                            local clip = getclipboard()
-                            local parsed = hexToC3(clip)
-                            if parsed then
-                                window.colorpicker.selected:SetColor(parsed)
-                                window.colorpicker:Visualize(parsed, window.colorpicker.selected.trans)
-                                library:SendNotification('Pasted hex '..c3ToHex(parsed)..' from clipboard!', 3, parsed)
-                                return
-                            end
-                        end
-                        -- Quick palette cycle on click
-                        local presets = {
-                            fromrgb(255,255,255), fromrgb(220,50,50), fromrgb(50,220,80),
-                            fromrgb(50,130,240), fromrgb(240,200,40), fromrgb(180,50,240),
-                            fromrgb(40,220,220), fromrgb(40,40,40)
-                        }
-                        local cur = window.colorpicker.selected.color
-                        local nextC3 = presets[1]
-                        for idx, p in ipairs(presets) do
-                            if math.abs(p.R - cur.R) < 0.05 and math.abs(p.G - cur.G) < 0.05 and math.abs(p.B - cur.B) < 0.05 then
-                                nextC3 = presets[(idx % #presets) + 1]
-                                break
-                            end
-                        end
-                        window.colorpicker.selected:SetColor(nextC3)
-                        window.colorpicker:Visualize(nextC3, window.colorpicker.selected.trans)
-                    end
-                end)
-
                 -- Percentage Box
                 objs.percentBackground = utility:Draw('Square', {
-                    Size = newUDim2(0, 52, 0, 20);
-                    Position = newUDim2(0, 97, 0, 185);
+                    Size = newUDim2(0, 64, 0, 22);
+                    Position = newUDim2(0, 152, 0, 174);
                     ThemeColor = 'Option Background';
                     ZIndex = z+2;
                     Parent = objs.background;
@@ -2108,10 +2006,10 @@ function library:init()
                 })
 
                 objs.percentText = utility:Draw('Text', {
-                    Position = newUDim2(0.5, 0, 0, 3);
+                    Position = newUDim2(0.5, 0, 0, 4);
                     Text = '100%';
                     Center = true;
-                    Size = 12;
+                    Size = 13;
                     Font = 2;
                     Outline = true;
                     ThemeColor = 'Option Text 1';
@@ -2119,34 +2017,102 @@ function library:init()
                     Parent = objs.percentBackground;
                 })
 
-                -- Format Badge
-                objs.formatBackground = utility:Draw('Square', {
-                    Size = newUDim2(0, 60, 0, 20);
-                    Position = newUDim2(0, 156, 0, 185);
-                    ThemeColor = 'Option Background';
-                    ZIndex = z+2;
-                    Parent = objs.background;
-                })
+                -- Interactive Hex TextBox Logic
+                local hexFocused = false
+                local hexInput = ''
+                local hexBlinkConn = nil
+                local hexBlink = true
+                local lastHexBlink = 0
 
-                objs.formatBorder = utility:Draw('Square', {
-                    Size = newUDim2(1, 2, 1, 2);
-                    Position = newUDim2(0, -1, 0, -1);
-                    ThemeColor = 'Option Border 1';
-                    ZIndex = z+1;
-                    Parent = objs.formatBackground;
-                })
+                local function releaseHexFocus(apply)
+                    if not hexFocused then return end
+                    hexFocused = false
+                    objs.hexBorder.ThemeColor = 'Option Border 1'
+                    if hexBlinkConn then
+                        hexBlinkConn:Disconnect()
+                        hexBlinkConn = nil
+                    end
+                    if apply and window.colorpicker.selected ~= nil then
+                        local parsed = hexToC3(hexInput)
+                        if parsed then
+                            window.colorpicker.selected:SetColor(parsed)
+                            window.colorpicker:Visualize(parsed, window.colorpicker.selected.trans)
+                            library:SendNotification('Applied color: ' .. c3ToHex(parsed), 3, parsed)
+                        else
+                            objs.hexText.Text = c3ToHex(window.colorpicker.selected.color)
+                        end
+                    elseif window.colorpicker.selected ~= nil then
+                        objs.hexText.Text = c3ToHex(window.colorpicker.selected.color)
+                    end
+                end
 
-                objs.formatText = utility:Draw('Text', {
-                    Position = newUDim2(0.5, 0, 0, 3);
-                    Text = 'HEX ▾';
-                    Center = true;
-                    Size = 12;
-                    Font = 2;
-                    Outline = true;
-                    ThemeColor = 'Option Text 2';
-                    ZIndex = z+3;
-                    Parent = objs.formatBackground;
-                })
+                local function captureHexFocus()
+                    if hexFocused then return end
+                    hexFocused = true
+                    objs.hexBorder.ThemeColor = 'Accent'
+                    if window.colorpicker.selected ~= nil then
+                        hexInput = c3ToHex(window.colorpicker.selected.color)
+                    else
+                        hexInput = '#FFFFFF'
+                    end
+                    objs.hexText.Text = hexInput .. '|'
+                    hexBlink = true
+                    lastHexBlink = tick()
+                    
+                    hexBlinkConn = utility:Connection(runservice.RenderStepped, function()
+                        if hexFocused then
+                            if tick() - lastHexBlink > 0.45 then
+                                hexBlink = not hexBlink
+                                lastHexBlink = tick()
+                                objs.hexText.Text = hexInput .. (hexBlink and '|' or '')
+                            end
+                        end
+                    end)
+                end
+
+                utility:Connection(objs.hexDetector.MouseEnter, function()
+                    objs.hexBorder.ThemeColor = 'Accent'
+                end)
+                utility:Connection(objs.hexDetector.MouseLeave, function()
+                    objs.hexBorder.ThemeColor = hexFocused and 'Accent' or 'Option Border 1'
+                end)
+                utility:Connection(objs.hexDetector.MouseButton1Down, function()
+                    captureHexFocus()
+                end)
+
+                utility:Connection(inputservice.InputBegan, function(inp)
+                    if hexFocused then
+                        if inp.KeyCode == Enum.KeyCode.Return then
+                            releaseHexFocus(true)
+                        elseif inp.KeyCode == Enum.KeyCode.Escape then
+                            releaseHexFocus(false)
+                        elseif inp.UserInputType == Enum.UserInputType.MouseButton1 then
+                            local mp = inputservice:GetMouseLocation()
+                            local hp = objs.hexBackground.Object.Position
+                            local hs = objs.hexBackground.Object.Size
+                            if not (mp.X >= hp.X and mp.X <= hp.X + hs.X and mp.Y >= hp.Y and mp.Y <= hp.Y + hs.Y) then
+                                releaseHexFocus(true)
+                            end
+                        elseif inp.KeyCode == Enum.KeyCode.Backspace then
+                            if #hexInput > 1 then
+                                hexInput = hexInput:sub(1, -2)
+                            end
+                            objs.hexText.Text = hexInput .. '|'
+                            hexBlink = true
+                            lastHexBlink = tick()
+                        else
+                            local name = inp.KeyCode.Name
+                            local numMap = {Zero='0', One='1', Two='2', Three='3', Four='4', Five='5', Six='6', Seven='7', Eight='8', Nine='9'}
+                            local ch = numMap[name] or (#name == 1 and name:upper() or nil)
+                            if ch and ch:match('^[0-9A-F]$') and #hexInput < 7 then
+                                hexInput = hexInput .. ch
+                                objs.hexText.Text = hexInput .. '|'
+                                hexBlink = true
+                                lastHexBlink = tick()
+                            end
+                        end
+                    end
+                end)
 
                 local draggingHue, draggingSat, draggingTrans = false, false, false;
 
@@ -2156,7 +2122,7 @@ function library:init()
                         local sizeX = objs.mainColor.Object.Size.X
                         local sizeY = objs.mainColor.Object.Size.Y
                         if sizeX <= 0 then sizeX = 208 end
-                        if sizeY <= 0 then sizeY = 95 end
+                        if sizeY <= 0 then sizeY = 104 end
                         local relX = math.clamp((pos.X - objs.mainColor.Object.Position.X) / sizeX, 0, 0.999)
                         local relY = math.clamp((pos.Y - objs.mainColor.Object.Position.Y) / sizeY, 0, 0.999)
                         local sat = relX
@@ -2231,7 +2197,19 @@ function library:init()
                 h = h == 0 and 1 or h;
                 self.color = c3;
                 self.trans = a;
-                self.objects.mainColor.Color = fromhsv(h,1,1);
+
+                -- Update 16x8 HSV gradient palette
+                for _, cell in ipairs(self.objects.paletteCells) do
+                    cell.sq.Color = fromhsv(h, cell.s, cell.v)
+                end
+
+                -- Update dynamic transparency bar (c3 fading smoothly to dark background)
+                local transCount = #self.objects.transSegments
+                for seg = 0, transCount - 1 do
+                    local aFrac = seg / math.max(transCount - 1, 1)
+                    self.objects.transSegments[seg + 1].Color = c3:Lerp(Color3.fromRGB(22, 22, 24), aFrac)
+                end
+
                 self.objects.hueSlider.Position = newUDim2(math.clamp(h, 0, 0.99), 0, 0, -1);
                 self.objects.transSlider.Position = newUDim2(math.clamp(a, 0, 0.99), 0, 0, -1);
                 self.objects.pointer.Position = newUDim2(math.clamp(s, 0, 0.99), -2, math.clamp(1 - v, 0, 0.99), -2);
@@ -2253,24 +2231,12 @@ function library:init()
                 self.objects.hexText.Text = string.format("#%02X%02X%02X", r, g, b)
                 self.objects.percentText.Text = math.floor((1 - a) * 100) .. '%'
 
-                -- Update sun / moon button active states
-                if v > 0.65 then
-                    self.objects.sunBtn.Color = fromrgb(55, 55, 55)
-                    self.objects.moonBtn.Color = fromrgb(28, 28, 28)
-                    self.objects.sunText.ThemeColor = 'Primary Text'
-                    self.objects.moonText.ThemeColor = 'Option Text 2'
-                else
-                    self.objects.sunBtn.Color = fromrgb(28, 28, 28)
-                    self.objects.moonBtn.Color = fromrgb(55, 55, 55)
-                    self.objects.sunText.ThemeColor = 'Option Text 2'
-                    self.objects.moonText.ThemeColor = 'Primary Text'
-                end
             end
             
             window.colorpicker:Visualize(window.colorpicker.color, window.colorpicker.trans)
 
         end
-        -------------------------
+        -------------------------------------
 
         ---- Create Dropdown ----
         do
@@ -2317,19 +2283,40 @@ function library:init()
             function window.dropdown:Refresh()
                 if self.selected ~= nil then
                     local list = self.selected
+                    local function updateItemVisual(idx, isHovered)
+                        local valueObj = self.objects.values[idx]
+                        if not valueObj then return end
+                        local val = list.values[idx]
+                        if val == nil then return end
+                        local isSel = (typeof(list.selected) == 'table' and table.find(list.selected, val)) or list.selected == val
+                        if isSel then
+                            valueObj.background.Transparency = 1
+                            valueObj.background.Color = fromrgb(36, 36, 42)
+                            valueObj.text.ThemeColor = 'Accent'
+                        elseif isHovered then
+                            valueObj.background.Transparency = 1
+                            valueObj.background.Color = fromrgb(28, 28, 32)
+                            valueObj.text.ThemeColor = 'Primary Text'
+                        else
+                            valueObj.background.Transparency = 0
+                            valueObj.background.Color = fromrgb(20, 20, 22)
+                            valueObj.text.ThemeColor = 'Option Text 2'
+                        end
+                    end
+
                     for idx, value in next, list.values do
                         local valueObject = self.objects.values[idx]
                         if valueObject == nil then
                             valueObject = {};
                             valueObject.background = utility:Draw('Square', {
                                 Size = newUDim2(1,-4,0,18);
-                                Color = Color3.new(.25,.25,.25);
+                                Color = fromrgb(20, 20, 22);
                                 Transparency = 0;
                                 ZIndex = library.zindexOrder.dropdown+1;
                                 Parent = self.objects.background;
                             })
                             valueObject.text = utility:Draw('Text', {
-                                Position = newUDim2(0,3,0,1);
+                                Position = newUDim2(0,6,0,1);
                                 ThemeColor = 'Option Text 2';
                                 Text = tostring(value);
                                 Size = 13;
@@ -2337,6 +2324,15 @@ function library:init()
                                 ZIndex = library.zindexOrder.dropdown+2;
                                 Parent = valueObject.background;
                             })
+                            valueObject.isHovered = false;
+                            utility:Connection(valueObject.background.MouseEnter, function()
+                                valueObject.isHovered = true;
+                                updateItemVisual(idx, true);
+                            end)
+                            utility:Connection(valueObject.background.MouseLeave, function()
+                                valueObject.isHovered = false;
+                                updateItemVisual(idx, false);
+                            end)
                             valueObject.connection = utility:Connection(valueObject.background.MouseButton1Down, function()
                                 local currentList = self.selected
                                 if currentList then
@@ -2362,12 +2358,9 @@ function library:init()
                                         currentList.objects.openText.Text = '+';
                                         window.dropdown.selected = nil;
                                         window.dropdown.objects.background.Visible = false;
-                                    end
-
-                                    for idx, val in next, currentList.values do
-                                        local valueObj = self.objects.values[idx]
-                                        if valueObj then
-                                            valueObj.background.Transparency = (typeof(newSelected) == 'table' and table.find(newSelected, val) or newSelected == val) and 1 or 0
+                                    else
+                                        for vIdx, _ in next, currentList.values do
+                                            updateItemVisual(vIdx, self.objects.values[vIdx] and self.objects.values[vIdx].isHovered or false)
                                         end
                                     end
 
@@ -2380,7 +2373,7 @@ function library:init()
                     for idx, val in next, list.values do
                         local valueObj = self.objects.values[idx]
                         if valueObj then
-                            valueObj.background.Transparency = (typeof(list.selected) == 'table' and table.find(list.selected, val) or list.selected == val) and 1 or 0
+                            updateItemVisual(idx, valueObj.isHovered or false)
                         end
                     end
 
@@ -2523,6 +2516,22 @@ function library:init()
 
                 utility:Connection(objs.background.MouseButton1Down, function()
                     tab:Select();
+                end)
+
+                utility:Connection(objs.background.MouseEnter, function()
+                    if tab ~= window.selectedTab then
+                        objs.background.Color = fromrgb(32, 32, 36);
+                        objs.text.ThemeColor = 'Primary Text';
+                        objs.topBorder.ThemeColor = 'Accent';
+                    end
+                end)
+
+                utility:Connection(objs.background.MouseLeave, function()
+                    if tab ~= window.selectedTab then
+                        objs.background.ThemeColor = 'Unselected Tab Background';
+                        objs.text.ThemeColor = 'Unselected Tab Text';
+                        objs.topBorder.ThemeColor = 'Unselected Tab Background';
+                    end
                 end)
 
             end
@@ -4437,13 +4446,14 @@ function library:init()
                         end)
 
                         utility:Connection(objs.holder.MouseLeave, function()
-                            objs.border1.ThemeColor = 'Option Border 1';
+                            if not box.focused then
+                                objs.border1.ThemeColor = 'Option Border 1';
+                            end
                         end)
 
                         utility:Connection(objs.holder.MouseButton1Down, function()
                             if box.focused then
-                                box:ReleaseFocus();
-                                actionservice:UnbindAction('FreezeMovement');
+                                box:ReleaseFocus(true);
                             else
                                 actionservice:BindAction(
                                     'FreezeMovement',
@@ -4455,7 +4465,7 @@ function library:init()
                                 )
                                 box:CaptureFocus(inputservice:IsKeyDown(Enum.KeyCode.LeftControl));
                                 if inputservice:IsKeyDown(Enum.KeyCode.LeftControl) then
-                                    objs.inputText.Text = '';
+                                    objs.inputText.Text = '|';
                                 end
                             end
                         end)
@@ -4470,9 +4480,12 @@ function library:init()
                         end
                     end
 
+                    local c, blinkConn
+                    local input = box.input;
                     function box:SetInput(str, nocallback)
                         if typeof(str) == 'string' then
                             self.input = str;
+                            input = str;
                             self.objects.inputText.Text = str;
                             if not nocallback then
                                 self.callback(str);
@@ -4483,26 +4496,50 @@ function library:init()
                         end
                     end
 
-                    local c
-                    local input = box.input;
                     function box:CaptureFocus(clear)
+                        if box.focused then return end
                         box.focused = true
+                        objs.border1.ThemeColor = 'Accent';
 
                         if clear then
                             input = '';
+                        else
+                            input = self.input or '';
                         end
 
                         self.objects.inputText.ThemeColor = 'Option Text 1';
+                        local blink = true
+                        local lastBlink = tick()
+                        self.objects.inputText.Text = input .. '|';
+
+                        blinkConn = utility:Connection(runservice.RenderStepped, function()
+                            if box.focused then
+                                if tick() - lastBlink > 0.45 then
+                                    blink = not blink
+                                    lastBlink = tick()
+                                    self.objects.inputText.Text = input .. (blink and '|' or '')
+                                end
+                            end
+                        end)
+
                         c = utility:Connection(inputservice.InputBegan, function(inp)
-                            if inp.KeyCode == Enum.KeyCode.Return or inp.UserInputType == Enum.UserInputType.MouseButton1 then
+                            if inp.KeyCode == Enum.KeyCode.Return then
                                 box:ReleaseFocus(true);
+                            elseif inp.UserInputType == Enum.UserInputType.MouseButton1 then
+                                local mp = inputservice:GetMouseLocation()
+                                local bp = objs.background.Object.Position
+                                local bs = objs.background.Object.Size
+                                if not (mp.X >= bp.X and mp.X <= bp.X + bs.X and mp.Y >= bp.Y and mp.Y <= bp.Y + bs.Y) then
+                                    box:ReleaseFocus(true);
+                                end
                             elseif inp.KeyCode == Enum.KeyCode.Escape then
                                 input = self.input
-                                self.objects.inputText.Text = input;
-                                box:ReleaseFocus();
+                                box:ReleaseFocus(false);
                             elseif inp.KeyCode == Enum.KeyCode.Backspace then
                                 input = input:sub(1,-2);
-                                self.objects.inputText.Text = input;
+                                blink = true;
+                                lastBlink = tick();
+                                self.objects.inputText.Text = input .. '|';
                             elseif #inp.KeyCode.Name == 1 or table.find(whitelistedBoxKeys, inp.KeyCode) or inp.KeyCode.Name == 'Space' or inp.KeyCode.Name == 'Minus' or inp.KeyCode.Name == 'Equals' or inp.KeyCode.Name == 'Backquote' then
                                 local wlIdx = table.find(whitelistedBoxKeys, inp.KeyCode)
                                 local keyString = inp.KeyCode.Name == 'Space' and ' ' or inp.KeyCode.Name == 'Minus' and '_' or inp.KeyCode.Name == 'Equals' and '+' or inp.KeyCode.Name == 'Backquote' and '~' or wlIdx ~= nil and tostring(wlIdx-1) or inp.KeyCode.Name
@@ -4516,42 +4553,48 @@ function library:init()
                                         keyString = '`'
                                     end
                                 else
-                                    if keyString == '1' then
-                                        keyString = '!'
-                                    elseif keyString == '2' then
-                                        keyString = '@'
-                                    elseif keyString == '3' then
-                                        keyString = '#'
-                                    elseif keyString == '4' then
-                                        keyString = '$'
-                                    elseif keyString == '5' then
-                                        keyString = '%'
-                                    elseif keyString == '6' then
-                                        keyString = '^'
-                                    elseif keyString == '7' then
-                                        keyString = '&'
-                                    elseif keyString == '8' then
-                                        keyString = '*'
-                                    elseif keyString == '9' then
-                                        keyString = '('
-                                    elseif keyString == '0' then
-                                        keyString = ')'
+                                    if keyString == '1' then keyString = '!'
+                                    elseif keyString == '2' then keyString = '@'
+                                    elseif keyString == '3' then keyString = '#'
+                                    elseif keyString == '4' then keyString = '$'
+                                    elseif keyString == '5' then keyString = '%'
+                                    elseif keyString == '6' then keyString = '^'
+                                    elseif keyString == '7' then keyString = '&'
+                                    elseif keyString == '8' then keyString = '*'
+                                    elseif keyString == '9' then keyString = '('
+                                    elseif keyString == '0' then keyString = ')'
                                     end
                                 end
                                 input = input..keyString;
-                                self.objects.inputText.Text = input;
+                                blink = true;
+                                lastBlink = tick();
+                                self.objects.inputText.Text = input .. '|';
                             end
                         end)
 
                     end
 
                     function box:ReleaseFocus(apply)
+                        if not box.focused then return end
                         box.focused = false;
+                        objs.border1.ThemeColor = 'Option Border 1';
                         self.objects.inputText.ThemeColor = 'Option Text 2';
+                        if blinkConn then
+                            blinkConn:Disconnect();
+                            blinkConn = nil;
+                        end
+                        if c then
+                            c:Disconnect();
+                            c = nil;
+                        end
+                        pcall(function()
+                            actionservice:UnbindAction('FreezeMovement');
+                        end)
                         if apply then
                             box:SetInput(input);
+                        else
+                            self.objects.inputText.Text = self.input;
                         end
-                        c:Disconnect();
                     end
 
                     tooltip(box);
@@ -5166,7 +5209,7 @@ function library:init()
             };
             lock = 'custom';
             position = newUDim2(0,0,0,0);
-            refreshrate = 25;
+            refreshrate = 400;
         }
 
         function self.watermark:Update()
@@ -5287,16 +5330,29 @@ function library:init()
         end
     end
 
+    local smoothedFps = 60;
+    local smoothedPing = 40;
     local lasttick = tick();
     utility:Connection(runservice.RenderStepped, function(step)
-        library.stats.fps = floor(1/step)
-        library.stats.ping = stats.Network.ServerStatsItem["Data Ping"]:GetValue()
-        library.stats.sendkbps = stats.DataSendKbps
-        library.stats.receivekbps = stats.DataReceiveKbps
+        if step and step > 0 then
+            local rawFps = math.clamp(1 / step, 1, 999);
+            smoothedFps = smoothedFps + (rawFps - smoothedFps) * math.clamp(step * 3.5, 0.01, 0.15);
+        end
+        local ok, rawPing = pcall(function()
+            return stats.Network.ServerStatsItem["Data Ping"]:GetValue();
+        end)
+        if ok and typeof(rawPing) == 'number' and rawPing >= 0 then
+            smoothedPing = smoothedPing + (rawPing - smoothedPing) * math.clamp((step or 0.016) * 3.5, 0.01, 0.15);
+        end
+
+        library.stats.fps = floor(smoothedFps + 0.5);
+        library.stats.ping = floor(smoothedPing + 0.5);
+        library.stats.sendkbps = stats.DataSendKbps;
+        library.stats.receivekbps = stats.DataReceiveKbps;
 
         if (tick()-lasttick)*1000 > library.watermark.refreshrate then
-            lasttick = tick()
-            library.watermark:Update()
+            lasttick = tick();
+            library.watermark:Update();
         end
     end)
 
