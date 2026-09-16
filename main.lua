@@ -1250,12 +1250,15 @@ function library:init()
                 indDragging = false
             end)
 
-            utility:Connection(mousemove, function(pos)
+            utility:Connection(runservice.RenderStepped, function()
                 if indDragging and library.open then
-                    local delta = newVector2(pos.X, pos.Y) - indMouseStart
+                    local mPos = inputservice:GetMouseLocation()
+                    local delta = mPos - indMouseStart
                     local target = indObjStart + delta
                     indicator.position = newUDim2(0, target.X, 0, target.Y)
                     objs.background.Position = indicator.position
+                else
+                    indDragging = false
                 end
             end)
 
@@ -1263,7 +1266,7 @@ function library:init()
         --------------------
 
         function indicator:Update()
-            local xSize  = 125
+            local xSize  = 190
             local yPos  = 0
             table.sort(self.values, function(a,b)
                 return a.order < b.order;
@@ -1273,20 +1276,20 @@ function library:init()
                 v.objects.keyLabel.Text = tostring(v.key);
                 v.objects.valueLabel.Text = tostring(v.value);
             
-                v.objects.valueLabel.Position = newUDim2(1,-(v.objects.valueLabel.TextBounds.X + 3),0,0)
+                v.objects.valueLabel.Position = newUDim2(1,-(v.objects.valueLabel.TextBounds.X + 5),0,0)
                 v.objects.background.Position = newUDim2(0,0,1,3 + yPos)
-                v.objects.background.Visible = v.enabled
+                v.objects.background.Visible = v.enabled and self.enabled
 
-                if v.enabled then
+                if v.enabled and self.enabled then
                     yPos = yPos + 16 + 3
-                    local x = (v.objects.keyLabel.TextBounds.X + 10 + v.objects.valueLabel.TextBounds.X)
+                    local x = (v.objects.keyLabel.TextBounds.X + 16 + v.objects.valueLabel.TextBounds.X)
                     if x > xSize then
                         xSize = x
                     end
                 end
             end
 
-            self.objects.background.Size = newUDim2(0,xSize + 8,0,16)
+            self.objects.background.Size = newUDim2(0,xSize + 10,0,16)
             self.objects.background.Position = self.position
         end
 
@@ -1571,22 +1574,25 @@ function library:init()
             local dragging, mouseStart, objStart;
 
             utility:Connection(objs.dragdetector.MouseButton1Down, function(pos)
-                dragging = true;
-                mouseStart = newUDim2(0, pos.X, 0, pos.Y);
-                objStart = objs.background.Position;
+                if window.open then
+                    dragging = true;
+                    mouseStart = newVector2(pos.X, pos.Y);
+                    objStart = objs.background.Object.Position;
+                end
             end)
 
             utility:Connection(button1up, function()
                 dragging = false;
             end)
 
-            utility:Connection(mousemove, function(pos)
-                if dragging then
-                    if window.open then
-                        objs.background.Position = objStart + newUDim2(0, pos.X, 0, pos.Y) - mouseStart;
-                    else
-                        dragging = false
-                    end
+            utility:Connection(runservice.RenderStepped, function()
+                if dragging and window.open then
+                    local mPos = inputservice:GetMouseLocation()
+                    local delta = mPos - mouseStart
+                    local target = objStart + delta
+                    objs.background.Position = newUDim2(0, target.X, 0, target.Y)
+                else
+                    dragging = false
                 end
             end)
 
@@ -1595,6 +1601,27 @@ function library:init()
 
         -- Create Color Picker --
         do
+            local function hexToC3(hex)
+                if typeof(hex) ~= 'string' then return nil end
+                hex = hex:gsub('#', ''):gsub('%s+', '')
+                if #hex == 6 then
+                    local r = tonumber(hex:sub(1, 2), 16)
+                    local g = tonumber(hex:sub(3, 4), 16)
+                    local b = tonumber(hex:sub(5, 6), 16)
+                    if r and g and b then
+                        return Color3.fromRGB(r, g, b)
+                    end
+                end
+                return nil
+            end
+
+            local function c3ToHex(c3)
+                local r = math.floor(clamp(c3.R, 0, 1) * 255)
+                local g = math.floor(clamp(c3.G, 0, 1) * 255)
+                local b = math.floor(clamp(c3.B, 0, 1) * 255)
+                return string.format("#%02X%02X%02X", r, g, b)
+            end
+
             -- Objects
             do
                 local objs = window.colorpicker.objects;
@@ -1602,8 +1629,8 @@ function library:init()
 
                 objs.background = utility:Draw('Square', {
                     Visible = false;
-                    Size = newUDim2(0,200,0,242);
-                    Position = newUDim2(1,-200,1,10);
+                    Size = newUDim2(0, 224, 0, 218);
+                    Position = newUDim2(1, -224, 1, 6);
                     ThemeColor = 'Background';
                     ZIndex = z;
                     Parent = window.objects.background;
@@ -1633,10 +1660,11 @@ function library:init()
                     Parent = objs.border2;
                 })
 
+                -- Header: Title + Close Button
                 objs.statusText = utility:Draw('Text', {
-                    Position = newUDim2(0,5,0,4);
-                    Text = 'colorpicker_status_text';
-                    ThemeColor = 'Option Text 1';
+                    Position = newUDim2(0, 8, 0, 6);
+                    Text = 'Edit Color';
+                    ThemeColor = 'Primary Text';
                     Size = 13;
                     Font = 2;
                     Outline = true;
@@ -1644,9 +1672,130 @@ function library:init()
                     Parent = objs.background;
                 })
 
+                objs.closeBtn = utility:Draw('Text', {
+                    Position = newUDim2(1, -16, 0, 5);
+                    Text = '×';
+                    Color = fromrgb(170, 170, 170);
+                    Size = 14;
+                    Font = 2;
+                    Outline = true;
+                    ZIndex = z+2;
+                    Parent = objs.background;
+                })
+
+                objs.closeDetector = utility:Draw('Square', {
+                    Size = newUDim2(0, 18, 0, 18);
+                    Position = newUDim2(1, -20, 0, 3);
+                    Transparency = 0;
+                    ZIndex = z+10;
+                    Parent = objs.background;
+                })
+
+                utility:Connection(objs.closeDetector.MouseEnter, function()
+                    objs.closeBtn.Color = fromrgb(255, 255, 255);
+                end)
+                utility:Connection(objs.closeDetector.MouseLeave, function()
+                    objs.closeBtn.Color = fromrgb(170, 170, 170);
+                end)
+                utility:Connection(objs.closeDetector.MouseButton1Down, function()
+                    if window.colorpicker.selected then
+                        window.colorpicker.selected:SetOpen(false);
+                    end
+                end)
+
+                -- Mode Bar (Light / Dark segmented buttons in square style)
+                objs.modeBar = utility:Draw('Square', {
+                    Size = newUDim2(1, -16, 0, 20);
+                    Position = newUDim2(0, 8, 0, 25);
+                    Color = fromrgb(24, 24, 24);
+                    ZIndex = z+1;
+                    Parent = objs.background;
+                })
+
+                objs.modeBarBorder = utility:Draw('Square', {
+                    Size = newUDim2(1, 2, 1, 2);
+                    Position = newUDim2(0, -1, 0, -1);
+                    ThemeColor = 'Option Border 1';
+                    ZIndex = z;
+                    Parent = objs.modeBar;
+                })
+
+                objs.sunBtn = utility:Draw('Square', {
+                    Size = newUDim2(0.5, -2, 1, -2);
+                    Position = newUDim2(0, 1, 0, 1);
+                    Color = fromrgb(45, 45, 45);
+                    ZIndex = z+2;
+                    Parent = objs.modeBar;
+                })
+
+                objs.sunText = utility:Draw('Text', {
+                    Position = newUDim2(0.5, 0, 0.5, -6);
+                    Text = '☀ Light';
+                    Center = true;
+                    Size = 12;
+                    Font = 2;
+                    Outline = true;
+                    ThemeColor = 'Primary Text';
+                    ZIndex = z+3;
+                    Parent = objs.sunBtn;
+                })
+
+                objs.sunDetector = utility:Draw('Square', {
+                    Size = newUDim2(1, 0, 1, 0);
+                    Transparency = 0;
+                    ZIndex = z+10;
+                    Parent = objs.sunBtn;
+                })
+
+                objs.moonBtn = utility:Draw('Square', {
+                    Size = newUDim2(0.5, -2, 1, -2);
+                    Position = newUDim2(0.5, 1, 0, 1);
+                    Color = fromrgb(30, 30, 30);
+                    ZIndex = z+2;
+                    Parent = objs.modeBar;
+                })
+
+                objs.moonText = utility:Draw('Text', {
+                    Position = newUDim2(0.5, 0, 0.5, -6);
+                    Text = '🌙 Dark';
+                    Center = true;
+                    Size = 12;
+                    Font = 2;
+                    Outline = true;
+                    ThemeColor = 'Option Text 2';
+                    ZIndex = z+3;
+                    Parent = objs.moonBtn;
+                })
+
+                objs.moonDetector = utility:Draw('Square', {
+                    Size = newUDim2(1, 0, 1, 0);
+                    Transparency = 0;
+                    ZIndex = z+10;
+                    Parent = objs.moonBtn;
+                })
+
+                utility:Connection(objs.sunDetector.MouseButton1Down, function()
+                    if window.colorpicker.selected ~= nil then
+                        local hue, sat, _ = window.colorpicker.selected.color:ToHSV()
+                        local newC3 = fromhsv(hue, clamp(sat, 0.001, 0.999), 0.98)
+                        window.colorpicker.selected:SetColor(newC3)
+                        window.colorpicker:Visualize(newC3, window.colorpicker.selected.trans)
+                    end
+                end)
+
+                utility:Connection(objs.moonDetector.MouseButton1Down, function()
+                    if window.colorpicker.selected ~= nil then
+                        local hue, sat, _ = window.colorpicker.selected.color:ToHSV()
+                        local newC3 = fromhsv(hue, clamp(sat, 0.001, 0.999), 0.40)
+                        window.colorpicker.selected:SetColor(newC3)
+                        window.colorpicker:Visualize(newC3, window.colorpicker.selected.trans)
+                    end
+                end)
+
+                -- Main Saturation / Value Gradient Rect
                 objs.mainColor = utility:Draw('Square', {
-                    Size = newUDim2(0, 175, 0, 175);
-                    Position = newUDim2(0, 5, 0, 25);
+                    Size = newUDim2(0, 208, 0, 95);
+                    Position = newUDim2(0, 8, 0, 49);
                     Color = c3new(1,0,0);
                     ZIndex = z+2;
                     Parent = objs.background;
@@ -1662,7 +1811,7 @@ function library:init()
 
                 objs.sat2 = utility:Draw('Image', {
                     Size = newUDim2(1,0,1,0);
-                    Data = decodeBase64"iVBORw0KGgoAAAANSUhEUgAAAaQAAAGkCAQAAADURZm+AAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JQAAgIMAAPn/AACA6QAAdTAAAOpgAAA6mAAAF2+SX8VGAAAAAmJLR0QA/4ePzL8AAAAJcEhZcwAACxMAAAsTAQCanBgAAAAHdElNRQflBwwSLyBEeyyCAAAD4klEQVR42u3YwQnAQAhFQTek/5pz9eBtEYzMlBD4PDcRADDBieMjwK3HJwBDghFepx0oEhgSOO0ARQJDAqcdKBJgSGBI4I0EhgQ47cCQwJDAGwlQJDAkcNqBIgGKBIoEhgROO0CRQJFAkQBDAqcdGBI47QBFAkUCQwKnHaBIoEigSKBIgCKBIYHTDhQJUCQwJHDagSIBigSGBE47UCRAkcCQwGkHKBIoEigSGBLgtANDAkMCbyTAkMBpB4oEigQoEhgSOO1AkQBDAqcdKBIoEqBIYEjgtANFUiRQJFAkMCTAaQeKBIoEigQYEjjtQJFAkQBFAkMCpx0oEmBI4LQDRQJFAhQJDAmcdqBIgCKBIoEhAU47UCRQJFAkwJDAaQeKBIYEOO1AkUCRYHuRTAmcduC0A0UCFAkUCQwJnHaAIoEigSKBIQFOO2gvkimBIoE3EhgS4LQDRQJDAqcdoEigSKBIYEiAIYEhwXx+NoAigSGB0w5QJDAkMCQwJKDiZwMoEhgSOO0ARQJFgnlFMiVw2oHTDhQJUCRQJDAkcNoBVZFMCRQJvJHAkACnHSgSKBIoElANSZPAaQdOOzAkwGkHigSGBIYEGBK08LMBFAkUCRQJMCQwJDAkWMjPBlAkMCRw2gG5SKYEigTeSGBIgNMOFAkMCQwJMCRo4WcDKBIYEjjtgFwkUwJFAm8kMCTAaQeKBIoEigRUQ9IkcNqB0w4MCXDagSKBIsHCIpkSOO3AaQeKBCgSKBIYEhgSYEjQws8GUCQwJHDaAblIpgSKBN5IYEiA0w4UCQwJDAkwJGjhZwMoEhgSOO0ARQJDAkMCQwIqfjaAIoEigSIBhgROO5hXJFMCpx047UCRAEUCRQJDAqcdUBXJlECRwBsJDAlw2oEigSKBIgGGBIYEhgSL+dkAigSGBE47QJHAkMBpB4oEGBIYEhgSrOZnAygSKBIoEmBI4LQDRQJFAhQJDAmcdrC8SKYEigTeSGBIgNMOFAkMCZx2gCKBIoEigSEBTjtQJFAkUCTAkMBpB4oEigQoEhgSOO1AkQBDAqcdKBKgSKBIYEjgtAMUCRQJFAkMCXDagSKBIoEiAYYETjtQJFAkQJHAkMBpB4oEGBI47UCRQJEARQJDAqcdoEigSGBI4LQDFAkUCRQJFAkwJHDagSKBIQFOOzAkMCTwRgIMCZx2oEigSIAigSKBIYHTzkcARQJFAkMCnHZgSGBI4I0EGBI47UCRQJEAQwKnHSgSKBKgSGBI4LQDRQIUCRQJDAmcdoAigSGB0w5QJFAkUCQwJMBpB4oEhgROO0CRwJDAkMAbCVAkMCT4gw/reQYigE05fAAAACV0RVh0ZGF0ZTpjcmVhdGUAMjAyMS0wNy0xMlQxODo0NzozMiswMDowMN2VK3MAAAAldEVYdGRhdGU6bW9kaWZ5ADIwMjEtMDctMTJUMTg6NDc6MzIrMDA6MDCsyJPPAAAAAElFTkSuQmCC";
+                    Data = decodeBase64"iVBORw0KGgoAAAANSUhEUgAAAaQAAAGkCAQAAADURZm+AAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JQAAgIMAAPn/AACA6QAAdTAAAOpgAAA6mAAAF2+SX8VGAAAAAmJLR0QA/4ePzL8AAAAJcEhZcwAACxMAAAsTAQCanBgAAAAHdElNRQflBwwSLyBEeyyCAAAD4klEQVR42u3YwQnAQAhFQTek/5pz9eBtEYzMlBD4PDcRADDBieMjwK3HJwBDghFepx0oEhgSOO0ARQJDAqcdKBJgSGBI4I0EhgQ47cCQwJDAGwlQJDAkcNqBIgGKBIoEhgROO0CRQJFAkQBDAqcdGBI47QBFAkUCQwKnHaBIoEigSKBIgCKBIYHTDhQJUCQwJHDagSIBigSGBE47UCRAkcCQwGkHKBIoEigSGBLgtANDAkMCbyTAkMBpB4oEigQoEhgSOO1AkQBDAqcdKBIoEqBIYEjgtANFUiRQJFAkMCTAaQeKBIoEigQYEjjtQJFAkQBFAkMCpx0oEmBI4LQDRQJFAhQJDAmcdqBIgCKBIoEhAU47UCRQJFAkwJDAaQeKBIYEOO1AkUCRYHuRTAmcduC0A0UCFAkUCQwJnHaAIoEigSKBIQFOO2gvkimBIoE3EhgS4LQDRQJDAqcdoEigSKBIYEiAIYEhwXx+NoAigSGB0w5QJDAkMCQwJKDiZwMoEhgSOO0ARQJFgnlFMiVw2oHTDhQJUCRQJDAkcNoBVZFMCRQJvJHAkACnHSgSKBIoElANSZPAaQdOOzAkwGkHigSGBIYEGBK08LMBFAkUCRQJMCQwJDAkWMjPBlAkMCRw2gG5SKYEigTeSGBIgNMOFAkMCQwJMCRo4WcDKBIYEjjtgFwkUwJFAm8kMCTAaQeKBIoEigRUQ9IkcNqB0w4MCXDagSKBIsHCIpkSOO3AaQeKBCgSKBIYEhgSYEjQws8GUCQwJHDaAblIpgSKBN5IYEiA0w4UCQwJDAkwJGjhZwMoEhgSOO0ARQJDAkMCQwIqfjaAIoEigSIBhgROO5hXJFMCpx047UCRAEUCRQJDAqcdUBXJlECRwBsJDAlw2oEigSKBIgGGBIYEhgSL+dkAigSGBE47QJHAkMBpB4oEGBIYEhgSrOZnAygSKBIoEmBI4LQDRQJFAhQJDAmcdrC8SKYEigTeSGBIgNMOFAkMCZx2gCKBIoEigSEBTjtQJFAkUCTAkMBpB4oEigQoEhgSOO1AkQBDAqcdKBKgSKBIYEjgtAMUCRQJFAkMCXDagSKBIoEiAYYETjtQJFAkQJHAkMBpB4oEGBIyeMwAAACV0RVh0ZGF0ZTpjcmVhdGUAMjAyMS0wNy0xMlQxODo0NzozMiswMDowMN2VK3MAAAAldEVYdGRhdGU6bW9kaWZ5ADIwMjEtMDctMTJUMTg6NDc6MzIrMDA6MDCsyJPPAAAAAElFTkSuQmCC";
                     Transparency = 0.85;
                     ZIndex = z+4;
                     Parent = objs.mainColor;
@@ -1676,24 +1825,41 @@ function library:init()
                     Parent = objs.mainColor;
                 })
 
-                objs.mainDetector = utility:Draw('Square',{
-                    Size = newUDim2(1,0,1,0);
+                objs.pointer = utility:Draw('Square', {
+                    Size = newUDim2(0, 4, 0, 4);
+                    Position = newUDim2(0, 0, 0, 0);
+                    Color = c3new(1, 1, 1);
+                    ZIndex = z+6;
+                    Parent = objs.mainColor;
+                })
+
+                objs.pointerBorder = utility:Draw('Square', {
+                    Size = newUDim2(1, 2, 1, 2);
+                    Position = newUDim2(0, -1, 0, -1);
+                    Color = c3new(0, 0, 0);
+                    ZIndex = z+5;
+                    Parent = objs.pointer;
+                })
+
+                objs.mainDetector = utility:Draw('Square', {
+                    Size = newUDim2(1, 0, 1, 0);
                     Transparency = 0;
                     ZIndex = z+10;
                     Parent = objs.mainColor;
                 })
 
+                -- Sliders: Rainbow Hue Bar (Horizontal)
                 objs.hue = utility:Draw('Square', {
-                    Size = newUDim2(0,175,0,12);
-                    Position = newUDim2(0,5,0,205);
+                    Size = newUDim2(0, 174, 0, 11);
+                    Position = newUDim2(0, 8, 0, 149);
                     Color = c3new(1,0,0);
                     ZIndex = z+2;
                     Parent = objs.background;
                 })
 
                 objs.hueSegments = {}
-                local segCount = 35
-                local segWidth = 175 / segCount
+                local segCount = 29
+                local segWidth = 174 / segCount
                 for seg = 0, segCount - 1 do
                     local segHue = seg / segCount
                     local segSquare = utility:Draw('Square', {
@@ -1707,51 +1873,53 @@ function library:init()
                 end
 
                 objs.hueBorder = utility:Draw('Square', {
-                    Size = newUDim2(1,2,1,2);
-                    Position = newUDim2(0,-1,0,-1);
+                    Size = newUDim2(1, 2, 1, 2);
+                    Position = newUDim2(0, -1, 0, -1);
                     ThemeColor = 'Border';
                     ZIndex = z+1;
                     Parent = objs.hue;
                 })
 
                 objs.hueSlider = utility:Draw('Square', {
-                    Size = newUDim2(0,2,1,0);
-                    Color = c3new(1,1,1);
+                    Size = newUDim2(0, 3, 1, 2);
+                    Position = newUDim2(0, 0, 0, -1);
+                    Color = c3new(1, 1, 1);
                     ZIndex = z+6;
                     Parent = objs.hue;
                 })
 
                 objs.hueSliderBorder = utility:Draw('Square', {
-                    Size = newUDim2(1,2,1,2);
-                    Position = newUDim2(0,-1,0,-1);
-                    Color = c3new(0,0,0);
+                    Size = newUDim2(1, 2, 1, 2);
+                    Position = newUDim2(0, -1, 0, -1);
+                    Color = c3new(0, 0, 0);
                     ZIndex = z+5;
                     Parent = objs.hueSlider;
                 })
 
-                objs.hueDetector = utility:Draw('Square',{
-                    Size = newUDim2(1,0,1,0);
+                objs.hueDetector = utility:Draw('Square', {
+                    Size = newUDim2(1, 0, 1, 0);
                     Transparency = 0;
                     ZIndex = z+10;
                     Parent = objs.hue;
                 })
 
+                -- Sliders: Opacity / Alpha Bar (Horizontal)
                 objs.transColor = utility:Draw('Square', {
-                    Size = newUDim2(0,10,0,175);
-                    Position = newUDim2(0,185,0,25);
-                    Color = c3new(1,0,0);
+                    Size = newUDim2(0, 174, 0, 11);
+                    Position = newUDim2(0, 8, 0, 165);
+                    Color = c3new(1,1,1);
                     ZIndex = z+2;
                     Parent = objs.background;
                 })
 
                 objs.transSegments = {}
                 local transCount = 20
-                local transHeight = 175 / transCount
+                local transWidth = 174 / transCount
                 for seg = 0, transCount - 1 do
                     local aFrac = seg / (transCount - 1)
                     local transSq = utility:Draw('Square', {
-                        Size = newUDim2(1, 0, 0, math.ceil(transHeight));
-                        Position = newUDim2(0, 0, 0, math.floor(seg * transHeight));
+                        Size = newUDim2(0, math.ceil(transWidth), 1, 0);
+                        Position = newUDim2(0, math.floor(seg * transWidth), 0, 0);
                         Color = fromrgb(math.floor(255 * (1 - aFrac)), math.floor(255 * (1 - aFrac)), math.floor(255 * (1 - aFrac)));
                         ZIndex = z+3;
                         Parent = objs.transColor;
@@ -1760,148 +1928,239 @@ function library:init()
                 end
 
                 objs.transBorder = utility:Draw('Square', {
-                    Size = newUDim2(1,2,1,2);
-                    Position = newUDim2(0,-1,0,-1);
+                    Size = newUDim2(1, 2, 1, 2);
+                    Position = newUDim2(0, -1, 0, -1);
                     ThemeColor = 'Border';
                     ZIndex = z+1;
                     Parent = objs.transColor;
                 })
 
                 objs.transSlider = utility:Draw('Square', {
-                    Size = newUDim2(1,0,0,2);
-                    Color = c3new(1,1,1);
+                    Size = newUDim2(0, 3, 1, 2);
+                    Position = newUDim2(0, 0, 0, -1);
+                    Color = c3new(1, 1, 1);
                     ZIndex = z+6;
                     Parent = objs.transColor;
                 })
 
                 objs.transSliderBorder = utility:Draw('Square', {
-                    Size = newUDim2(1,2,1,2);
-                    Position = newUDim2(0,-1,0,-1);
-                    Color = c3new(0,0,0);
+                    Size = newUDim2(1, 2, 1, 2);
+                    Position = newUDim2(0, -1, 0, -1);
+                    Color = c3new(0, 0, 0);
                     ZIndex = z+5;
                     Parent = objs.transSlider;
                 })
 
-                objs.transDetector = utility:Draw('Square',{
-                    Size = newUDim2(1,0,1,0);
+                objs.transDetector = utility:Draw('Square', {
+                    Size = newUDim2(1, 0, 1, 0);
                     Transparency = 0;
                     ZIndex = z+10;
                     Parent = objs.transColor;
                 })
 
-                objs.pointer = utility:Draw('Square', {
-                    Size = newUDim2(0,2,0,2);
-                    Position = newUDim2(0,0,0,0);
-                    Color = c3new(1,1,1);
-                    ZIndex = z+6;
-                    Parent = objs.mainColor;
-                })
-
-                objs.pointerBorder = utility:Draw('Square', {
-                    Size = newUDim2(1,2,1,2);
-                    Position = newUDim2(0,-1,0,-1);
-                    Color = c3new(0,0,0);
-                    ZIndex = z+5;
-                    Parent = objs.pointer;
-                })
-
-                objs.rBackground = utility:Draw('Square', {
-                    Size = newUDim2(0, 60, 0, 15);
-                    Position = newUDim2(0, 5, 1, - 20);
+                -- Pipette / Swatch Button (Right of sliders)
+                objs.swatchBtn = utility:Draw('Square', {
+                    Size = newUDim2(0, 27, 0, 27);
+                    Position = newUDim2(0, 189, 0, 149);
                     ThemeColor = 'Option Background';
+                    ZIndex = z+2;
                     Parent = objs.background;
-                    ZIndex = z+5;
                 })
 
-                objs.rBorder = utility:Draw('Square', {
-                    Size = newUDim2(1,2,1,2);
-                    Position = newUDim2(0,-1,0,-1);
-                    Color = c3new(0,0,0);
-                    ZIndex = z+4;
-                    Parent = objs.rBackground;
+                objs.swatchBorder = utility:Draw('Square', {
+                    Size = newUDim2(1, 2, 1, 2);
+                    Position = newUDim2(0, -1, 0, -1);
+                    ThemeColor = 'Option Border 1';
+                    ZIndex = z+1;
+                    Parent = objs.swatchBtn;
                 })
 
-                objs.rText = utility:Draw('Text', {
-                    Position = newUDim2(.5,0,0,0);
-                    Color = c3new(1,.1,.1);
-                    Text = 'R';
-                    Size = 13;
+                objs.swatchInner = utility:Draw('Square', {
+                    Size = newUDim2(1, -6, 1, -6);
+                    Position = newUDim2(0, 3, 0, 3);
+                    Color = c3new(1, 1, 1);
+                    ZIndex = z+3;
+                    Parent = objs.swatchBtn;
+                })
+
+                objs.swatchIcon = utility:Draw('Text', {
+                    Position = newUDim2(0.5, 0, 0.5, -6);
+                    Text = '✎';
+                    Center = true;
+                    Size = 12;
                     Font = 2;
                     Outline = true;
-                    Center = true;
-                    ZIndex = z+6;
-                    Parent = objs.rBackground;
-                })
-
-                objs.gBackground = utility:Draw('Square', {
-                    Size = newUDim2(0, 60, 0, 15);
-                    Position = newUDim2(0, 70, 1, - 20);
-                    ThemeColor = 'Option Background';
-                    Parent = objs.background;
-                    ZIndex = z+5;
-                })
-
-                objs.gBorder = utility:Draw('Square', {
-                    Size = newUDim2(1,2,1,2);
-                    Position = newUDim2(0,-1,0,-1);
-                    Color = c3new(0,0,0);
+                    Color = fromrgb(255, 255, 255);
                     ZIndex = z+4;
-                    Parent = objs.gBackground;
+                    Parent = objs.swatchInner;
                 })
 
-                objs.gText = utility:Draw('Text', {
-                    Position = newUDim2(.5,0,0,0);
-                    Color = c3new(.1,1,.1);
-                    Text = 'G';
-                    Size = 13;
+                objs.swatchDetector = utility:Draw('Square', {
+                    Size = newUDim2(1, 0, 1, 0);
+                    Transparency = 0;
+                    ZIndex = z+10;
+                    Parent = objs.swatchBtn;
+                })
+
+                utility:Connection(objs.swatchDetector.MouseEnter, function()
+                    objs.swatchBorder.ThemeColor = 'Accent';
+                end)
+                utility:Connection(objs.swatchDetector.MouseLeave, function()
+                    objs.swatchBorder.ThemeColor = 'Option Border 1';
+                end)
+                utility:Connection(objs.swatchDetector.MouseButton1Down, function()
+                    if window.colorpicker.selected ~= nil then
+                        local hex = c3ToHex(window.colorpicker.selected.color)
+                        if setclipboard then
+                            setclipboard(hex)
+                            library:SendNotification('Copied '..hex..' to clipboard!', 3)
+                        end
+                    end
+                end)
+
+                -- Bottom Row: [ #HEX ]  [ 100% ]  [ HEX ▾ ]
+                objs.hexBackground = utility:Draw('Square', {
+                    Size = newUDim2(0, 84, 0, 20);
+                    Position = newUDim2(0, 8, 0, 185);
+                    ThemeColor = 'Option Background';
+                    ZIndex = z+2;
+                    Parent = objs.background;
+                })
+
+                objs.hexBorder = utility:Draw('Square', {
+                    Size = newUDim2(1, 2, 1, 2);
+                    Position = newUDim2(0, -1, 0, -1);
+                    ThemeColor = 'Option Border 1';
+                    ZIndex = z+1;
+                    Parent = objs.hexBackground;
+                })
+
+                objs.hexText = utility:Draw('Text', {
+                    Position = newUDim2(0, 6, 0, 3);
+                    Text = '#FFFFFF';
+                    Size = 12;
                     Font = 2;
                     Outline = true;
-                    Center = true;
-                    ZIndex = z+6;
-                    Parent = objs.gBackground;
+                    ThemeColor = 'Primary Text';
+                    ZIndex = z+3;
+                    Parent = objs.hexBackground;
                 })
 
-                objs.bBackground = utility:Draw('Square', {
-                    Size = newUDim2(0, 60, 0, 15);
-                    Position = newUDim2(0, 135, 1, - 20);
+                objs.hexDetector = utility:Draw('Square', {
+                    Size = newUDim2(1, 0, 1, 0);
+                    Transparency = 0;
+                    ZIndex = z+10;
+                    Parent = objs.hexBackground;
+                })
+
+                utility:Connection(objs.hexDetector.MouseEnter, function()
+                    objs.hexBorder.ThemeColor = 'Accent';
+                end)
+                utility:Connection(objs.hexDetector.MouseLeave, function()
+                    objs.hexBorder.ThemeColor = 'Option Border 1';
+                end)
+                utility:Connection(objs.hexDetector.MouseButton1Down, function()
+                    if window.colorpicker.selected ~= nil then
+                        if getclipboard then
+                            local clip = getclipboard()
+                            local parsed = hexToC3(clip)
+                            if parsed then
+                                window.colorpicker.selected:SetColor(parsed)
+                                window.colorpicker:Visualize(parsed, window.colorpicker.selected.trans)
+                                library:SendNotification('Pasted hex '..c3ToHex(parsed)..' from clipboard!', 3, parsed)
+                                return
+                            end
+                        end
+                        -- Quick palette cycle on click
+                        local presets = {
+                            fromrgb(255,255,255), fromrgb(220,50,50), fromrgb(50,220,80),
+                            fromrgb(50,130,240), fromrgb(240,200,40), fromrgb(180,50,240),
+                            fromrgb(40,220,220), fromrgb(40,40,40)
+                        }
+                        local cur = window.colorpicker.selected.color
+                        local nextC3 = presets[1]
+                        for idx, p in ipairs(presets) do
+                            if math.abs(p.R - cur.R) < 0.05 and math.abs(p.G - cur.G) < 0.05 and math.abs(p.B - cur.B) < 0.05 then
+                                nextC3 = presets[(idx % #presets) + 1]
+                                break
+                            end
+                        end
+                        window.colorpicker.selected:SetColor(nextC3)
+                        window.colorpicker:Visualize(nextC3, window.colorpicker.selected.trans)
+                    end
+                end)
+
+                -- Percentage Box
+                objs.percentBackground = utility:Draw('Square', {
+                    Size = newUDim2(0, 52, 0, 20);
+                    Position = newUDim2(0, 97, 0, 185);
                     ThemeColor = 'Option Background';
+                    ZIndex = z+2;
                     Parent = objs.background;
-                    ZIndex = z+5;
                 })
 
-                objs.bBorder = utility:Draw('Square', {
-                    Size = newUDim2(1,2,1,2);
-                    Position = newUDim2(0,-1,0,-1);
-                    Color = c3new(0,0,0);
-                    ZIndex = z+4;
-                    Parent = objs.bBackground;
+                objs.percentBorder = utility:Draw('Square', {
+                    Size = newUDim2(1, 2, 1, 2);
+                    Position = newUDim2(0, -1, 0, -1);
+                    ThemeColor = 'Option Border 1';
+                    ZIndex = z+1;
+                    Parent = objs.percentBackground;
                 })
 
-                objs.bText = utility:Draw('Text', {
-                    Position = newUDim2(.5,0,0,0);
-                    Color = c3new(.1,.1,1);
-                    Text = 'B';
-                    Size = 13;
+                objs.percentText = utility:Draw('Text', {
+                    Position = newUDim2(0.5, 0, 0, 3);
+                    Text = '100%';
+                    Center = true;
+                    Size = 12;
                     Font = 2;
                     Outline = true;
+                    ThemeColor = 'Option Text 1';
+                    ZIndex = z+3;
+                    Parent = objs.percentBackground;
+                })
+
+                -- Format Badge
+                objs.formatBackground = utility:Draw('Square', {
+                    Size = newUDim2(0, 60, 0, 20);
+                    Position = newUDim2(0, 156, 0, 185);
+                    ThemeColor = 'Option Background';
+                    ZIndex = z+2;
+                    Parent = objs.background;
+                })
+
+                objs.formatBorder = utility:Draw('Square', {
+                    Size = newUDim2(1, 2, 1, 2);
+                    Position = newUDim2(0, -1, 0, -1);
+                    ThemeColor = 'Option Border 1';
+                    ZIndex = z+1;
+                    Parent = objs.formatBackground;
+                })
+
+                objs.formatText = utility:Draw('Text', {
+                    Position = newUDim2(0.5, 0, 0, 3);
+                    Text = 'HEX ▾';
                     Center = true;
-                    ZIndex = z+6;
-                    Parent = objs.bBackground;
+                    Size = 12;
+                    Font = 2;
+                    Outline = true;
+                    ThemeColor = 'Option Text 2';
+                    ZIndex = z+3;
+                    Parent = objs.formatBackground;
                 })
 
                 local draggingHue, draggingSat, draggingTrans = false, false, false;
 
                 local function updateSatVal(pos)
                     if window.colorpicker.selected ~= nil then
-                        local hue, sat, val = window.colorpicker.selected.color:ToHSV()
+                        local hue, _, _ = window.colorpicker.selected.color:ToHSV()
                         local sizeX = objs.mainColor.Object.Size.X
                         local sizeY = objs.mainColor.Object.Size.Y
-                        if sizeX <= 0 then sizeX = 175 end
-                        if sizeY <= 0 then sizeY = 175 end
+                        if sizeX <= 0 then sizeX = 208 end
+                        if sizeY <= 0 then sizeY = 95 end
                         local relX = math.clamp((pos.X - objs.mainColor.Object.Position.X) / sizeX, 0, 0.999)
                         local relY = math.clamp((pos.Y - objs.mainColor.Object.Position.Y) / sizeY, 0, 0.999)
-                        sat = relX
-                        val = 1 - relY
+                        local sat = relX
+                        local val = 1 - relY
                         local newC3 = fromhsv(hue, math.clamp(sat, 0.001, 0.999), math.clamp(val, 0.001, 0.999))
                         window.colorpicker.selected:SetColor(newC3);
                         window.colorpicker:Visualize(newC3, window.colorpicker.selected.trans);
@@ -1910,10 +2169,10 @@ function library:init()
 
                 local function updateHue(pos)
                     if window.colorpicker.selected ~= nil then
-                        local hue, sat, val = window.colorpicker.selected.color:ToHSV()
+                        local _, sat, val = window.colorpicker.selected.color:ToHSV()
                         local sizeX = objs.hue.Object.Size.X
-                        if sizeX <= 0 then sizeX = 175 end
-                        hue = math.clamp((pos.X - objs.hue.Object.Position.X) / sizeX, 0, 0.999)
+                        if sizeX <= 0 then sizeX = 174 end
+                        local hue = math.clamp((pos.X - objs.hue.Object.Position.X) / sizeX, 0, 0.999)
                         local newC3 = fromhsv(hue, math.clamp(sat, 0.001, 0.999), math.clamp(val, 0.001, 0.999))
                         window.colorpicker.selected:SetColor(newC3);
                         window.colorpicker:Visualize(newC3, window.colorpicker.selected.trans);
@@ -1922,41 +2181,13 @@ function library:init()
 
                 local function updateTrans(pos)
                     if window.colorpicker.selected ~= nil then
-                        local sizeY = objs.transColor.Object.Size.Y
-                        if sizeY <= 0 then sizeY = 175 end
-                        local Y = math.clamp((pos.Y - objs.transColor.Object.Position.Y) / sizeY, 0, 0.999)
-                        window.colorpicker.selected:SetTrans(Y);
-                        window.colorpicker:Visualize(window.colorpicker.selected.color, Y);
+                        local sizeX = objs.transColor.Object.Size.X
+                        if sizeX <= 0 then sizeX = 174 end
+                        local X = math.clamp((pos.X - objs.transColor.Object.Position.X) / sizeX, 0, 0.999)
+                        window.colorpicker.selected:SetTrans(X);
+                        window.colorpicker:Visualize(window.colorpicker.selected.color, X);
                     end
                 end
-
-                local function cycleChannel(ch)
-                    if window.colorpicker.selected ~= nil then
-                        local c = window.colorpicker.selected.color
-                        local r, g, b = math.floor(c.R * 255), math.floor(c.G * 255), math.floor(c.B * 255)
-                        if ch == 'R' then
-                            r = (r + 25) > 255 and 0 or (r + 25)
-                        elseif ch == 'G' then
-                            g = (g + 25) > 255 and 0 or (g + 25)
-                        elseif ch == 'B' then
-                            b = (b + 25) > 255 and 0 or (b + 25)
-                        end
-                        local newC3 = fromrgb(r, g, b)
-                        window.colorpicker.selected:SetColor(newC3)
-                        window.colorpicker:Visualize(newC3, window.colorpicker.selected.trans)
-                    end
-                end
-
-                utility:Connection(objs.rBackground.MouseButton1Down, function() cycleChannel('R') end)
-                utility:Connection(objs.gBackground.MouseButton1Down, function() cycleChannel('G') end)
-                utility:Connection(objs.bBackground.MouseButton1Down, function() cycleChannel('B') end)
-
-                utility:Connection(objs.rBackground.MouseEnter, function() objs.rBorder.Color = c3new(1,1,1) end)
-                utility:Connection(objs.rBackground.MouseLeave, function() objs.rBorder.Color = c3new(0,0,0) end)
-                utility:Connection(objs.gBackground.MouseEnter, function() objs.gBorder.Color = c3new(1,1,1) end)
-                utility:Connection(objs.gBackground.MouseLeave, function() objs.gBorder.Color = c3new(0,0,0) end)
-                utility:Connection(objs.bBackground.MouseEnter, function() objs.bBorder.Color = c3new(1,1,1) end)
-                utility:Connection(objs.bBackground.MouseLeave, function() objs.bBorder.Color = c3new(0,0,0) end)
 
                 utility:Connection(objs.mainDetector.MouseButton1Down, function(pos)
                     draggingSat = true;
@@ -2001,27 +2232,39 @@ function library:init()
                 self.color = c3;
                 self.trans = a;
                 self.objects.mainColor.Color = fromhsv(h,1,1);
-                self.objects.transColor.Color = fromhsv(h,s,v);
-                self.objects.hueSlider.Position = newUDim2(h, 0, 0, 0);
-                self.objects.transSlider.Position = newUDim2(0, 0, a, 0);
-                self.objects.pointer.Position = newUDim2(s, 0, 1 - v, 0);
-                self.objects.statusText.Text = 'Editing : Unknown';
-                if self.selected ~= nil then
-                    local txt = 'Editing : Unknown';
-                    if self.selected.text ~= nil and self.selected.text ~= '' then
-                        txt = tostring(self.selected.text)
-                    elseif self.selected.flag ~= nil and self.selected.flag ~= '' then
-                        txt = tostring(self.selected.flag)
-                    end
-                    self.objects.statusText.Text = tostring(txt);
-                end
+                self.objects.hueSlider.Position = newUDim2(math.clamp(h, 0, 0.99), 0, 0, -1);
+                self.objects.transSlider.Position = newUDim2(math.clamp(a, 0, 0.99), 0, 0, -1);
+                self.objects.pointer.Position = newUDim2(math.clamp(s, 0, 0.99), -2, math.clamp(1 - v, 0, 0.99), -2);
+                self.objects.swatchInner.Color = c3;
 
-                local r255 = math.floor(c3.R * 255)
-                local g255 = math.floor(c3.G * 255)
-                local b255 = math.floor(c3.B * 255)
-                if self.objects.rText then self.objects.rText.Text = 'R: '..r255 end
-                if self.objects.gText then self.objects.gText.Text = 'G: '..g255 end
-                if self.objects.bText then self.objects.bText.Text = 'B: '..b255 end
+                local title = 'Color';
+                if self.selected ~= nil then
+                    if self.selected.text ~= nil and self.selected.text ~= '' then
+                        title = tostring(self.selected.text)
+                    elseif self.selected.flag ~= nil and self.selected.flag ~= '' then
+                        title = tostring(self.selected.flag)
+                    end
+                end
+                self.objects.statusText.Text = 'Edit ' .. title;
+
+                local r = math.floor(clamp(c3.R, 0, 1) * 255)
+                local g = math.floor(clamp(c3.G, 0, 1) * 255)
+                local b = math.floor(clamp(c3.B, 0, 1) * 255)
+                self.objects.hexText.Text = string.format("#%02X%02X%02X", r, g, b)
+                self.objects.percentText.Text = math.floor((1 - a) * 100) .. '%'
+
+                -- Update sun / moon button active states
+                if v > 0.65 then
+                    self.objects.sunBtn.Color = fromrgb(55, 55, 55)
+                    self.objects.moonBtn.Color = fromrgb(28, 28, 28)
+                    self.objects.sunText.ThemeColor = 'Primary Text'
+                    self.objects.moonText.ThemeColor = 'Option Text 2'
+                else
+                    self.objects.sunBtn.Color = fromrgb(28, 28, 28)
+                    self.objects.moonBtn.Color = fromrgb(55, 55, 55)
+                    self.objects.sunText.ThemeColor = 'Option Text 2'
+                    self.objects.moonText.ThemeColor = 'Primary Text'
+                end
             end
             
             window.colorpicker:Visualize(window.colorpicker.color, window.colorpicker.trans)
@@ -5028,13 +5271,16 @@ function library:init()
                 wmDragging = false
             end)
 
-            utility:Connection(mousemove, function(pos)
+            utility:Connection(runservice.RenderStepped, function()
                 if wmDragging and library.open then
-                    local delta = newVector2(pos.X, pos.Y) - wmMouseStart
+                    local mPos = inputservice:GetMouseLocation()
+                    local delta = mPos - wmMouseStart
                     local target = wmObjStart + delta
                     self.watermark.lock = 'Free'
                     self.watermark.position = newUDim2(0, target.X, 0, target.Y)
                     objs.background.Position = self.watermark.position
+                else
+                    wmDragging = false
                 end
             end)
 
@@ -5113,27 +5359,6 @@ function library:CreateSettingsTab(menu)
         library:SetOpen(not library.open)
     end});
 
-    mainSection:AddButton({text = 'Join Discord', flag = 'joindiscord', confirm = true, callback = function()
-        if customRequest then
-            pcall(function()
-                customRequest({
-                    Url = 'https://discord.gg/rkRW5VrbWu',
-                    Method = 'POST',
-                    Headers = {
-                        ['Content-Type'] = 'application/json',
-                        Origin = 'https://discord.com'
-                    },
-                    Body = game:GetService('HttpService'):JSONEncode({
-                        cmd = 'INVITE_BROWSER',
-                        nonce = game:GetService('HttpService'):GenerateGUID(false),
-                        args = {code = 'rkRW5VrbWu'}
-                    })
-                })
-            end)
-        end
-        library:SendNotification(library.cheatname..' | Joined Discord', 3);
-    end})
-
     mainSection:AddButton({text = 'Rejoin Server', confirm = true, callback = function()
         game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId);
     end})
@@ -5157,23 +5382,16 @@ function library:CreateSettingsTab(menu)
 
     mainSection:AddSeparator({text = 'Indicators'});
 
-    mainSection:AddToggle({text = 'Watermark', flag = 'watermark_enabled', state = true,});
-
-    mainSection:AddSlider({text = 'Custom X', flag = 'watermark_x', suffix = '%', min = 0, max = 100, increment = .1, value = 6});
-    mainSection:AddSlider({text = 'Custom Y', flag = 'watermark_y', suffix = '%', min = 0, max = 100, increment = .1, value = 1});
-
-    mainSection:AddToggle({text = 'Keybinds', flag = 'keybind_indicator', state = true, callback = function(bool)
-        library.keyIndicator:SetEnabled(bool);
-    end})
-    mainSection:AddSlider({text = 'Position X', flag = 'keybind_indicator_x', min = 0, max = 100, increment = .1, value = .5, callback = function()
-        local kx = (library.flags.keybind_indicator_x or 0.5) / 100
-        local ky = (library.flags.keybind_indicator_y or 30) / 100
-        library.keyIndicator:SetPosition(newUDim2(kx, 0, ky, 0));    
+    mainSection:AddToggle({text = 'Watermark', flag = 'watermark_enabled', state = true, callback = function(bool)
+        if library.watermark and library.watermark.objects and library.watermark.objects.background then
+            library.watermark.objects.background.Visible = bool
+        end
     end});
-    mainSection:AddSlider({text = 'Position Y', flag = 'keybind_indicator_y', min = 0, max = 100, increment = .1, value = 30, callback = function()
-        local kx = (library.flags.keybind_indicator_x or 0.5) / 100
-        local ky = (library.flags.keybind_indicator_y or 30) / 100
-        library.keyIndicator:SetPosition(newUDim2(kx, 0, ky, 0));    
+
+    mainSection:AddToggle({text = 'Keybinds Menu', flag = 'keybind_indicator', state = true, callback = function(bool)
+        if library.keyIndicator then
+            library.keyIndicator:SetEnabled(bool)
+        end
     end});
 
 
