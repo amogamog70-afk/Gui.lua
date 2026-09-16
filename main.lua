@@ -492,10 +492,12 @@ do
     end
 
     function utility:UDim2ToVector2(udim2, vector2)
-        local x,y
-        x = udim2.X.Offset + self:ConvertNumberRange(udim2.X.Scale,0,1,0,vector2.X)
-        y = udim2.Y.Offset + self:ConvertNumberRange(udim2.Y.Scale,0,1,0,vector2.Y)
-        return newVector2(x,y)
+        local vx = vector2 and vector2.X or 0
+        local vy = vector2 and vector2.Y or 0
+        return newVector2(
+            udim2.X.Offset + (udim2.X.Scale * vx),
+            udim2.Y.Offset + (udim2.Y.Scale * vy)
+        )
     end
 
     function utility:Lerp(a,b,c)
@@ -630,26 +632,34 @@ do
         drawing.MouseLeave._owner = drawing;
 
         function drawing:Update()
-            -- if drawing.Parent then
-                local parent = drawing.Parent ~= nil and library.drawings[drawing.Parent.Object] or nil
-                local parentSize,parentPos,parentVis = workspace.CurrentCamera.ViewportSize, Vector2.new(0,0), true;
-                if parent ~= nil then
-                    parentSize = (parent.Class == 'Square' or parent.Class == 'Image') and parent.Object.Size or parent.Class == 'Text' and parent.TextBounds or workspace.CurrentCamera.ViewportSize
-                    parentPos = parent.Object.Position
-                    parentVis = parent.Object.Visible
+            local parent = drawing.Parent ~= nil and library.drawings[drawing.Parent.Object] or nil
+            local parentSize,parentPos,parentVis = workspace.CurrentCamera.ViewportSize, Vector2.new(0,0), true;
+            if parent ~= nil then
+                parentSize = (parent.Class == 'Square' or parent.Class == 'Image') and parent.Object.Size or parent.Class == 'Text' and parent.TextBounds or workspace.CurrentCamera.ViewportSize
+                parentPos = parent.Object.Position
+                parentVis = parent.Object.Visible
+            end
+
+            local isVis = (parentVis and drawing.Visible) and true or false
+            drawing.Object.Visible = isVis
+
+            if not isVis then
+                for child in next, drawing.Children do
+                    if child.Object.Visible then
+                        child.Object.Visible = false
+                    end
                 end
+                return
+            end
 
-                if drawing.Class == 'Square' or drawing.Class == 'Image' then
-                    drawing.Object.Size = typeof(drawing.Size) == 'Vector2' and drawing.Size or typeof(drawing.Size) == 'UDim2' and utility:UDim2ToVector2(drawing.Size,parentSize)
-                end
+            if drawing.Class == 'Square' or drawing.Class == 'Image' then
+                drawing.Object.Size = typeof(drawing.Size) == 'Vector2' and drawing.Size or typeof(drawing.Size) == 'UDim2' and utility:UDim2ToVector2(drawing.Size,parentSize)
+            end
 
-                if drawing.Class == 'Square' or drawing.Class == 'Image' or drawing.Class == 'Circle' or drawing.Class == 'Text' then
-                    drawing.Object.Position = parentPos + (typeof(drawing.Position) == 'Vector2' and drawing.Position or utility:UDim2ToVector2(drawing.Position,parentSize))
-                end
+            if drawing.Class == 'Square' or drawing.Class == 'Image' or drawing.Class == 'Circle' or drawing.Class == 'Text' then
+                drawing.Object.Position = parentPos + (typeof(drawing.Position) == 'Vector2' and drawing.Position or utility:UDim2ToVector2(drawing.Position,parentSize))
+            end
 
-                drawing.Object.Visible = (parentVis and drawing.Visible) and true or false
-
-            -- end
             drawing:UpdateChildren()
         end
 
@@ -712,8 +722,18 @@ do
                 if table.find({'Size','Position','Position','Visible','Parent'},i) then
                     drawing:Update()
                 end
-                if table.find({'ThemeColor','OutlineThemeColor','ThemeColorOffset','OutlineThemeColorOffset'},i) and lastval ~= v then
-                    library.UpdateThemeColors()
+                if (i == 'ThemeColor' or i == 'ThemeColorOffset') and lastval ~= v then
+                    local themeName = drawing.ThemeColor
+                    if themeName and library.theme[themeName] then
+                        local offset = drawing.ThemeColorOffset or 0
+                        drawing.Object.Color = utility:AddRGB(library.theme[themeName], fromrgb(offset, offset, offset))
+                    end
+                elseif (i == 'OutlineThemeColor' or i == 'OutlineThemeColorOffset') and lastval ~= v then
+                    local themeName = drawing.ThemeColorOutline
+                    if themeName and library.theme[themeName] then
+                        local offset = drawing.OutlineThemeColorOffset or 0
+                        drawing.Object.OutlineColor = utility:AddRGB(library.theme[themeName], fromrgb(offset, offset, offset))
+                    end
                 end
 
             end
@@ -4499,7 +4519,7 @@ function library:init()
                     function box:CaptureFocus(clear)
                         if box.focused then return end
                         box.focused = true
-                        objs.border1.ThemeColor = 'Accent';
+                        self.objects.border1.ThemeColor = 'Accent';
 
                         if clear then
                             input = '';
@@ -4527,8 +4547,8 @@ function library:init()
                                 box:ReleaseFocus(true);
                             elseif inp.UserInputType == Enum.UserInputType.MouseButton1 then
                                 local mp = inputservice:GetMouseLocation()
-                                local bp = objs.background.Object.Position
-                                local bs = objs.background.Object.Size
+                                local bp = self.objects.background.Object.Position
+                                local bs = self.objects.background.Object.Size
                                 if not (mp.X >= bp.X and mp.X <= bp.X + bs.X and mp.Y >= bp.Y and mp.Y <= bp.Y + bs.Y) then
                                     box:ReleaseFocus(true);
                                 end
@@ -4577,7 +4597,7 @@ function library:init()
                     function box:ReleaseFocus(apply)
                         if not box.focused then return end
                         box.focused = false;
-                        objs.border1.ThemeColor = 'Option Border 1';
+                        self.objects.border1.ThemeColor = 'Option Border 1';
                         self.objects.inputText.ThemeColor = 'Option Text 2';
                         if blinkConn then
                             blinkConn:Disconnect();
