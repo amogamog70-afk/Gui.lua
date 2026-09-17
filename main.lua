@@ -231,183 +231,209 @@ library.themes = {
     {
         name = 'Default',
         theme = {
-            ['Accent']                    = fromrgb(230,230,230);
-            ['Background']                = fromrgb(15,15,15);
-            ['Border']                    = fromrgb(0,0,0);
-            ['Border 1']                  = fromrgb(45,45,45);
-            ['Border 2']                  = fromrgb(22,22,22);
-            ['Border 3']                  = fromrgb(10,10,10);
-            ['Primary Text']              = fromrgb(240,240,240);
-            ['Group Background']          = fromrgb(18,18,18);
-            ['Selected Tab Background']   = fromrgb(26,26,26);
-            ['Unselected Tab Background'] = fromrgb(14,14,14);
-            ['Selected Tab Text']         = fromrgb(255,255,255);
-            ['Unselected Tab Text']       = fromrgb(135,135,135);
-            ['Section Background']        = fromrgb(16,16,16);
-            ['Option Text 1']             = fromrgb(240,240,240);
-            ['Option Text 2']             = fromrgb(185,185,185);
-            ['Option Text 3']             = fromrgb(135,135,135);
-            ['Option Border 1']           = fromrgb(45,45,45);
-            ['Option Border 2']           = fromrgb(10,10,10);
-            ['Option Background']         = fromrgb(26,26,26);
-            ["Risky Text"]                = fromrgb(180, 30, 30);
-            ["Risky Text Enabled"]        = fromrgb(255, 50, 50);
+            ['Accent']                    = fromrgb(0, 215, 255);
+            ['Background']                = fromrgb(22, 25, 34);
+            ['Border']                    = fromrgb(0, 0, 0);
+            ['Border 1']                  = fromrgb(56, 64, 86);
+            ['Border 2']                  = fromrgb(28, 32, 44);
+            ['Border 3']                  = fromrgb(12, 14, 18);
+            ['Primary Text']              = fromrgb(255, 255, 255);
+            ['Group Background']          = fromrgb(28, 32, 44);
+            ['Selected Tab Background']   = fromrgb(36, 42, 58);
+            ['Unselected Tab Background'] = fromrgb(20, 22, 30);
+            ['Selected Tab Text']         = fromrgb(255, 255, 255);
+            ['Unselected Tab Text']       = fromrgb(170, 180, 200);
+            ['Section Background']        = fromrgb(25, 28, 38);
+            ['Option Text 1']             = fromrgb(255, 255, 255);
+            ['Option Text 2']             = fromrgb(215, 225, 240);
+            ['Option Text 3']             = fromrgb(165, 175, 195);
+            ['Option Border 1']           = fromrgb(52, 60, 82);
+            ['Option Border 2']           = fromrgb(12, 14, 18);
+            ['Option Background']         = fromrgb(32, 36, 48);
+            ['Risky Text']                = fromrgb(255, 75, 75);
+            ['Risky Text Enabled']        = fromrgb(255, 30, 30);
         }
     },
     {
         name = 'Midnight',
         theme = {
-            ['Accent']                    = fromrgb(103,89,179);
-            ['Background']                = fromrgb(22,22,31);
-            ['Border']                    = fromrgb(0,0,0);
-            ['Border 1']                  = fromrgb(50,50,50);
-            ['Border 2']                  = fromrgb(24,25,37);
-            ['Border 3']                  = fromrgb(10,10,10);
-            ['Primary Text']              = fromrgb(235,235,235);
-            ['Group Background']          = fromrgb(24,25,37);
-            ['Selected Tab Background']   = fromrgb(24,25,37);
-            ['Unselected Tab Background'] = fromrgb(22,22,31);
-            ['Selected Tab Text']         = fromrgb(245,245,245);
-            ['Unselected Tab Text']       = fromrgb(145,145,145);
-            ['Section Background']        = fromrgb(22,22,31);
-            ['Option Text 1']             = fromrgb(245,245,245);
-            ['Option Text 2']             = fromrgb(195,195,195);
-            ['Option Text 3']             = fromrgb(145,145,145);
-            ['Option Border 1']           = fromrgb(50,50,50);
-            ['Option Border 2']           = fromrgb(0,0,0);
-            ['Option Background']         = fromrgb(24,25,37);
-            ["Risky Text"]                = fromrgb(175, 21, 21);
-            ["Risky Text Enabled"]        = fromrgb(255, 41, 41);
+            ['Accent']                    = fromrgb(160, 110, 255);
+            ['Background']                = fromrgb(26, 24, 38);
+            ['Border']                    = fromrgb(0, 0, 0);
+            ['Border 1']                  = fromrgb(72, 64, 105);
+            ['Border 2']                  = fromrgb(32, 28, 48);
+            ['Border 3']                  = fromrgb(12, 10, 18);
+            ['Primary Text']              = fromrgb(255, 255, 255);
+            ['Group Background']          = fromrgb(34, 30, 50);
+            ['Selected Tab Background']   = fromrgb(42, 36, 62);
+            ['Unselected Tab Background'] = fromrgb(22, 20, 32);
+            ['Selected Tab Text']         = fromrgb(255, 255, 255);
+            ['Unselected Tab Text']       = fromrgb(175, 168, 205);
+            ['Section Background']        = fromrgb(30, 26, 44);
+            ['Option Text 1']             = fromrgb(255, 255, 255);
+            ['Option Text 2']             = fromrgb(225, 220, 245);
+            ['Option Text 3']             = fromrgb(170, 162, 200);
+            ['Option Border 1']           = fromrgb(72, 64, 105);
+            ['Option Border 2']           = fromrgb(14, 12, 20);
+            ['Option Background']         = fromrgb(36, 32, 54);
+            ['Risky Text']                = fromrgb(255, 75, 75);
+            ['Risky Text Enabled']        = fromrgb(255, 30, 30);
         }
     },
     {
         name = 'Nekocheat',
         theme = {
-            ["Accent"]                    = fromrgb(226, 30, 112);
-            ["Background"]                = fromrgb(18,18,18);
-            ["Border"]                    = fromrgb(0,0,0);
-            ["Border 1"]                  = fromrgb(60,60,60);
-            ["Border 2"]                  = fromrgb(18,18,18);
-            ["Border 3"]                  = fromrgb(10,10,10);
-            ["Primary Text"]              = fromrgb(255,255,255);
-            ["Group Background"]          = fromrgb(18,18,18);
-            ["Selected Tab Background"]   = fromrgb(18,18,18);
-            ["Unselected Tab Background"] = fromrgb(18,18,18);
-            ["Selected Tab Text"]         = fromrgb(245,245,245);
-            ["Unselected Tab Text"]       = fromrgb(145,145,145);
-            ["Section Background"]        = fromrgb(18,18,18);
-            ["Option Text 1"]             = fromrgb(255,255,255);
-            ["Option Text 2"]             = fromrgb(255,255,255);
-            ["Option Text 3"]             = fromrgb(255,255,255);
-            ["Option Border 1"]           = fromrgb(50,50,50);
-            ["Option Border 2"]           = fromrgb(0,0,0);
-            ["Option Background"]         = fromrgb(23,23,23);
-            ["Risky Text"]                = fromrgb(175, 21, 21);
-            ["Risky Text Enabled"]        = fromrgb(255, 41, 41);
+            ['Accent']                    = fromrgb(255, 65, 155);
+            ['Background']                = fromrgb(28, 22, 30);
+            ['Border']                    = fromrgb(0, 0, 0);
+            ['Border 1']                  = fromrgb(80, 60, 88);
+            ['Border 2']                  = fromrgb(34, 26, 38);
+            ['Border 3']                  = fromrgb(12, 10, 14);
+            ['Primary Text']              = fromrgb(255, 255, 255);
+            ['Group Background']          = fromrgb(36, 28, 40);
+            ['Selected Tab Background']   = fromrgb(46, 34, 52);
+            ['Unselected Tab Background'] = fromrgb(24, 18, 26);
+            ['Selected Tab Text']         = fromrgb(255, 255, 255);
+            ['Unselected Tab Text']       = fromrgb(190, 170, 195);
+            ['Section Background']        = fromrgb(32, 25, 36);
+            ['Option Text 1']             = fromrgb(255, 255, 255);
+            ['Option Text 2']             = fromrgb(235, 215, 240);
+            ['Option Text 3']             = fromrgb(180, 160, 185);
+            ['Option Border 1']           = fromrgb(78, 58, 86);
+            ['Option Border 2']           = fromrgb(16, 12, 18);
+            ['Option Background']         = fromrgb(36, 28, 40);
+            ['Risky Text']                = fromrgb(255, 75, 75);
+            ['Risky Text Enabled']        = fromrgb(255, 30, 30);
         }
     },
     {
         name = 'Nekocheat Blue',
         theme = {
-            ["Accent"]                    = fromrgb(0, 247, 255);
-            ["Background"]                = fromrgb(18,18,18);
-            ["Border"]                    = fromrgb(0,0,0);
-            ["Border 1"]                  = fromrgb(60,60,60);
-            ["Border 2"]                  = fromrgb(18,18,18);
-            ["Border 3"]                  = fromrgb(10,10,10);
-            ["Primary Text"]              = fromrgb(255,255,255);
-            ["Group Background"]          = fromrgb(18,18,18);
-            ["Selected Tab Background"]   = fromrgb(18,18,18);
-            ["Unselected Tab Background"] = fromrgb(18,18,18);
-            ["Selected Tab Text"]         = fromrgb(245,245,245);
-            ["Unselected Tab Text"]       = fromrgb(145,145,145);
-            ["Section Background"]        = fromrgb(18,18,18);
-            ["Option Text 1"]             = fromrgb(255,255,255);
-            ["Option Text 2"]             = fromrgb(255,255,255);
-            ["Option Text 3"]             = fromrgb(255,255,255);
-            ["Option Border 1"]           = fromrgb(50,50,50);
-            ["Option Border 2"]           = fromrgb(0,0,0);
-            ["Option Background"]         = fromrgb(23,23,23);
-            ["Risky Text"]                = fromrgb(175, 21, 21);
-            ["Risky Text Enabled"]        = fromrgb(255, 41, 41);
+            ['Accent']                    = fromrgb(0, 225, 255);
+            ['Background']                = fromrgb(20, 25, 36);
+            ['Border']                    = fromrgb(0, 0, 0);
+            ['Border 1']                  = fromrgb(54, 72, 100);
+            ['Border 2']                  = fromrgb(26, 34, 48);
+            ['Border 3']                  = fromrgb(10, 14, 20);
+            ['Primary Text']              = fromrgb(255, 255, 255);
+            ['Group Background']          = fromrgb(26, 34, 48);
+            ['Selected Tab Background']   = fromrgb(34, 46, 65);
+            ['Unselected Tab Background'] = fromrgb(18, 22, 32);
+            ['Selected Tab Text']         = fromrgb(255, 255, 255);
+            ['Unselected Tab Text']       = fromrgb(170, 190, 215);
+            ['Section Background']        = fromrgb(22, 28, 40);
+            ['Option Text 1']             = fromrgb(255, 255, 255);
+            ['Option Text 2']             = fromrgb(220, 235, 250);
+            ['Option Text 3']             = fromrgb(165, 185, 210);
+            ['Option Border 1']           = fromrgb(52, 70, 96);
+            ['Option Border 2']           = fromrgb(12, 16, 24);
+            ['Option Background']         = fromrgb(28, 38, 54);
+            ['Risky Text']                = fromrgb(255, 75, 75);
+            ['Risky Text Enabled']        = fromrgb(255, 30, 30);
         }
     },
     {
         name = 'Fatality',
         theme = {
-            ['Accent']                    = fromrgb(197,7,83);
-            ['Background']                = fromrgb(25,19,53);
-            ['Border']                    = fromrgb(0,0,0);
-            ['Border 1']                  = fromrgb(60,53,93);
-            ['Border 2']                  = fromrgb(29,23,66);
-            ['Border 3']                  = fromrgb(10,10,10);
-            ['Primary Text']              = fromrgb(235,235,235);
-            ['Group Background']          = fromrgb(29,23,66);
-            ['Selected Tab Background']   = fromrgb(29,23,66);
-            ['Unselected Tab Background'] = fromrgb(25,19,53);
-            ['Selected Tab Text']         = fromrgb(245,245,245);
-            ['Unselected Tab Text']       = fromrgb(145,145,145);
-            ['Section Background']        = fromrgb(25,19,53);
-            ['Option Text 1']             = fromrgb(245,245,245);
-            ['Option Text 2']             = fromrgb(195,195,195);
-            ['Option Text 3']             = fromrgb(145,145,145);
-            ['Option Border 1']           = fromrgb(60,53,93);
-            ['Option Border 2']           = fromrgb(0,0,0);
-            ['Option Background']         = fromrgb(29,23,66);
-            ["Risky Text"]                = fromrgb(175, 21, 21);
-            ["Risky Text Enabled"]        = fromrgb(255, 41, 41);
+            ['Accent']                    = fromrgb(235, 35, 95);
+            ['Background']                = fromrgb(28, 20, 44);
+            ['Border']                    = fromrgb(0, 0, 0);
+            ['Border 1']                  = fromrgb(75, 55, 110);
+            ['Border 2']                  = fromrgb(36, 25, 58);
+            ['Border 3']                  = fromrgb(12, 10, 18);
+            ['Primary Text']              = fromrgb(255, 255, 255);
+            ['Group Background']          = fromrgb(36, 25, 58);
+            ['Selected Tab Background']   = fromrgb(48, 32, 76);
+            ['Unselected Tab Background'] = fromrgb(24, 18, 36);
+            ['Selected Tab Text']         = fromrgb(255, 255, 255);
+            ['Unselected Tab Text']       = fromrgb(185, 170, 210);
+            ['Section Background']        = fromrgb(32, 22, 50);
+            ['Option Text 1']             = fromrgb(255, 255, 255);
+            ['Option Text 2']             = fromrgb(230, 215, 245);
+            ['Option Text 3']             = fromrgb(175, 160, 200);
+            ['Option Border 1']           = fromrgb(75, 55, 110);
+            ['Option Border 2']           = fromrgb(14, 10, 20);
+            ['Option Background']         = fromrgb(38, 28, 62);
+            ['Risky Text']                = fromrgb(255, 75, 75);
+            ['Risky Text Enabled']        = fromrgb(255, 30, 30);
         }
     },
     {
         name = 'Gamesense',
         theme = {
-            ['Accent']                    = fromrgb(147,184,26);
-            ['Background']                = fromrgb(17,17,17);
-            ['Border']                    = fromrgb(0,0,0);
-            ['Border 1']                  = fromrgb(47,47,47);
-            ['Border 2']                  = fromrgb(17,17,17);
-            ['Border 3']                  = fromrgb(10,10,10);
-            ['Primary Text']              = fromrgb(235,235,235);
-            ['Group Background']          = fromrgb(17,17,17);
-            ['Selected Tab Background']   = fromrgb(17,17,17);
-            ['Unselected Tab Background'] = fromrgb(17,17,17);
-            ['Selected Tab Text']         = fromrgb(245,245,245);
-            ['Unselected Tab Text']       = fromrgb(145,145,145);
-            ['Section Background']        = fromrgb(17,17,17);
-            ['Option Text 1']             = fromrgb(245,245,245);
-            ['Option Text 2']             = fromrgb(195,195,195);
-            ['Option Text 3']             = fromrgb(145,145,145);
-            ['Option Border 1']           = fromrgb(47,47,47);
-            ['Option Border 2']           = fromrgb(0,0,0);
-            ['Option Background']         = fromrgb(35,35,35);
-            ["Risky Text"]                = fromrgb(175, 21, 21);
-            ["Risky Text Enabled"]        = fromrgb(255, 41, 41);
+            ['Accent']                    = fromrgb(155, 225, 35);
+            ['Background']                = fromrgb(20, 26, 22);
+            ['Border']                    = fromrgb(0, 0, 0);
+            ['Border 1']                  = fromrgb(58, 78, 65);
+            ['Border 2']                  = fromrgb(24, 32, 26);
+            ['Border 3']                  = fromrgb(10, 14, 11);
+            ['Primary Text']              = fromrgb(255, 255, 255);
+            ['Group Background']          = fromrgb(26, 34, 28);
+            ['Selected Tab Background']   = fromrgb(34, 46, 38);
+            ['Unselected Tab Background'] = fromrgb(18, 22, 19);
+            ['Selected Tab Text']         = fromrgb(255, 255, 255);
+            ['Unselected Tab Text']       = fromrgb(175, 205, 185);
+            ['Section Background']        = fromrgb(23, 30, 25);
+            ['Option Text 1']             = fromrgb(255, 255, 255);
+            ['Option Text 2']             = fromrgb(220, 240, 225);
+            ['Option Text 3']             = fromrgb(165, 190, 175);
+            ['Option Border 1']           = fromrgb(55, 75, 62);
+            ['Option Border 2']           = fromrgb(12, 16, 13);
+            ['Option Background']         = fromrgb(28, 38, 30);
+            ['Risky Text']                = fromrgb(255, 75, 75);
+            ['Risky Text Enabled']        = fromrgb(255, 30, 30);
         }
     },
     {
         name = 'Twitch',
         theme = {
-            ['Accent']                    = fromrgb(169,112,255);
-            ['Background']                = fromrgb(14,14,14);
-            ['Border']                    = fromrgb(0,0,0);
-            ['Border 1']                  = fromrgb(45,45,45);
-            ['Border 2']                  = fromrgb(31,31,35);
-            ['Border 3']                  = fromrgb(10,10,10);
-            ['Primary Text']              = fromrgb(235,235,235);
-            ['Group Background']          = fromrgb(31,31,35);
-            ['Selected Tab Background']   = fromrgb(31,31,35);
-            ['Unselected Tab Background'] = fromrgb(17,17,17);
-            ['Selected Tab Text']         = fromrgb(225,225,225);
-            ['Unselected Tab Text']       = fromrgb(160,170,175);
-            ['Section Background']        = fromrgb(17,17,17);
-            ['Option Text 1']             = fromrgb(245,245,245);
-            ['Option Text 2']             = fromrgb(195,195,195);
-            ['Option Text 3']             = fromrgb(145,145,145);
-            ['Option Border 1']           = fromrgb(45,45,45);
-            ['Option Border 2']           = fromrgb(0,0,0);
-            ['Option Background']         = fromrgb(24,24,27);
-            ["Risky Text"]                = fromrgb(175, 21, 21);
-            ["Risky Text Enabled"]        = fromrgb(255, 41, 41);
+            ['Accent']                    = fromrgb(169, 112, 255);
+            ['Background']                = fromrgb(24, 22, 32);
+            ['Border']                    = fromrgb(0, 0, 0);
+            ['Border 1']                  = fromrgb(68, 60, 90);
+            ['Border 2']                  = fromrgb(34, 30, 46);
+            ['Border 3']                  = fromrgb(12, 10, 16);
+            ['Primary Text']              = fromrgb(255, 255, 255);
+            ['Group Background']          = fromrgb(34, 30, 46);
+            ['Selected Tab Background']   = fromrgb(44, 38, 60);
+            ['Unselected Tab Background'] = fromrgb(20, 18, 26);
+            ['Selected Tab Text']         = fromrgb(255, 255, 255);
+            ['Unselected Tab Text']       = fromrgb(180, 170, 205);
+            ['Section Background']        = fromrgb(28, 25, 38);
+            ['Option Text 1']             = fromrgb(255, 255, 255);
+            ['Option Text 2']             = fromrgb(225, 218, 245);
+            ['Option Text 3']             = fromrgb(170, 160, 195);
+            ['Option Border 1']           = fromrgb(65, 58, 88);
+            ['Option Border 2']           = fromrgb(14, 12, 18);
+            ['Option Background']         = fromrgb(36, 32, 50);
+            ['Risky Text']                = fromrgb(255, 75, 75);
+            ['Risky Text Enabled']        = fromrgb(255, 30, 30);
+        }
+    },
+    {
+        name = 'Solar Flare',
+        theme = {
+            ['Accent']                    = fromrgb(255, 175, 25);
+            ['Background']                = fromrgb(28, 24, 20);
+            ['Border']                    = fromrgb(0, 0, 0);
+            ['Border 1']                  = fromrgb(82, 68, 52);
+            ['Border 2']                  = fromrgb(34, 28, 24);
+            ['Border 3']                  = fromrgb(14, 12, 10);
+            ['Primary Text']              = fromrgb(255, 255, 255);
+            ['Group Background']          = fromrgb(36, 30, 24);
+            ['Selected Tab Background']   = fromrgb(48, 38, 30);
+            ['Unselected Tab Background'] = fromrgb(22, 19, 16);
+            ['Selected Tab Text']         = fromrgb(255, 255, 255);
+            ['Unselected Tab Text']       = fromrgb(195, 180, 165);
+            ['Section Background']        = fromrgb(32, 27, 22);
+            ['Option Text 1']             = fromrgb(255, 255, 255);
+            ['Option Text 2']             = fromrgb(240, 225, 210);
+            ['Option Text 3']             = fromrgb(185, 170, 155);
+            ['Option Border 1']           = fromrgb(80, 65, 50);
+            ['Option Border 2']           = fromrgb(16, 13, 10);
+            ['Option Background']         = fromrgb(38, 32, 26);
+            ['Risky Text']                = fromrgb(255, 75, 75);
+            ['Risky Text Enabled']        = fromrgb(255, 30, 30);
         }
     }
 }
@@ -545,17 +571,27 @@ do
                 local clampedA = a > 1 and 1 or (a < 0 and 0 or a)
                 local progress = tweenService:GetValue(clampedA, styleVal, dirVal)
                 local newVal = isNum and (startVal + (val - startVal) * progress) or startVal:Lerp(val, progress)
-                obj[prop] = newVal;
-                if a >= 1 or obj == nil then
+                local ok = pcall(function()
+                    obj[prop] = newVal;
+                end)
+                if not ok or a >= 1 or obj == nil then
                     tween:Cancel();
                 end
             end)
 
             function tween:Cancel()
-                tween.Connection:Disconnect();
-                tween.Completed:Fire();
-                table.clear(tween);
-                library.tweens[obj][prop] = nil;
+                if tween.Cancelled then return end
+                tween.Cancelled = true
+                if tween.Connection then
+                    pcall(function() tween.Connection:Disconnect() end)
+                    tween.Connection = nil
+                end
+                if tween.Completed then
+                    pcall(function() tween.Completed:Fire() end)
+                end
+                if library.tweens[obj] then
+                    library.tweens[obj][prop] = nil;
+                end
             end
             
             return tween;
@@ -627,24 +663,64 @@ do
         lastHoverMx = mx
         lastHoverMy = my
 
+        -- Check if mouse is over any active popup/modal window (colorpicker, dropdown, keybindMenu)
+        local modalMinZ = nil
+        local modalBlocker = nil
+        if library.windows then
+            for _, win in next, library.windows do
+                if win.colorpicker and (win.colorpicker.open or win.colorpicker.selected ~= nil) then
+                    local cpBg = win.colorpicker.objects and win.colorpicker.objects.background
+                    if cpBg and cpBg.Visible and utility:IsInBounds(cpBg, mousePos, 0) then
+                        modalMinZ = library.zindexOrder.colorpicker
+                        modalBlocker = cpBg.Object
+                        break
+                    end
+                end
+                if win.dropdown and win.dropdown.selected ~= nil then
+                    local ddBg = win.dropdown.objects and win.dropdown.objects.background
+                    if ddBg and ddBg.Visible and utility:IsInBounds(ddBg, mousePos, 0) then
+                        modalMinZ = library.zindexOrder.dropdown
+                        modalBlocker = ddBg.Object
+                        break
+                    end
+                end
+                if win.keybindMenu and win.keybindMenu.open then
+                    local kmBg = win.keybindMenu.objects and win.keybindMenu.objects.background
+                    if kmBg and kmBg.Visible and utility:IsInBounds(kmBg, mousePos, 0) then
+                        modalMinZ = library.zindexOrder.keybindMenu
+                        modalBlocker = kmBg.Object
+                        break
+                    end
+                end
+            end
+        end
+
         local bestObj = nil
         local bestZ = -999999
         for _, v in next, library.interactiveDrawings do
             if v.ActualVisible and v.Class == 'Square' then
-                local pos = v.AbsolutePosition
-                local size = v.AbsoluteSize
-                if pos and size then
-                    local x1, y1 = pos.X, pos.Y
-                    if mx >= x1 and mx <= x1 + size.X and my >= y1 and my <= y1 + size.Y then
-                        local z = v.ZIndex or (v.Object and v.Object.ZIndex) or 0
-                        if z > bestZ then
-                            bestZ = z
-                            bestObj = v.Object
+                local z = v.ZIndex or (v.Object and v.Object.ZIndex) or 0
+                if not modalMinZ or z >= modalMinZ then
+                    local pos = v.AbsolutePosition
+                    local size = v.AbsoluteSize
+                    if pos and size then
+                        local x1, y1 = pos.X, pos.Y
+                        if mx >= x1 and mx <= x1 + size.X and my >= y1 and my <= y1 + size.Y then
+                            if z > bestZ then
+                                bestZ = z
+                                bestObj = v.Object
+                            end
                         end
                     end
                 end
             end
         end
+
+        -- If inside modal area and no specific control was hit (e.g. padding/background gap), block input from elements behind
+        if modalMinZ and not bestObj then
+            bestObj = modalBlocker
+        end
+
         cachedHoverObj = bestObj
         return bestObj
     end
@@ -761,6 +837,7 @@ do
         end
 
         function drawing:Update()
+            if drawing.Removed or not drawing.Object then return end
             local parent = nil
             if drawing.Parent ~= nil then
                 if drawing.Parent.Object and library.drawings[drawing.Parent.Object] then
@@ -812,8 +889,15 @@ do
         end
 
         function drawing:UpdateChildren()
+            if drawing.Removed or not drawing.Children then return end
             for child in next, drawing.Children do
-                child:Update()
+                if typeof(child) == 'table' and typeof(rawget(child, 'Update') or child.Update) == 'function' and not rawget(child, 'Removed') then
+                    pcall(function()
+                        child:Update()
+                    end)
+                else
+                    drawing.Children[child] = nil
+                end
             end
         end
 
@@ -834,8 +918,14 @@ do
         -- this is really stupid lol
         local proxy = utility:DetectTableChange(
         function(obj,i)
+            if drawing.Removed then
+                return nil
+            end
             if drawing[i] ~= nil then
                 return drawing[i]
+            end
+            if not drawing.Object then
+                return nil
             end
             local s, r = pcall(function()
                 return drawing.Object[i]
@@ -846,6 +936,9 @@ do
             return nil
         end,
         function(obj,i,v)
+            if drawing.Removed or not drawing.Object then
+                return
+            end
             if not table.find(blacklistedProperties,i) then
 
                 local lastval = drawing[i]
@@ -908,7 +1001,11 @@ do
                 end
 
                 if table.find({'Size','Position','Visible','Parent'},i) then
-                    drawing:Update()
+                    if not drawing.Removed and typeof(drawing.Update) == 'function' then
+                        pcall(function()
+                            drawing:Update()
+                        end)
+                    end
                 end
 
                 if (i == 'ThemeColor' or i == 'ThemeColorOffset') then
@@ -929,19 +1026,55 @@ do
         end)
 
         function drawing:Remove()
-            for child in next, self.Children do
-                child:Remove();
+            if drawing.Removed then return end
+            drawing.Removed = true;
+
+            if library.tweens[proxy] then
+                for _, tw in pairs(library.tweens[proxy]) do
+                    if typeof(tw) == 'table' and tw.Cancel then
+                        pcall(function() tw:Cancel() end)
+                    end
+                end
+                library.tweens[proxy] = nil;
+            end
+            if library.tweens[drawing] then
+                for _, tw in pairs(library.tweens[drawing]) do
+                    if typeof(tw) == 'table' and tw.Cancel then
+                        pcall(function() tw:Cancel() end)
+                    end
+                end
+                library.tweens[drawing] = nil;
             end
 
-            if drawing.Parent and drawing.Parent.Children then
-                drawing.Parent.Children[drawing] = nil;
+            if drawing.Children then
+                for child in next, drawing.Children do
+                    if typeof(child) == 'table' and typeof(child.Remove) == 'function' then
+                        pcall(function() child:Remove() end)
+                    end
+                end
+                table.clear(drawing.Children)
             end
 
-            library.drawings[drawing.Object] = nil;
-            library.interactiveDrawings[drawing.Object] = nil;
-            drawing.Object:Remove();
+            if drawing.Parent ~= nil then
+                pcall(function()
+                    if drawing.Parent.Children then
+                        drawing.Parent.Children[drawing] = nil;
+                        drawing.Parent.Children[proxy] = nil;
+                    end
+                end)
+                drawing.Parent = nil
+            end
+
+            pcall(function()
+                if drawing.Object then
+                    library.drawings[drawing.Object] = nil;
+                    library.interactiveDrawings[drawing.Object] = nil;
+                    drawing.Object:Remove();
+                end
+            end)
+
             table.clear(drawing);
-
+            drawing.Removed = true;
         end
 
         properties = typeof(properties) == 'table' and properties or {}
@@ -958,7 +1091,9 @@ do
             proxy[i] = v
         end
 
-        drawing:Update()
+        if not drawing.Removed and typeof(drawing.Update) == 'function' then
+            pcall(function() drawing:Update() end)
+        end
         return proxy
     end
 end
@@ -972,6 +1107,18 @@ function library:Unload()
     end)
     for _,c in next, self.connections do
         c:Disconnect()
+    end
+    if self.tweens then
+        for obj, propTweens in pairs(self.tweens) do
+            if typeof(propTweens) == 'table' then
+                for _, tw in pairs(propTweens) do
+                    if typeof(tw) == 'table' and tw.Cancel then
+                        pcall(function() tw:Cancel() end)
+                    end
+                end
+            end
+        end
+        table.clear(self.tweens)
     end
     for obj in next, self.drawings do
         obj:Remove()
@@ -1316,7 +1463,7 @@ function library:init()
                 if library.CurrentTooltip ~= nil then
                     local isSubMenuOpen = false
                     for _, win in ipairs(library.windows) do
-                        if (win.dropdown and win.dropdown.selected ~= nil) or (win.colorpicker and win.colorpicker.open) or (win.keybindMenu and win.keybindMenu.open) then
+                        if (win.dropdown and win.dropdown.selected ~= nil) or (win.colorpicker and (win.colorpicker.open or win.colorpicker.selected ~= nil)) or (win.keybindMenu and win.keybindMenu.open) then
                             isSubMenuOpen = true
                             break
                         end
@@ -2374,6 +2521,9 @@ function library:init()
                     Parent = window.objects.background;
                 })
 
+                utility:Connection(objs.background.MouseButton1Down, function() end)
+                utility:Connection(objs.background.MouseEnter, function() end)
+
                 objs.border1 = utility:Draw('Square', {
                     Size = newUDim2(1,2,1,2);
                     Position = newUDim2(0,-1,0,-1);
@@ -3343,7 +3493,7 @@ function library:init()
 
         local function tooltip(option)
             utility:Connection(option.objects.holder.MouseEnter, function()
-                if (window.dropdown and window.dropdown.selected ~= nil) or (window.colorpicker and window.colorpicker.open) or (window.keybindMenu and window.keybindMenu.open) then
+                if (window.dropdown and window.dropdown.selected ~= nil) or (window.colorpicker and (window.colorpicker.open or window.colorpicker.selected ~= nil)) or (window.keybindMenu and window.keybindMenu.open) then
                     return
                 end
                 local tipText = tostring(option.tooltip or '')
@@ -4091,11 +4241,13 @@ function library:init()
                                             window.colorpicker.selected.objects.border1.Color = library.theme['Option Border 1'];
                                         end
                                     end
+                                    window.colorpicker.open = true;
                                     window.colorpicker.selected = color
                                     window.colorpicker.objects.background.Parent = self.objects.background;
                                     window.colorpicker.objects.background.Visible = true;
                                     window.colorpicker:Visualize(color.color, color.trans)
                                 elseif window.colorpicker.selected == color then
+                                    window.colorpicker.open = false;
                                     window.colorpicker.selected = nil;
                                     window.colorpicker.objects.background.Parent = window.objects.background;
                                     window.colorpicker.objects.background.Visible = false;
@@ -5742,11 +5894,13 @@ function library:init()
                                         window.colorpicker.selected.objects.text.ThemeColor = window.colorpicker.selected.risky and 'Risky Text' or 'Option Text 3';
                                     end
                                 end
+                                window.colorpicker.open = true;
                                 window.colorpicker.selected = color
                                 window.colorpicker.objects.background.Parent = self.objects.background;
                                 window.colorpicker.objects.background.Visible = true;
                                 window.colorpicker:Visualize(color.color, color.trans)
                             elseif window.colorpicker.selected == color then
+                                window.colorpicker.open = false;
                                 window.colorpicker.selected = nil;
                                 window.colorpicker.objects.background.Parent = window.objects.background;
                                 window.colorpicker.objects.background.Visible = false;
