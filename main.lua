@@ -188,8 +188,9 @@ local library = {
     zindexOrder = {
         ['indicator'] = 950;
         ['window'] = 1000;
-        ['dropdown'] = 1200;
         ['colorpicker'] = 1100;
+        ['dropdown'] = 1200;
+        ['keybindMenu'] = 1250;
         ['watermark'] = 1300;
         ['notification'] = 1400;
         ['cursor'] = 1500;
@@ -741,13 +742,16 @@ do
                 if table.find({'Size','Position','Position','Visible','Parent'},i) then
                     drawing:Update()
                 end
-                if (i == 'ThemeColor' or i == 'ThemeColorOffset') and lastval ~= v then
+                if i == 'Color' then
+                    drawing.ThemeColor = nil
+                end
+                if (i == 'ThemeColor' or i == 'ThemeColorOffset') then
                     local themeName = drawing.ThemeColor
                     if themeName and library.theme[themeName] then
                         local offset = drawing.ThemeColorOffset or 0
                         drawing.Object.Color = utility:AddRGB(library.theme[themeName], fromrgb(offset, offset, offset))
                     end
-                elseif (i == 'OutlineThemeColor' or i == 'OutlineThemeColorOffset') and lastval ~= v then
+                elseif (i == 'OutlineThemeColor' or i == 'OutlineThemeColorOffset') then
                     local themeName = drawing.ThemeColorOutline
                     if themeName and library.theme[themeName] then
                         local offset = drawing.OutlineThemeColorOffset or 0
@@ -948,6 +952,11 @@ function library:init()
             self.cursor2.PointA = pos - newVector2(1, 1);
             self.cursor2.PointB = pos + newVector2(-1, 18);
             self.cursor2.PointC = pos + newVector2(13, 13);
+            pcall(function()
+                if inputservice.MouseIconEnabled then
+                    inputservice.MouseIconEnabled = false
+                end
+            end)
         end
     end
 
@@ -1436,6 +1445,16 @@ function library:init()
                 end
             end
 
+            function value:SetActive(bool)
+                self.active = bool and true or false
+                if self.objects.keyLabel then
+                    self.objects.keyLabel.ThemeColor = self.active and 'Accent' or 'Primary Text'
+                end
+                if self.objects.valueLabel then
+                    self.objects.valueLabel.ThemeColor = self.active and 'Accent' or 'Option Text 2'
+                end
+            end
+
             self:Update()
             return value
         end
@@ -1499,7 +1518,7 @@ function library:init()
         ----- Create Objects ----
         do
             local size = data.size or newUDim2(0, 525, 0, 650);
-            local position = data.position or newUDim2(0, 250, 0, 150);
+            local position = data.position or newUDim2(1, -(size.X.Offset + 30), 0.5, -(size.Y.Offset / 2));
             local objs = window.objects;
             local z = library.zindexOrder.window;
 
@@ -2187,9 +2206,10 @@ function library:init()
                     if window.colorpicker.selected ~= nil then
                         local sizeX = objs.transColor.Object.Size.X
                         if sizeX <= 0 then sizeX = 174 end
-                        local X = math.clamp((pos.X - objs.transColor.Object.Position.X) / sizeX, 0, 0.999)
-                        window.colorpicker.selected:SetTrans(X);
-                        window.colorpicker:Visualize(window.colorpicker.selected.color, X);
+                        local opacity = math.clamp((pos.X - objs.transColor.Object.Position.X) / sizeX, 0, 1)
+                        local trans = 1 - opacity
+                        window.colorpicker.selected:SetTrans(trans);
+                        window.colorpicker:Visualize(window.colorpicker.selected.color, trans);
                     end
                 end
 
@@ -2247,17 +2267,20 @@ function library:init()
                     cell.sq.Color = fromhsv(h, cell.s, cell.v)
                 end
 
-                -- Update dynamic transparency bar (c3 fading smoothly to dark background)
+                local opacity = math.clamp(1 - (a or 0), 0, 1)
+
+                -- Update dynamic transparency bar (dark background fading smoothly to full c3 on the right)
                 local transCount = #self.objects.transSegments
                 for seg = 0, transCount - 1 do
-                    local aFrac = seg / math.max(transCount - 1, 1)
-                    self.objects.transSegments[seg + 1].Color = c3:Lerp(Color3.fromRGB(22, 22, 24), aFrac)
+                    local frac = seg / math.max(transCount - 1, 1)
+                    self.objects.transSegments[seg + 1].Color = Color3.fromRGB(22, 22, 24):Lerp(c3, frac)
                 end
 
                 self.objects.hueSlider.Position = newUDim2(math.clamp(h, 0, 0.99), 0, 0, -1);
-                self.objects.transSlider.Position = newUDim2(math.clamp(a, 0, 0.99), 0, 0, -1);
+                self.objects.transSlider.Position = newUDim2(math.clamp(opacity, 0, 0.99), 0, 0, -1);
                 self.objects.pointer.Position = newUDim2(math.clamp(s, 0, 0.99), -2, math.clamp(1 - v, 0, 0.99), -2);
-                self.objects.swatchInner.Color = c3;
+                self.objects.swatchInner.Color = Color3.fromRGB(20, 20, 24):Lerp(c3, opacity);
+                self.objects.swatchInner.Transparency = opacity;
 
                 local title = 'Color';
                 if self.selected ~= nil then
@@ -2273,7 +2296,7 @@ function library:init()
                 local g = math.floor(clamp(c3.G, 0, 1) * 255)
                 local b = math.floor(clamp(c3.B, 0, 1) * 255)
                 self.objects.hexText.Text = string.format("#%02X%02X%02X", r, g, b)
-                self.objects.percentText.Text = math.floor((1 - a) * 100) .. '%'
+                self.objects.percentText.Text = math.floor(opacity * 100) .. '%'
 
             end
             
@@ -2501,6 +2524,106 @@ function library:init()
             end
         end
 
+        ---- Create Keybind Mode Menu ----
+        do
+            window.keybindMenu = {
+                objects = { items = {} };
+                selectedBind = nil;
+                open = false;
+            };
+
+            local kmObjs = window.keybindMenu.objects;
+            local z = library.zindexOrder.keybindMenu or (library.zindexOrder.dropdown + 100);
+
+            kmObjs.background = utility:Draw('Square', {
+                Visible = false;
+                Size = newUDim2(0, 95, 0, 72);
+                ThemeColor = 'Background';
+                ZIndex = z;
+                Parent = window.objects.background;
+            })
+
+            kmObjs.border1 = utility:Draw('Square', {
+                Size = newUDim2(1, 2, 1, 2);
+                Position = newUDim2(0, -1, 0, -1);
+                ThemeColor = 'Border';
+                ZIndex = z - 1;
+                Parent = kmObjs.background;
+            })
+
+            kmObjs.border2 = utility:Draw('Square', {
+                Size = newUDim2(1, 2, 1, 2);
+                Position = newUDim2(0, -1, 0, -1);
+                ThemeColor = 'Border 1';
+                ZIndex = z - 2;
+                Parent = kmObjs.border1;
+            })
+
+            local modes = {'Hold', 'Toggle', 'Always'}
+            for i, modeName in ipairs(modes) do
+                local itemHolder = utility:Draw('Square', {
+                    Size = newUDim2(1, -6, 0, 20);
+                    Position = newUDim2(0, 3, 0, 3 + (i - 1) * 23);
+                    Transparency = 0;
+                    ZIndex = z + 2;
+                    Parent = kmObjs.background;
+                })
+
+                local itemText = utility:Draw('Text', {
+                    Position = newUDim2(0, 8, 0, 3);
+                    Text = modeName;
+                    Size = 13;
+                    Font = 2;
+                    Outline = true;
+                    ThemeColor = 'Option Text 2';
+                    ZIndex = z + 3;
+                    Parent = itemHolder;
+                })
+
+                utility:Connection(itemHolder.MouseEnter, function()
+                    itemHolder.Transparency = 1;
+                    itemHolder.Color = fromrgb(32, 32, 36);
+                    itemText.ThemeColor = 'Accent';
+                end)
+
+                utility:Connection(itemHolder.MouseLeave, function()
+                    local isSel = window.keybindMenu.selectedBind and string.lower(tostring(window.keybindMenu.selectedBind.mode or 'toggle')) == string.lower(modeName);
+                    itemHolder.Transparency = isSel and 1 or 0;
+                    itemHolder.Color = fromrgb(24, 24, 28);
+                    itemText.ThemeColor = isSel and 'Accent' or 'Option Text 2';
+                end)
+
+                utility:Connection(itemHolder.MouseButton1Down, function()
+                    if window.keybindMenu.selectedBind then
+                        window.keybindMenu.selectedBind:SetMode(string.lower(modeName));
+                    end
+                    window.keybindMenu:Close();
+                end)
+
+                kmObjs.items[modeName] = {holder = itemHolder, text = itemText};
+            end
+
+            function window.keybindMenu:Open(targetBind, pos)
+                self.selectedBind = targetBind;
+                self.open = true;
+                kmObjs.background.Position = pos;
+                kmObjs.background.Visible = true;
+
+                for modeName, item in pairs(kmObjs.items) do
+                    local isSel = string.lower(tostring(targetBind.mode or 'toggle')) == string.lower(modeName);
+                    item.holder.Transparency = isSel and 1 or 0;
+                    item.holder.Color = fromrgb(24, 24, 28);
+                    item.text.ThemeColor = isSel and 'Accent' or 'Option Text 2';
+                end
+            end
+
+            function window.keybindMenu:Close()
+                self.open = false;
+                self.selectedBind = nil;
+                kmObjs.background.Visible = false;
+            end
+        end
+
         function window:AddTab(text, order)
             local tab = {
                 text = text;
@@ -2573,6 +2696,7 @@ function library:init()
                 utility:Connection(objs.background.MouseLeave, function()
                     if tab ~= window.selectedTab then
                         objs.background.ThemeColor = 'Unselected Tab Background';
+                        objs.background.Color = library.theme['Unselected Tab Background'];
                         objs.text.ThemeColor = 'Unselected Tab Text';
                         objs.topBorder.ThemeColor = 'Unselected Tab Background';
                     end
@@ -2805,6 +2929,15 @@ function library:init()
                                 self.callback(bool);
                             end
 
+                            for _, opt in ipairs(self.options) do
+                                if opt.class == 'bind' then
+                                    opt.state = bool;
+                                    if opt.UpdateIndicator then
+                                        opt:UpdateIndicator();
+                                    end
+                                end
+                            end
+
                         end
                     end
 
@@ -2944,23 +3077,33 @@ function library:init()
                                 local h,s,v = c3:ToHSV(); c3 = fromhsv(h, clamp(s,.005,.995), clamp(v,.005,.995))
                                 self.color = c3;
                                 self.objects.background.Color = c3;
-                                if not nocallback then
-                                    self.callback(c3, self.trans);
-                                end
-                                if self.open then
-                                    window.colorpicker:Visualize(self.color, self.trans);
-                                end
+                                local opacity = math.clamp(1 - (self.trans or 0), 0, 1);
+                                self.objects.background.Transparency = opacity;
                                 if self.flag then
                                     library.flags[self.flag] = c3;
+                                    library.flags[self.flag .. '_trans'] = self.trans or 0;
+                                    library.flags[self.flag .. '_alpha'] = opacity;
+                                end
+                                if not nocallback then
+                                    self.callback(c3, self.trans or 0, opacity);
+                                end
+                                if self.open then
+                                    window.colorpicker:Visualize(self.color, self.trans or 0);
                                 end
                             end
                         end
     
                         function color:SetTrans(trans, nocallback)
                             if typeof(trans) == 'number' then
-                                self.trans = trans;
+                                self.trans = math.clamp(trans, 0, 1);
+                                local opacity = 1 - self.trans;
+                                self.objects.background.Transparency = opacity;
+                                if self.flag then
+                                    library.flags[self.flag .. '_trans'] = self.trans;
+                                    library.flags[self.flag .. '_alpha'] = opacity;
+                                end
                                 if not nocallback then
-                                    self.callback(self.color, trans);
+                                    self.callback(self.color, self.trans, opacity);
                                 end
                                 if self.open then
                                     window.colorpicker:Visualize(self.color, self.trans);
@@ -3005,10 +3148,12 @@ function library:init()
                             mode = 'toggle';
                             order = #self.options+1;
                             callback = function(state)
-                                toggle:SetState(state);
+                                bind.state = state;
+                                toggle:SetState(state, true);
                                 if userCallback then
                                     userCallback(state);
                                 end
+                                bind:UpdateIndicator();
                             end;
                             keycallback = function() end;
                             indicatorValue = library.keyIndicator:AddValue({value = 'value', key = 'key', enabled = false});
@@ -3032,18 +3177,9 @@ function library:init()
     
                         if bind.flag then
                             library.options[bind.flag] = bind;
-                        end
-
-                        if bind.bind == 'none' then
-                            bind.state = true
-                            if bind.flag then
-                                library.flags[bind.flag] = bind.state;
+                            if library.flags[bind.flag .. '_mode'] then
+                                bind.mode = library.flags[bind.flag .. '_mode'];
                             end
-                            bind.callback(true)
-                            local display = bind.state; if bind.invertindicator then display = not bind.state; end
-                            bind.indicatorValue:SetEnabled(display and not bind.noindicator);
-                            bind.indicatorValue:SetKey((bind.text == nil or bind.text == '') and (bind.flag == nil and 'unknown' or bind.flag) or bind.text); -- this is so dumb
-                            bind.indicatorValue:SetValue('[Always]');
                         end
     
                         --- Create Objects ---
@@ -3081,9 +3217,65 @@ function library:init()
                                     bind.binding = true;
                                 end
                             end)
+
+                            utility:Connection(objs.holder.MouseButton2Down, function()
+                                if window.keybindMenu then
+                                    local mousePos = inputservice:GetMouseLocation()
+                                    local winPos = window.objects.background.Object.Position
+                                    local relPos = newUDim2(0, mousePos.X - winPos.X + 5, 0, mousePos.Y - winPos.Y + 5)
+                                    window.keybindMenu:Open(bind, relPos)
+                                end
+                            end)
     
                         end
                         ----------------------
+
+                        function bind:UpdateIndicator()
+                            if not self.indicatorValue then return end
+                            local isBound = (self.bind ~= 'none' and self.bind ~= nil) or self.mode == 'always';
+                            local shouldShow = isBound and not self.noindicator;
+                            self.indicatorValue:SetEnabled(shouldShow);
+                            
+                            local keyName = 'NONE';
+                            if self.mode == 'always' then
+                                keyName = 'ALWAYS';
+                            elseif self.bind and self.bind ~= 'none' then
+                                keyName = keyNames[self.bind] or (typeof(self.bind) == 'EnumItem' and self.bind.Name) or tostring(self.bind);
+                                keyName = keyName:upper();
+                            end
+                            
+                            local bindLabel = (self.text == nil or self.text == '') and (toggle.text ~= nil and toggle.text ~= '' and toggle.text or (self.flag == nil and 'unknown' or self.flag)) or self.text;
+                            self.indicatorValue:SetKey(bindLabel);
+                            local modeSuffix = (self.mode and self.mode ~= 'always') and (' [' .. self.mode:sub(1,1):upper() .. self.mode:sub(2) .. ']') or '';
+                            self.indicatorValue:SetValue('[' .. keyName .. ']' .. modeSuffix);
+                            self.indicatorValue:SetActive(self.state == true);
+                            library.keyIndicator:Update();
+                        end
+
+                        function bind:SetMode(newMode)
+                            newMode = string.lower(tostring(newMode or 'toggle'))
+                            if newMode ~= 'toggle' and newMode ~= 'hold' and newMode ~= 'always' then
+                                newMode = 'toggle'
+                            end
+                            self.mode = newMode;
+                            if self.flag then
+                                library.flags[self.flag .. '_mode'] = newMode;
+                            end
+                            if newMode == 'always' then
+                                self.state = true;
+                                if self.flag then
+                                    library.flags[self.flag] = true;
+                                end
+                                self.callback(true);
+                            else
+                                self.state = false;
+                                if self.flag then
+                                    library.flags[self.flag] = false;
+                                end
+                                self.callback(false);
+                            end
+                            self:UpdateIndicator();
+                        end
     
                         local c
                         function bind:SetBind(keybind)
@@ -3098,32 +3290,24 @@ function library:init()
                             self.bind = (keybind and keybind) or keybind or self.bind
                             if self.bind == Enum.KeyCode.Backspace then
                                 self.bind = 'none';
-
                                 if bind.flag then
                                     library.flags[bind.flag] = bind.state;
                                 end
-                                self.callback(true)
-                                local display = bind.state; if bind.invertindicator then display = not bind.state; end
-                                bind.indicatorValue:SetEnabled(display and not bind.noindicator);
                             else
                                 keyName = keyNames[keybind] or keybind.Name or keybind
                             end
-                            if self.bind ~= 'none' then
+
+                            if self.bind ~= 'none' and self.mode ~= 'always' then
                                 bind.state = false
                                 if bind.flag then
                                     library.flags[bind.flag] = bind.state;
                                 end
                                 self.callback(false)
-                                local display = bind.state; if bind.invertindicator then display = not bind.state; end
-                                bind.indicatorValue:SetEnabled(display and not bind.noindicator);
                             end
+
                             self.keycallback(self.bind);
                             self:SetKeyText(keyName:upper());
-                            self.indicatorValue:SetKey((self.text == nil or self.text == '') and (self.flag == nil and 'unknown' or self.flag) or self.text); -- this is so dumb
-                            self.indicatorValue:SetValue('['..keyName:upper()..']');
-                            if self.bind == 'none' then
-
-                            end
+                            self:UpdateIndicator();
                             self.objects.keyText.ThemeColor = self.objects.holder.Hover and 'Accent' or 'Option Text 3';
                         end
     
@@ -3142,11 +3326,6 @@ function library:init()
                                 local key = (table.find({Enum.UserInputType.MouseButton1, Enum.UserInputType.MouseButton2, Enum.UserInputType.MouseButton3}, inp.UserInputType) and not bind.nomouse) and inp.UserInputType
                                 bind:SetBind(key or (not table.find(blacklistedKeys, inp.KeyCode)) and inp.KeyCode)
                                 bind.binding = false
-                            elseif not bind.binding and self.bind == 'none' then
-                                bind.state = true
-                                library.flags[bind.flag] = bind.state
-                                local display = bind.state; if bind.invertindicator then display = not bind.state; end
-                                bind.indicatorValue:SetEnabled(display and not bind.noindicator)
                             elseif (inp.KeyCode == bind.bind or inp.UserInputType == bind.bind) and not bind.binding then
                                 local mode = string.lower(tostring(bind.mode or 'toggle'))
                                 if mode == 'toggle' then
@@ -3155,17 +3334,14 @@ function library:init()
                                         library.flags[bind.flag] = bind.state;
                                     end
                                     bind.callback(bind.state)
-                                    local display = bind.state; if bind.invertindicator then display = not bind.state; end
-                                    bind.indicatorValue:SetEnabled(display and not bind.noindicator);
+                                    bind:UpdateIndicator();
                                 elseif mode == 'hold' then
                                     bind.state = true
                                     if bind.flag then
                                         library.flags[bind.flag] = true;
                                     end
-                                    bind.indicatorValue:SetEnabled((not bind.invertindicator and true or false) and not bind.noindicator);
-                                    if bind.callback then
-                                        bind.callback(true);
-                                    end
+                                    bind.callback(true);
+                                    bind:UpdateIndicator();
                                 end
                             end
                         end)
@@ -3179,10 +3355,8 @@ function library:init()
                                         if bind.flag then
                                             library.flags[bind.flag] = false;
                                         end
-                                        if bind.callback then
-                                            bind.callback(false);
-                                        end
-                                        bind.indicatorValue:SetEnabled(bind.invertindicator and true or false);
+                                        bind.callback(false);
+                                        bind:UpdateIndicator();
                                     end
                                 end
                             end
@@ -4368,23 +4542,33 @@ function library:init()
                             local h,s,v = c3:ToHSV(); c3 = fromhsv(h, clamp(s,.005,.995), clamp(v,.005,.995));
                             self.color = c3;
                             self.objects.background.Color = c3;
-                            if not nocallback then
-                                self.callback(c3, self.trans);
-                            end
-                            if self.open then
-                                window.colorpicker:Visualize(self.color, self.trans);
-                            end
+                            local opacity = math.clamp(1 - (self.trans or 0), 0, 1);
+                            self.objects.background.Transparency = opacity;
                             if self.flag then
                                 library.flags[self.flag] = c3;
+                                library.flags[self.flag .. '_trans'] = self.trans or 0;
+                                library.flags[self.flag .. '_alpha'] = opacity;
+                            end
+                            if not nocallback then
+                                self.callback(c3, self.trans or 0, opacity);
+                            end
+                            if self.open then
+                                window.colorpicker:Visualize(self.color, self.trans or 0);
                             end
                         end
                     end
 
                     function color:SetTrans(trans, nocallback)
                         if typeof(trans) == 'number' then
-                            self.trans = trans;
+                            self.trans = math.clamp(trans, 0, 1);
+                            local opacity = 1 - self.trans;
+                            self.objects.background.Transparency = opacity;
+                            if self.flag then
+                                library.flags[self.flag .. '_trans'] = self.trans;
+                                library.flags[self.flag .. '_alpha'] = opacity;
+                            end
                             if not nocallback then
-                                self.callback(self.color, trans);
+                                self.callback(self.color, self.trans, opacity);
                             end
                             if self.open then
                                 window.colorpicker:Visualize(self.color, self.trans);
@@ -4689,6 +4873,7 @@ function library:init()
                         keycallback = function() end;
                         indicatorValue = library.keyIndicator:AddValue({value = 'value', key = 'key', enabled = false});
                         noindicator = false;
+                        invertindicator = false;
                         state = false;
                         nomouse = false;
                         enabled = true;
@@ -4708,6 +4893,9 @@ function library:init()
 
                     if bind.flag then
                         library.options[bind.flag] = bind;
+                        if library.flags[bind.flag .. '_mode'] then
+                            bind.mode = library.flags[bind.flag .. '_mode'];
+                        end
                     end
 
                     --- Create Objects ---
@@ -4755,16 +4943,72 @@ function library:init()
                             end
                         end)
 
+                        utility:Connection(objs.holder.MouseButton2Down, function()
+                            if window.keybindMenu then
+                                local mousePos = inputservice:GetMouseLocation()
+                                local winPos = window.objects.background.Object.Position
+                                local relPos = newUDim2(0, mousePos.X - winPos.X + 5, 0, mousePos.Y - winPos.Y + 5)
+                                window.keybindMenu:Open(bind, relPos)
+                            end
+                        end)
+
                     end
                     ----------------------
 
                     local c
 
+                    function bind:UpdateIndicator()
+                        if not self.indicatorValue then return end
+                        local isBound = (self.bind ~= 'none' and self.bind ~= nil) or self.mode == 'always';
+                        local shouldShow = isBound and not self.noindicator;
+                        self.indicatorValue:SetEnabled(shouldShow);
+                        
+                        local keyName = 'NONE';
+                        if self.mode == 'always' then
+                            keyName = 'ALWAYS';
+                        elseif self.bind and self.bind ~= 'none' then
+                            keyName = keyNames[self.bind] or (typeof(self.bind) == 'EnumItem' and self.bind.Name) or tostring(self.bind);
+                            keyName = keyName:upper();
+                        end
+                        
+                        local bindLabel = (self.text == nil or self.text == '') and (self.flag == nil and 'unknown' or self.flag) or self.text;
+                        self.indicatorValue:SetKey(bindLabel);
+                        local modeSuffix = (self.mode and self.mode ~= 'always') and (' [' .. self.mode:sub(1,1):upper() .. self.mode:sub(2) .. ']') or '';
+                        self.indicatorValue:SetValue('[' .. keyName .. ']' .. modeSuffix);
+                        self.indicatorValue:SetActive(self.state == true);
+                        library.keyIndicator:Update();
+                    end
+
+                    function bind:SetMode(newMode)
+                        newMode = string.lower(tostring(newMode or 'toggle'))
+                        if newMode ~= 'toggle' and newMode ~= 'hold' and newMode ~= 'always' then
+                            newMode = 'toggle'
+                        end
+                        self.mode = newMode;
+                        if self.flag then
+                            library.flags[self.flag .. '_mode'] = newMode;
+                        end
+                        if newMode == 'always' then
+                            self.state = true;
+                            if self.flag then
+                                library.flags[self.flag] = true;
+                            end
+                            self.callback(true);
+                        else
+                            self.state = false;
+                            if self.flag then
+                                library.flags[self.flag] = false;
+                            end
+                            self.callback(false);
+                        end
+                        self:UpdateIndicator();
+                    end
+
                     function bind:SetText(str)
                         if typeof(str) == 'string' then
                             self.text = str;
                             self.objects.text.Text = str;
-                            self.indicatorValue:SetKey(str);
+                            self:UpdateIndicator();
                         end
                     end
 
@@ -4780,13 +5024,24 @@ function library:init()
                         self.bind = (keybind and keybind) or keybind or self.bind
                         if self.bind == Enum.KeyCode.Backspace then
                             self.bind = 'none';
+                            if bind.flag then
+                                library.flags[bind.flag] = bind.state;
+                            end
                         else
                             keyName = keyNames[keybind] or keybind.Name or keybind
                         end
+
+                        if self.bind ~= 'none' and self.mode ~= 'always' then
+                            bind.state = false
+                            if bind.flag then
+                                library.flags[bind.flag] = bind.state;
+                            end
+                            self.callback(false)
+                        end
+
                         self.keycallback(self.bind);
                         self:SetKeyText(keyName:upper());
-                        self.indicatorValue:SetKey((self.text == nil or self.text == '') and (self.flag == nil and 'unknown' or self.flag) or self.text); -- this is so dumb
-                        self.indicatorValue:SetValue('['..keyName:upper()..']');
+                        self:UpdateIndicator();
                         self.objects.keyText.ThemeColor = self.objects.holder.Hover and 'Accent' or 'Option Text 3';
                     end
 
@@ -4803,9 +5058,6 @@ function library:init()
                             local key = (table.find({Enum.UserInputType.MouseButton1, Enum.UserInputType.MouseButton2, Enum.UserInputType.MouseButton3}, inp.UserInputType) and not bind.nomouse) and inp.UserInputType
                             bind:SetBind(key or (not table.find(blacklistedKeys, inp.KeyCode)) and inp.KeyCode)
                             bind.binding = false
-                        elseif not bind.binding and self.bind == 'none' then
-                            bind.state = true
-                            library.flags[bind.flag] = bind.state
                         elseif (inp.KeyCode == bind.bind or inp.UserInputType == bind.bind) and not bind.binding then
                             local mode = string.lower(tostring(bind.mode or 'toggle'))
                             if mode == 'toggle' then
@@ -4814,16 +5066,14 @@ function library:init()
                                     library.flags[bind.flag] = bind.state;
                                 end
                                 bind.callback(bind.state)
-                                bind.indicatorValue:SetEnabled(bind.state and not bind.noindicator);
+                                bind:UpdateIndicator();
                             elseif mode == 'hold' then
                                 bind.state = true
                                 if bind.flag then
                                     library.flags[bind.flag] = true;
                                 end
-                                bind.indicatorValue:SetEnabled(true and not bind.noindicator);
-                                if bind.callback then
-                                    bind.callback(true);
-                                end
+                                bind.callback(true);
+                                bind:UpdateIndicator();
                             end
                         end
                     end)
@@ -4837,10 +5087,8 @@ function library:init()
                                     if bind.flag then
                                         library.flags[bind.flag] = false;
                                     end
-                                    if bind.callback then
-                                        bind.callback(false);
-                                    end
-                                    bind.indicatorValue:SetEnabled(false);
+                                    bind.callback(false);
+                                    bind:UpdateIndicator();
                                 end
                             end
                         end
@@ -5271,6 +5519,9 @@ function library:init()
                     window.colorpicker.objects.background.Visible = false;
                     window.colorpicker.objects.background.Parent = window.objects.background;
                 end
+                if window.keybindMenu and window.keybindMenu.open then
+                    window.keybindMenu:Close();
+                end
                 window.selectedTab = tab;
                 window:UpdateTabs();
                 for i,v in next, window.tabs do
@@ -5298,6 +5549,7 @@ function library:init()
                 local objs = v.objects;
                 v.selected = v == self.selectedTab;
                 objs.background.ThemeColor = v.selected and 'Selected Tab Background' or 'Unselected Tab Background';
+                objs.background.Color = library.theme[objs.background.ThemeColor];
                 objs.background.Size = newUDim2(0, objs.text.TextBounds.X + 14, 1, v.selected and 1 or 0);
                 objs.background.Position = newUDim2(0, pos, 0, 0)
 
@@ -5531,9 +5783,15 @@ function library:init()
             lasttick = tick();
             library.watermark:Update();
         end
+
+        if self.open and inputservice.MouseIconEnabled then
+            pcall(function()
+                inputservice.MouseIconEnabled = false
+            end)
+        end
     end)
 
-    self.keyIndicator = self.NewIndicator({title = 'Keybinds', pos = newUDim2(0,15,0,325), enabled = true});
+    self.keyIndicator = self.NewIndicator({title = 'Keybinds', pos = newUDim2(0, 20, 0, 60), enabled = true});
     
     self.targetIndicator = self.NewIndicator({title = 'Target Info', pos = newUDim2(0,15,0,350), enabled = false});
     self.targetName = self.targetIndicator:AddValue({key = 'Name     :', value = 'nil'})
