@@ -586,6 +586,27 @@ do
         return (mousePos.X >= x1 and mousePos.Y >= y1 and mousePos.X <= x2 and mousePos.Y <= y2)
     end
 
+    function utility:IsInBounds(drawObj, mp, margin)
+        if not drawObj then return false end
+        local rawObj = drawObj.Object or drawObj
+        if not rawObj then return false end
+        local isVis = (drawObj.Visible ~= nil and drawObj.Visible)
+        if isVis == nil then
+            isVis = (rawObj.Visible ~= nil and rawObj.Visible)
+        end
+        if isVis == false then return false end
+        local pos = drawObj.AbsolutePosition or rawObj.Position
+        local size = drawObj.AbsoluteSize or rawObj.Size
+        if not pos or not size then return false end
+        mp = mp or inputservice:GetMouseLocation()
+        margin = margin or 2
+        local x1 = pos.X - margin
+        local y1 = pos.Y - margin
+        local x2 = pos.X + size.X + margin
+        local y2 = pos.Y + size.Y + margin
+        return (mp.X >= x1 and mp.X <= x2 and mp.Y >= y1 and mp.Y <= y2)
+    end
+
     function utility:GetHoverObject()
         if library.isDragging or library.draggingSlider ~= nil then return nil end
         local mousePos = inputservice:GetMouseLocation()
@@ -1011,6 +1032,59 @@ function library:init()
             if library.open then
                 local hoverObj = utility:GetHoverObject();
                 local hoverObjData = library.drawings[hoverObj];
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.MouseButton2 then
+                    local mp = inputservice:GetMouseLocation()
+                    for _, win in next, library.windows do
+                        -- Close Dropdown / Multi-select if clicked outside
+                        if win.dropdown and win.dropdown.selected then
+                            local list = win.dropdown.selected
+                            local ddBg = win.dropdown.objects and win.dropdown.objects.background
+                            local listHolder = list.objects and list.objects.holder
+                            local inDropdown = ddBg and ddBg.Visible and utility:IsInBounds(ddBg, mp)
+                            local inHolder = (listHolder and utility:IsInBounds(listHolder, mp))
+                                or (listHolder and listHolder.Parent and utility:IsInBounds(listHolder.Parent, mp))
+                            if not inDropdown and not inHolder then
+                                list.open = false
+                                if list.objects and list.objects.openText then
+                                    list.objects.openText.Text = '+'
+                                end
+                                if list.objects and list.objects.border1 then
+                                    list.objects.border1.ThemeColor = list.objects.holder and list.objects.holder.Hover and 'Accent' or 'Option Border 1'
+                                end
+                                if list.objects and list.objects.text then
+                                    list.objects.text.ThemeColor = list.objects.holder and list.objects.holder.Hover and (list.risky and 'Risky Text Enabled' or 'Option Text 1') or (list.risky and 'Risky Text' or 'Option Text 2')
+                                end
+                                win.dropdown.selected = nil
+                                if ddBg then
+                                    ddBg.Visible = false
+                                end
+                            end
+                        end
+
+                        -- Close Colorpicker if clicked outside
+                        if win.colorpicker and win.colorpicker.selected then
+                            local color = win.colorpicker.selected
+                            local cpBg = win.colorpicker.objects and win.colorpicker.objects.background
+                            local colorHolder = color.objects and color.objects.holder
+                            local inColorpicker = cpBg and cpBg.Visible and utility:IsInBounds(cpBg, mp)
+                            local inHolder = (colorHolder and utility:IsInBounds(colorHolder, mp))
+                                or (colorHolder and colorHolder.Parent and utility:IsInBounds(colorHolder.Parent, mp))
+                            if not inColorpicker and not inHolder then
+                                color:SetOpen(false)
+                            end
+                        end
+
+                        -- Close Keybind Menu if clicked outside
+                        if win.keybindMenu and win.keybindMenu.open then
+                            local kmBg = win.keybindMenu.objects and win.keybindMenu.objects.background
+                            local inKm = kmBg and kmBg.Visible and utility:IsInBounds(kmBg, mp)
+                            if not inKm then
+                                win.keybindMenu:Close()
+                            end
+                        end
+                    end
+                end
+
                 if input.UserInputType == Enum.UserInputType.MouseButton1 then
                     mb1down = true;
                     button1down:Fire()
@@ -1117,6 +1191,34 @@ function library:init()
         updateCursor();
         for _,window in next, self.windows do
             window:SetOpen(bool);
+        end
+
+        if not bool then
+            for _, win in next, self.windows do
+                if win.dropdown and win.dropdown.selected then
+                    local list = win.dropdown.selected
+                    list.open = false
+                    if list.objects and list.objects.openText then
+                        list.objects.openText.Text = '+'
+                    end
+                    if list.objects and list.objects.border1 then
+                        list.objects.border1.ThemeColor = 'Option Border 1'
+                    end
+                    if list.objects and list.objects.text then
+                        list.objects.text.ThemeColor = list.risky and 'Risky Text' or 'Option Text 2'
+                    end
+                    win.dropdown.selected = nil
+                    if win.dropdown.objects and win.dropdown.objects.background then
+                        win.dropdown.objects.background.Visible = false
+                    end
+                end
+                if win.colorpicker and win.colorpicker.selected then
+                    win.colorpicker.selected:SetOpen(false)
+                end
+                if win.keybindMenu and win.keybindMenu.open then
+                    win.keybindMenu:Close()
+                end
+            end
         end
 
         library.CurrentTooltip = nil;
@@ -1526,7 +1628,7 @@ function library:init()
         ----- Create Objects ----
         do
             local size = data.size or newUDim2(0, 525, 0, 650);
-            local position = data.position or newUDim2(1, -(size.X.Offset + 30), 0.5, -(size.Y.Offset / 2));
+            local position = data.position or newUDim2(1, -(size.X.Offset + 110), 0.5, -(size.Y.Offset / 2) + 70);
             local objs = window.objects;
             local z = library.zindexOrder.window;
 
@@ -2431,6 +2533,12 @@ function library:init()
                                     if not currentList.multi then
                                         currentList.open = false;
                                         currentList.objects.openText.Text = '+';
+                                        if currentList.objects.border1 then
+                                            currentList.objects.border1.ThemeColor = currentList.objects.holder.Hover and 'Accent' or 'Option Border 1';
+                                        end
+                                        if currentList.objects.text then
+                                            currentList.objects.text.ThemeColor = currentList.objects.holder.Hover and (currentList.risky and 'Risky Text Enabled' or 'Option Text 1') or (currentList.risky and 'Risky Text' or 'Option Text 2');
+                                        end
                                         window.dropdown.selected = nil;
                                         window.dropdown.objects.background.Visible = false;
                                     else
@@ -2495,6 +2603,30 @@ function library:init()
 
                 if bool then
                     self.objects.background.Visible = true;
+                else
+                    if self.dropdown and self.dropdown.selected then
+                        local list = self.dropdown.selected
+                        list.open = false
+                        if list.objects and list.objects.openText then
+                            list.objects.openText.Text = '+'
+                        end
+                        if list.objects and list.objects.border1 then
+                            list.objects.border1.ThemeColor = 'Option Border 1'
+                        end
+                        if list.objects and list.objects.text then
+                            list.objects.text.ThemeColor = list.risky and 'Risky Text' or 'Option Text 2'
+                        end
+                        self.dropdown.selected = nil
+                        if self.dropdown.objects and self.dropdown.objects.background then
+                            self.dropdown.objects.background.Visible = false
+                        end
+                    end
+                    if self.colorpicker and self.colorpicker.selected then
+                        self.colorpicker.selected:SetOpen(false)
+                    end
+                    if self.keybindMenu and self.keybindMenu.open then
+                        self.keybindMenu:Close()
+                    end
                 end
 
                 if self.fadeConn then
@@ -2614,21 +2746,49 @@ function library:init()
             function window.keybindMenu:Open(targetBind, pos)
                 self.selectedBind = targetBind;
                 self.open = true;
+
+                -- Clamp position within window bounds so it doesn't overflow
+                if window.objects.background and window.objects.background.Object then
+                    local winSize = window.objects.background.AbsoluteSize or window.objects.background.Object.Size
+                    local w, h = 95, 72
+                    local x = pos.X.Offset
+                    local y = pos.Y.Offset
+                    if x + w > winSize.X - 10 then
+                        x = winSize.X - w - 10
+                    end
+                    if y + h > winSize.Y - 10 then
+                        y = y - h - 10
+                    end
+                    pos = newUDim2(0, math.max(5, x), 0, math.max(5, y))
+                end
+
                 kmObjs.background.Position = pos;
                 kmObjs.background.Visible = true;
+                if kmObjs.border1 and kmObjs.border1.Object then kmObjs.border1.Object.Visible = true end
+                if kmObjs.border2 and kmObjs.border2.Object then kmObjs.border2.Object.Visible = true end
 
                 for modeName, item in pairs(kmObjs.items) do
+                    if item.holder and item.holder.Object then item.holder.Object.Visible = true end
+                    if item.text and item.text.Object then item.text.Object.Visible = true end
                     local isSel = string.lower(tostring(targetBind.mode or 'toggle')) == string.lower(modeName);
                     item.holder.Transparency = isSel and 1 or 0;
                     item.holder.Color = fromrgb(24, 24, 28);
                     item.text.ThemeColor = isSel and 'Accent' or 'Option Text 2';
                 end
+                kmObjs.background:Update();
             end
 
             function window.keybindMenu:Close()
                 self.open = false;
                 self.selectedBind = nil;
                 kmObjs.background.Visible = false;
+                for _, item in pairs(kmObjs.items) do
+                    if item.holder and item.holder.Object then item.holder.Object.Visible = false end
+                    if item.text and item.text.Object then item.text.Object.Visible = false end
+                end
+                if kmObjs.border1 and kmObjs.border1.Object then kmObjs.border1.Object.Visible = false end
+                if kmObjs.border2 and kmObjs.border2.Object then kmObjs.border2.Object.Visible = false end
+                kmObjs.background:Update();
             end
         end
 
@@ -2908,10 +3068,12 @@ function library:init()
 
                         utility:Connection(objs.holder.MouseEnter, function()
                             objs.border1.ThemeColor = 'Accent';
+                            objs.text.ThemeColor = toggle.risky and 'Risky Text Enabled' or 'Option Text 1';
                         end)
 
                         utility:Connection(objs.holder.MouseLeave, function()
                             objs.border1.ThemeColor = toggle.state and 'Accent' or 'Option Border 1';
+                            objs.text.ThemeColor = toggle.state and (toggle.risky and 'Risky Text Enabled' or 'Option Text 1') or (toggle.risky and 'Risky Text' or 'Option Text 3');
                         end)
 
                         utility:Connection(objs.holder.MouseButton1Down, function()
@@ -2929,7 +3091,7 @@ function library:init()
                             end
 
                             self.objects.border1.ThemeColor = bool and 'Accent' or (self.objects.holder.Hover and 'Accent' or 'Option Border 1');
-                            self.objects.text.ThemeColor = bool and (self.risky and 'Risky Text Enabled' or 'Option Text 1') or (self.risky and 'Risky Text' or 'Option Text 3');
+                            self.objects.text.ThemeColor = (bool or self.objects.holder.Hover) and (self.risky and 'Risky Text Enabled' or 'Option Text 1') or (self.risky and 'Risky Text' or 'Option Text 3');
                             self.objects.background.ThemeColor = bool and 'Accent' or 'Option Background';
                             self.objects.background.ThemeColorOffset = bool and -55 or 0
 
@@ -3473,10 +3635,12 @@ function library:init()
 
                             utility:Connection(objs.holder.MouseEnter, function()
                                 objs.border1.ThemeColor = 'Accent';
+                                objs.text.ThemeColor = 'Option Text 1';
                             end)
     
                             utility:Connection(objs.holder.MouseLeave, function()
                                 objs.border1.ThemeColor = slider.dragging and 'Accent' or 'Option Border 1';
+                                objs.text.ThemeColor = slider.dragging and 'Option Text 1' or 'Option Text 3';
                             end)
     
                             local c;
@@ -3518,6 +3682,7 @@ function library:init()
     
                             utility:Connection(button1up, function()
                                 objs.border1.ThemeColor = objs.holder.Hover and 'Accent' or 'Option Border 1';
+                                objs.text.ThemeColor = objs.holder.Hover and 'Option Text 1' or 'Option Text 3';
                                 if slider.dragging then
                                     slider.dragging = false;
                                     library.draggingSlider = nil;
@@ -3664,16 +3829,23 @@ function library:init()
     
                             utility:Connection(objs.holder.MouseEnter, function()
                                 objs.border1.ThemeColor = 'Accent';
+                                objs.inputText.ThemeColor = 'Option Text 1';
+                                objs.openText.ThemeColor = 'Option Text 1';
                             end)
     
                             utility:Connection(objs.holder.MouseLeave, function()
-                                objs.border1.ThemeColor = 'Option Border 1';
+                                objs.border1.ThemeColor = list.open and 'Accent' or 'Option Border 1';
+                                objs.inputText.ThemeColor = list.open and 'Option Text 1' or 'Option Text 2';
+                                objs.openText.ThemeColor = list.open and 'Option Text 1' or 'Option Text 3';
                             end)
     
                             utility:Connection(objs.holder.MouseButton1Down, function()
                                 if list.open then
                                     list.open = false;
                                     objs.openText.Text = '+';
+                                    objs.border1.ThemeColor = objs.holder.Hover and 'Accent' or 'Option Border 1';
+                                    objs.inputText.ThemeColor = objs.holder.Hover and 'Option Text 1' or 'Option Text 2';
+                                    objs.openText.ThemeColor = objs.holder.Hover and 'Option Text 1' or 'Option Text 3';
                                     if window.dropdown.selected == list then
                                         window.dropdown.selected = nil;
                                         window.dropdown.objects.background.Visible = false;
@@ -3684,6 +3856,9 @@ function library:init()
                                     end
                                     list.open = true;
                                     objs.openText.Text = '-';
+                                    objs.border1.ThemeColor = 'Accent';
+                                    objs.inputText.ThemeColor = 'Option Text 1';
+                                    objs.openText.ThemeColor = 'Option Text 1';
                                     window.dropdown.selected = list;
                                     window.dropdown.objects.background.Visible = true;
                                     window.dropdown.objects.background.Parent = objs.holder;
@@ -3853,6 +4028,43 @@ function library:init()
                             Parent = objs.holder;
                         })
 
+                        -- Value TextBox
+                        objs.valBox = utility:Draw('Square', {
+                            Size = newUDim2(0, 48, 0, 16);
+                            Position = newUDim2(1, -98, 0, 0);
+                            ThemeColor = 'Option Background';
+                            ZIndex = z + 3;
+                            Parent = objs.holder;
+                        })
+
+                        objs.valBorder1 = utility:Draw('Square', {
+                            Size = newUDim2(1, 2, 1, 2);
+                            Position = newUDim2(0, -1, 0, -1);
+                            ThemeColor = 'Option Border 1';
+                            ZIndex = z + 2;
+                            Parent = objs.valBox;
+                        })
+
+                        objs.valBorder2 = utility:Draw('Square', {
+                            Size = newUDim2(1, 2, 1, 2);
+                            Position = newUDim2(0, -1, 0, -1);
+                            ThemeColor = 'Option Border 2';
+                            ZIndex = z + 1;
+                            Parent = objs.valBorder1;
+                        })
+
+                        objs.valText = utility:Draw('Text', {
+                            Position = newUDim2(0.5, 0, 0, 1);
+                            ThemeColor = 'Option Text 1';
+                            Text = tostring(slider.value) .. tostring(slider.suffix);
+                            Size = 13;
+                            Font = 2;
+                            Center = true;
+                            Outline = true;
+                            ZIndex = z + 4;
+                            Parent = objs.valBox;
+                        })
+
                         objs.plusDetector = utility:Draw('Square', {
                             Size = newUDim2(0,22,0,18);
                             Position = newUDim2(1,-46,0,-1);
@@ -3913,55 +4125,171 @@ function library:init()
 
                         utility:Connection(objs.holder.MouseEnter, function()
                             objs.border1.ThemeColor = 'Accent';
+                            objs.text.ThemeColor = slider.risky and 'Risky Text Enabled' or 'Option Text 1';
                         end)
 
                         utility:Connection(objs.holder.MouseLeave, function()
                             objs.border1.ThemeColor = slider.dragging and 'Accent' or 'Option Border 1';
+                            objs.text.ThemeColor = slider.dragging and (slider.risky and 'Risky Text Enabled' or 'Option Text 1') or (slider.risky and 'Risky Text' or 'Option Text 3');
                         end)
 
-                        utility:Connection(slider.objects.plusDetector.MouseButton1Down,function()
+                        local function parseSliderKey(keyCode)
+                            local name = keyCode.Name
+                            if library.numberStrings[name] ~= nil then
+                                return tostring(library.numberStrings[name])
+                            end
+                            if name:sub(1, 6) == 'Keypad' then
+                                local sub = name:sub(7)
+                                if library.numberStrings[sub] ~= nil then
+                                    return tostring(library.numberStrings[sub])
+                                elseif sub == 'Period' then
+                                    return '.'
+                                elseif sub == 'Minus' then
+                                    return '-'
+                                end
+                            end
+                            if name == 'Period' then
+                                return '.'
+                            elseif name == 'Minus' then
+                                return '-'
+                            end
+                            return nil
+                        end
+
+                        local c, blinkConn;
+                        local inputNumber = '';
+
+                        local function releaseValueFocus(commit)
+                            if not slider.focused then return end
+                            slider.focused = false;
+                            if blinkConn then
+                                blinkConn:Disconnect();
+                                blinkConn = nil;
+                            end
+                            if c then
+                                c:Disconnect();
+                                c = nil;
+                            end
+                            objs.valBorder1.ThemeColor = 'Option Border 1';
+                            pcall(function() actionservice:UnbindAction('FreezeMovement') end)
+
+                            if commit then
+                                local num = tonumber(inputNumber);
+                                if num ~= nil then
+                                    slider:SetValue(num);
+                                else
+                                    slider:SetValue(slider.value);
+                                end
+                            else
+                                slider:SetValue(slider.value);
+                            end
+                        end
+
+                        local function captureValueFocus()
+                            if slider.focused then return end
+                            slider.focused = true;
+                            inputNumber = string.format("%.14g", slider.value);
+                            objs.valBorder1.ThemeColor = 'Accent';
+
+                            pcall(function()
+                                actionservice:BindAction(
+                                    'FreezeMovement',
+                                    function() return Enum.ContextActionResult.Sink end,
+                                    false,
+                                    unpack(Enum.PlayerActions:GetEnumItems())
+                                )
+                            end)
+
+                            local blink = true
+                            local lastBlink = tick()
+                            objs.valText.Text = inputNumber .. '|';
+
+                            blinkConn = utility:Connection(runservice.RenderStepped, function()
+                                if slider.focused then
+                                    if tick() - lastBlink > 0.45 then
+                                        blink = not blink
+                                        lastBlink = tick()
+                                        objs.valText.Text = inputNumber .. (blink and '|' or '')
+                                    end
+                                end
+                            end)
+
+                            c = utility:Connection(inputservice.InputBegan, function(inp)
+                                if inp.KeyCode == Enum.KeyCode.Return or inp.KeyCode == Enum.KeyCode.KeypadEnter then
+                                    releaseValueFocus(true);
+                                elseif inp.KeyCode == Enum.KeyCode.Escape then
+                                    releaseValueFocus(false);
+                                elseif inp.UserInputType == Enum.UserInputType.MouseButton1 then
+                                    local mp = inputservice:GetMouseLocation();
+                                    local bp = objs.valBox.Object.Position;
+                                    local bs = objs.valBox.Object.Size;
+                                    if not (mp.X >= bp.X and mp.X <= bp.X + bs.X and mp.Y >= bp.Y and mp.Y <= bp.Y + bs.Y) then
+                                        releaseValueFocus(true);
+                                    end
+                                elseif inp.KeyCode == Enum.KeyCode.Backspace then
+                                    inputNumber = inputNumber:sub(1, -2);
+                                    blink = true;
+                                    lastBlink = tick();
+                                    objs.valText.Text = inputNumber .. '|';
+                                else
+                                    local char = parseSliderKey(inp.KeyCode);
+                                    if char ~= nil then
+                                        if char == '-' and #inputNumber > 0 then
+                                            -- don't allow minus in middle
+                                        elseif char == '.' and inputNumber:find('%.') then
+                                            -- don't allow multiple dots
+                                        else
+                                            inputNumber = inputNumber .. char;
+                                            blink = true;
+                                            lastBlink = tick();
+                                            objs.valText.Text = inputNumber .. '|';
+                                        end
+                                    end
+                                end
+                            end)
+                        end
+
+                        utility:Connection(objs.valBox.MouseEnter, function()
+                            if not slider.focused then
+                                objs.valBorder1.ThemeColor = 'Accent';
+                            end
+                        end)
+
+                        utility:Connection(objs.valBox.MouseLeave, function()
+                            if not slider.focused then
+                                objs.valBorder1.ThemeColor = 'Option Border 1';
+                            end
+                        end)
+
+                        utility:Connection(objs.valBox.MouseButton1Down, function()
+                            captureValueFocus();
+                        end)
+
+                        utility:Connection(objs.text.MouseButton1Down, function()
+                            captureValueFocus();
+                        end)
+
+                        utility:Connection(slider.objects.plusDetector.MouseButton1Down, function()
+                            if slider.focused then releaseValueFocus(true) end
                             slider:SetValue(slider.value + (inputservice:IsKeyDown(Enum.KeyCode.LeftShift) and 10 or slider.increment))
                         end)
-    
-                        utility:Connection(slider.objects.minusDetector.MouseButton1Down,function()
+
+                        utility:Connection(slider.objects.minusDetector.MouseButton1Down, function()
+                            if slider.focused then releaseValueFocus(true) end
                             slider:SetValue(slider.value - (inputservice:IsKeyDown(Enum.KeyCode.LeftShift) and 10 or slider.increment))
                         end)
 
+                        utility:Connection(objs.background.MouseButton1Down, function()
+                            if slider.focused then releaseValueFocus(true) end
+                            slider.dragging = true;
+                            library.draggingSlider = slider;
+                            library.isDragging = true;
+                        end)
 
-                        local c;
-                        local inputNumber = '';
-                        utility:Connection(slider.objects.holder.MouseButton1Down, function()
-                            if inputservice:IsKeyDown(Enum.KeyCode.LeftControl) then
-                                if slider.focused then
-                                    slider.focused = false;
-                                    c:Disconnect();
-                                else
-                                    objs.text.Text = slider.text..': '..tostring(slider.value)..tostring(slider.suffix)..' []';
-                                    slider.focused = true;
-                                    inputNumber = '';
-                                    c = utility:Connection(inputservice.InputBegan, function(inp)
-                                        if library.numberStrings[inp.KeyCode.Name] then
-                                            local number = library.numberStrings[inp.KeyCode.Name];
-                                            inputNumber = inputNumber..tostring(number);
-                                            objs.text.Text = slider.text..': '..string.format("%.14g",slider.value)..tostring(slider.suffix)..' ['..inputNumber..']';
-                                        elseif inp.KeyCode == Enum.KeyCode.Backspace then
-                                            inputNumber = inputNumber:sub(1,-2);
-                                            objs.text.Text = slider.text..': '..string.format("%.14g",slider.value)..tostring(slider.suffix)..' ['..inputNumber..']';
-                                        elseif inp.KeyCode == Enum.KeyCode.Return then
-                                            slider:SetValue(tonumber(inputNumber))
-                                            slider.focused = false;
-                                            c:Disconnect();
-                                        elseif inp.KeyCode == Enum.KeyCode.Escape then
-                                            slider:SetValue(slider.value, true)
-                                            slider.focused = false;
-                                            c:Disconnect();
-                                        end
-                                    end)
-
-                                end
-
-
-                            else
+                        utility:Connection(objs.holder.MouseButton1Down, function(pos)
+                            local relY = pos.Y - objs.holder.Object.Position.Y
+                            if relY >= 18 then
+                                if slider.focused then releaseValueFocus(true) end
                                 slider.dragging = true;
                                 library.draggingSlider = slider;
                                 library.isDragging = true;
@@ -3970,6 +4298,7 @@ function library:init()
 
                         utility:Connection(button1up, function()
                             objs.border1.ThemeColor = objs.holder.Hover and 'Accent' or 'Option Border 1';
+                            objs.text.ThemeColor = objs.holder.Hover and (slider.risky and 'Risky Text Enabled' or 'Option Text 1') or (slider.risky and 'Risky Text' or 'Option Text 3');
                             if slider.dragging then
                                 slider.dragging = false;
                                 library.draggingSlider = nil;
@@ -3982,7 +4311,7 @@ function library:init()
 
                     function slider:SetValue(value, nocallback)
                         if typeof(value) == 'number' then
-                            local newValue = clamp(self.increment * floor(value/self.increment), self.min, self.max);
+                            local newValue = clamp(self.increment * floor((value/self.increment) + 0.5), self.min, self.max);
                             local size, pos = self.objects.slider.Size, self.objects.slider.Position;
 
                             if self.min >= 0 then
@@ -4002,8 +4331,11 @@ function library:init()
 
                             self.value = newValue;
                             library.flags[self.flag] = newValue;
-                            self.objects.text.Text = slider.text..': '..string.format("%.14g",newValue)..tostring(self.suffix);
-                            self.objects.text.ThemeColor = (self.min < 0 and newValue == 0 or newValue == self.min)  and (self.risky and 'Risky Text' or 'Option Text 3') or (self.risky and 'Risky Text Enabled' or 'Option Text 1');
+                            self.objects.text.Text = slider.text;
+                            if not self.focused then
+                                self.objects.valText.Text = string.format("%.14g", newValue) .. tostring(self.suffix);
+                            end
+                            self.objects.text.ThemeColor = (self.min < 0 and newValue == 0 or newValue == self.min) and (self.risky and 'Risky Text' or 'Option Text 3') or (self.risky and 'Risky Text Enabled' or 'Option Text 1');
 
                             if not nocallback then
                                 self.callback(newValue);
@@ -4015,7 +4347,7 @@ function library:init()
                     function slider:SetText(str)
                         if typeof(str) == 'string' then
                             self.text = str;
-                            self.objects.text.Text = str..': '..tostring(self.value)..tostring(self.suffix);
+                            self.objects.text.Text = str;
                         end
                     end
 
@@ -4113,17 +4445,18 @@ function library:init()
 
                         utility:Connection(objs.holder.MouseEnter, function()
                             objs.border1.ThemeColor = 'Accent';
+                            objs.text.ThemeColor = button.risky and 'Risky Text Enabled' or 'Option Text 1';
                         end)
 
                         utility:Connection(objs.holder.MouseLeave, function()
                             objs.border1.ThemeColor = 'Option Border 1';
-                            objs.text.ThemeColor = self.risky and 'Risky Text' or 'Option Text 3';
+                            objs.text.ThemeColor = button.risky and 'Risky Text' or 'Option Text 3';
                             objs.background.ThemeColor = 'Option Background';
                             objs.background.ThemeColorOffset = 0;
                         end)
 
                         utility:Connection(objs.holder.MouseButton1Up, function()
-                            objs.text.ThemeColor = self.risky and 'Risky Text' or  'Option Text 3';
+                            objs.text.ThemeColor = objs.holder.Hover and (button.risky and 'Risky Text Enabled' or 'Option Text 1') or (button.risky and 'Risky Text' or 'Option Text 3');
                             objs.background.ThemeColor = 'Option Background';
                             objs.background.ThemeColorOffset = 0;
                         end)
@@ -4248,17 +4581,18 @@ function library:init()
     
                             utility:Connection(objs.holder.MouseEnter, function()
                                 objs.border1.ThemeColor = 'Accent';
+                                objs.text.ThemeColor = button.risky and 'Risky Text Enabled' or 'Option Text 1';
                             end)
     
                             utility:Connection(objs.holder.MouseLeave, function()
                                 objs.border1.ThemeColor = 'Option Border 1';
-                                objs.text.ThemeColor = self.risky and 'Risky Text' or 'Option Text 3';
+                                objs.text.ThemeColor = button.risky and 'Risky Text' or 'Option Text 3';
                                 objs.background.ThemeColor = 'Option Background';
                                 objs.background.ThemeColorOffset = 0;
                             end)
     
                             utility:Connection(objs.holder.MouseButton1Up, function()
-                                objs.text.ThemeColor = self.risky and 'Risky Text' or 'Option Text 3';
+                                objs.text.ThemeColor = objs.holder.Hover and (button.risky and 'Risky Text Enabled' or 'Option Text 1') or (button.risky and 'Risky Text' or 'Option Text 3');
                                 objs.background.ThemeColor = 'Option Background';
                                 objs.background.ThemeColorOffset = 0;
                             end)
@@ -4526,10 +4860,12 @@ function library:init()
 
                         utility:Connection(objs.holder.MouseEnter, function()
                             objs.border1.ThemeColor = 'Accent';
+                            objs.text.ThemeColor = color.risky and 'Risky Text Enabled' or 'Option Text 1';
                         end)
 
                         utility:Connection(objs.holder.MouseLeave, function()
-                            objs.border1.ThemeColor = color.state and 'Accent' or 'Option Border 1';
+                            objs.border1.ThemeColor = color.open and 'Accent' or 'Option Border 1';
+                            objs.text.ThemeColor = color.open and (color.risky and 'Risky Text Enabled' or 'Option Text 1') or (color.risky and 'Risky Text' or 'Option Text 3');
                         end)
 
                         utility:Connection(objs.holder.MouseButton1Down, function()
@@ -4588,9 +4924,17 @@ function library:init()
                     function color:SetOpen(bool)
                         if typeof(bool) == 'boolean' then
                             self.open = bool
+                            self.objects.border1.ThemeColor = (bool or self.objects.holder.Hover) and 'Accent' or 'Option Border 1';
+                            self.objects.text.ThemeColor = (bool or self.objects.holder.Hover) and (self.risky and 'Risky Text Enabled' or 'Option Text 1') or (self.risky and 'Risky Text' or 'Option Text 3');
                             if bool then
                                 if window.colorpicker.selected then
                                     window.colorpicker.selected.open = false;
+                                    if window.colorpicker.selected.objects and window.colorpicker.selected.objects.border1 then
+                                        window.colorpicker.selected.objects.border1.ThemeColor = 'Option Border 1';
+                                    end
+                                    if window.colorpicker.selected.objects and window.colorpicker.selected.objects.text then
+                                        window.colorpicker.selected.objects.text.ThemeColor = window.colorpicker.selected.risky and 'Risky Text' or 'Option Text 3';
+                                    end
                                 end
                                 window.colorpicker.selected = color
                                 window.colorpicker.objects.background.Parent = self.objects.background;
@@ -4707,11 +5051,13 @@ function library:init()
 
                         utility:Connection(objs.holder.MouseEnter, function()
                             objs.border1.ThemeColor = 'Accent';
+                            objs.text.ThemeColor = box.risky and 'Risky Text Enabled' or 'Option Text 1';
                         end)
 
                         utility:Connection(objs.holder.MouseLeave, function()
                             if not box.focused then
                                 objs.border1.ThemeColor = 'Option Border 1';
+                                objs.text.ThemeColor = box.risky and 'Risky Text' or 'Option Text 2';
                             end
                         end)
 
@@ -4841,7 +5187,8 @@ function library:init()
                     function box:ReleaseFocus(apply)
                         if not box.focused then return end
                         box.focused = false;
-                        self.objects.border1.ThemeColor = 'Option Border 1';
+                        self.objects.border1.ThemeColor = self.objects.holder.Hover and 'Accent' or 'Option Border 1';
+                        self.objects.text.ThemeColor = self.objects.holder.Hover and (self.risky and 'Risky Text Enabled' or 'Option Text 1') or (self.risky and 'Risky Text' or 'Option Text 2');
                         self.objects.inputText.ThemeColor = 'Option Text 2';
                         if blinkConn then
                             blinkConn:Disconnect();
@@ -4940,10 +5287,12 @@ function library:init()
 
                         utility:Connection(objs.holder.MouseEnter, function()
                             objs.keyText.ThemeColor = 'Accent';
+                            objs.text.ThemeColor = bind.risky and 'Risky Text Enabled' or 'Option Text 1';
                         end)
 
                         utility:Connection(objs.holder.MouseLeave, function()
                             objs.keyText.ThemeColor = bind.binding and 'Accent' or 'Option Text 3';
+                            objs.text.ThemeColor = bind.binding and (bind.risky and 'Risky Text Enabled' or 'Option Text 1') or (bind.risky and 'Risky Text' or 'Option Text 2');
                         end)
 
                         utility:Connection(objs.holder.MouseButton1Down, function()
@@ -5053,6 +5402,7 @@ function library:init()
                         self:SetKeyText(keyName:upper());
                         self:UpdateIndicator();
                         self.objects.keyText.ThemeColor = self.objects.holder.Hover and 'Accent' or 'Option Text 3';
+                        self.objects.text.ThemeColor = self.objects.holder.Hover and (self.risky and 'Risky Text Enabled' or 'Option Text 1') or (self.risky and 'Risky Text' or 'Option Text 2');
                     end
 
                     function bind:SetKeyText(str)
@@ -5221,16 +5571,20 @@ function library:init()
 
                         utility:Connection(objs.holder.MouseEnter, function()
                             objs.border1.ThemeColor = 'Accent';
+                            objs.text.ThemeColor = list.risky and 'Risky Text Enabled' or 'Option Text 1';
                         end)
 
                         utility:Connection(objs.holder.MouseLeave, function()
-                            objs.border1.ThemeColor = 'Option Border 1';
+                            objs.border1.ThemeColor = list.open and 'Accent' or 'Option Border 1';
+                            objs.text.ThemeColor = list.open and (list.risky and 'Risky Text Enabled' or 'Option Text 1') or (list.risky and 'Risky Text' or 'Option Text 2');
                         end)
 
                         utility:Connection(objs.holder.MouseButton1Down, function()
                             if list.open then
                                 list.open = false;
                                 objs.openText.Text = '+';
+                                objs.border1.ThemeColor = objs.holder.Hover and 'Accent' or 'Option Border 1';
+                                objs.text.ThemeColor = objs.holder.Hover and (list.risky and 'Risky Text Enabled' or 'Option Text 1') or (list.risky and 'Risky Text' or 'Option Text 2');
                                 if window.dropdown.selected == list then
                                     window.dropdown.selected = nil;
                                     window.dropdown.objects.background.Visible = false;
@@ -5238,9 +5592,20 @@ function library:init()
                             else
                                 if window.dropdown.selected ~= nil then
                                     window.dropdown.selected.open = false
+                                    if window.dropdown.selected.objects and window.dropdown.selected.objects.openText then
+                                        window.dropdown.selected.objects.openText.Text = '+';
+                                    end
+                                    if window.dropdown.selected.objects and window.dropdown.selected.objects.border1 then
+                                        window.dropdown.selected.objects.border1.ThemeColor = 'Option Border 1';
+                                    end
+                                    if window.dropdown.selected.objects and window.dropdown.selected.objects.text then
+                                        window.dropdown.selected.objects.text.ThemeColor = window.dropdown.selected.risky and 'Risky Text' or 'Option Text 2';
+                                    end
                                 end
                                 list.open = true;
                                 objs.openText.Text = '-';
+                                objs.border1.ThemeColor = 'Accent';
+                                objs.text.ThemeColor = list.risky and 'Risky Text Enabled' or 'Option Text 1';
                                 window.dropdown.selected = list;
                                 window.dropdown.objects.background.Visible = true;
                                 window.dropdown.objects.background.Parent = objs.holder;
@@ -5520,11 +5885,23 @@ function library:init()
                     if window.dropdown.selected.objects and window.dropdown.selected.objects.openText then
                         window.dropdown.selected.objects.openText.Text = '+';
                     end
+                    if window.dropdown.selected.objects and window.dropdown.selected.objects.border1 then
+                        window.dropdown.selected.objects.border1.ThemeColor = 'Option Border 1';
+                    end
+                    if window.dropdown.selected.objects and window.dropdown.selected.objects.text then
+                        window.dropdown.selected.objects.text.ThemeColor = window.dropdown.selected.risky and 'Risky Text' or 'Option Text 2';
+                    end
                     window.dropdown.selected = nil;
                     window.dropdown.objects.background.Visible = false;
                 end
                 if window.colorpicker and window.colorpicker.selected then
                     window.colorpicker.selected.open = false;
+                    if window.colorpicker.selected.objects and window.colorpicker.selected.objects.border1 then
+                        window.colorpicker.selected.objects.border1.ThemeColor = 'Option Border 1';
+                    end
+                    if window.colorpicker.selected.objects and window.colorpicker.selected.objects.text then
+                        window.colorpicker.selected.objects.text.ThemeColor = window.colorpicker.selected.risky and 'Risky Text' or 'Option Text 3';
+                    end
                     window.colorpicker.selected = nil;
                     window.colorpicker.objects.background.Visible = false;
                     window.colorpicker.objects.background.Parent = window.objects.background;
@@ -5802,7 +6179,7 @@ function library:init()
         end
     end)
 
-    self.keyIndicator = self.NewIndicator({title = 'Keybinds', pos = newUDim2(0, 20, 0, 60), enabled = true});
+    self.keyIndicator = self.NewIndicator({title = 'Keybinds', pos = newUDim2(0, 20, 1, -220), enabled = true});
     
     self.targetIndicator = self.NewIndicator({title = 'Target Info', pos = newUDim2(0,15,0,350), enabled = false});
     self.targetName = self.targetIndicator:AddValue({key = 'Name     :', value = 'nil'})
