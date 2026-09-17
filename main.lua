@@ -862,8 +862,37 @@ function library:init()
 
     safeMakeFolder(self.cheatname)
     safeMakeFolder(self.cheatname..'/assets')
+    safeMakeFolder(self.cheatname..'/logs')
     safeMakeFolder(self.cheatname..'/'..self.gamename)
     safeMakeFolder(self.cheatname..'/'..self.gamename..'/configs');
+
+    function self:Log(...)
+        local args = {...}
+        local parts = {}
+        for i = 1, #args do
+            local val = args[i]
+            if typeof(val) == 'Color3' then
+                parts[i] = string.format("Color3(%.3f, %.3f, %.3f)", val.R, val.G, val.B)
+            elseif typeof(val) == 'table' then
+                local s, encoded = pcall(function() return http:JSONEncode(val) end)
+                parts[i] = s and encoded or tostring(val)
+            else
+                parts[i] = tostring(val)
+            end
+        end
+        local line = os.date('[%X] ') .. table.concat(parts, ' ') .. '\n'
+        pcall(function()
+            local logDir = self.cheatname..'/logs'
+            safeMakeFolder(logDir)
+            local logFile = logDir..'/actions.log'
+            if appendfile then
+                appendfile(logFile, line)
+            elseif writefile then
+                local prev = isfile and isfile(logFile) and readfile(logFile) or ''
+                writefile(logFile, prev .. line)
+            end
+        end)
+    end
 
     function self:SetTheme(theme)
         for i,v in next, theme do
@@ -4028,43 +4057,6 @@ function library:init()
                             Parent = objs.holder;
                         })
 
-                        -- Value TextBox
-                        objs.valBox = utility:Draw('Square', {
-                            Size = newUDim2(0, 48, 0, 16);
-                            Position = newUDim2(1, -98, 0, 0);
-                            ThemeColor = 'Option Background';
-                            ZIndex = z + 3;
-                            Parent = objs.holder;
-                        })
-
-                        objs.valBorder1 = utility:Draw('Square', {
-                            Size = newUDim2(1, 2, 1, 2);
-                            Position = newUDim2(0, -1, 0, -1);
-                            ThemeColor = 'Option Border 1';
-                            ZIndex = z + 2;
-                            Parent = objs.valBox;
-                        })
-
-                        objs.valBorder2 = utility:Draw('Square', {
-                            Size = newUDim2(1, 2, 1, 2);
-                            Position = newUDim2(0, -1, 0, -1);
-                            ThemeColor = 'Option Border 2';
-                            ZIndex = z + 1;
-                            Parent = objs.valBorder1;
-                        })
-
-                        objs.valText = utility:Draw('Text', {
-                            Position = newUDim2(0.5, 0, 0, 1);
-                            ThemeColor = 'Option Text 1';
-                            Text = tostring(slider.value) .. tostring(slider.suffix);
-                            Size = 13;
-                            Font = 2;
-                            Center = true;
-                            Outline = true;
-                            ZIndex = z + 4;
-                            Parent = objs.valBox;
-                        })
-
                         objs.plusDetector = utility:Draw('Square', {
                             Size = newUDim2(0,22,0,18);
                             Position = newUDim2(1,-46,0,-1);
@@ -4130,166 +4122,48 @@ function library:init()
 
                         utility:Connection(objs.holder.MouseLeave, function()
                             objs.border1.ThemeColor = slider.dragging and 'Accent' or 'Option Border 1';
-                            objs.text.ThemeColor = slider.dragging and (slider.risky and 'Risky Text Enabled' or 'Option Text 1') or (slider.risky and 'Risky Text' or 'Option Text 3');
-                        end)
-
-                        local function parseSliderKey(keyCode)
-                            local name = keyCode.Name
-                            if library.numberStrings[name] ~= nil then
-                                return tostring(library.numberStrings[name])
-                            end
-                            if name:sub(1, 6) == 'Keypad' then
-                                local sub = name:sub(7)
-                                if library.numberStrings[sub] ~= nil then
-                                    return tostring(library.numberStrings[sub])
-                                elseif sub == 'Period' then
-                                    return '.'
-                                elseif sub == 'Minus' then
-                                    return '-'
-                                end
-                            end
-                            if name == 'Period' then
-                                return '.'
-                            elseif name == 'Minus' then
-                                return '-'
-                            end
-                            return nil
-                        end
-
-                        local c, blinkConn;
-                        local inputNumber = '';
-
-                        local function releaseValueFocus(commit)
-                            if not slider.focused then return end
-                            slider.focused = false;
-                            if blinkConn then
-                                blinkConn:Disconnect();
-                                blinkConn = nil;
-                            end
-                            if c then
-                                c:Disconnect();
-                                c = nil;
-                            end
-                            objs.valBorder1.ThemeColor = 'Option Border 1';
-                            pcall(function() actionservice:UnbindAction('FreezeMovement') end)
-
-                            if commit then
-                                local num = tonumber(inputNumber);
-                                if num ~= nil then
-                                    slider:SetValue(num);
-                                else
-                                    slider:SetValue(slider.value);
-                                end
-                            else
-                                slider:SetValue(slider.value);
-                            end
-                        end
-
-                        local function captureValueFocus()
-                            if slider.focused then return end
-                            slider.focused = true;
-                            inputNumber = string.format("%.14g", slider.value);
-                            objs.valBorder1.ThemeColor = 'Accent';
-
-                            pcall(function()
-                                actionservice:BindAction(
-                                    'FreezeMovement',
-                                    function() return Enum.ContextActionResult.Sink end,
-                                    false,
-                                    unpack(Enum.PlayerActions:GetEnumItems())
-                                )
-                            end)
-
-                            local blink = true
-                            local lastBlink = tick()
-                            objs.valText.Text = inputNumber .. '|';
-
-                            blinkConn = utility:Connection(runservice.RenderStepped, function()
-                                if slider.focused then
-                                    if tick() - lastBlink > 0.45 then
-                                        blink = not blink
-                                        lastBlink = tick()
-                                        objs.valText.Text = inputNumber .. (blink and '|' or '')
-                                    end
-                                end
-                            end)
-
-                            c = utility:Connection(inputservice.InputBegan, function(inp)
-                                if inp.KeyCode == Enum.KeyCode.Return or inp.KeyCode == Enum.KeyCode.KeypadEnter then
-                                    releaseValueFocus(true);
-                                elseif inp.KeyCode == Enum.KeyCode.Escape then
-                                    releaseValueFocus(false);
-                                elseif inp.UserInputType == Enum.UserInputType.MouseButton1 then
-                                    local mp = inputservice:GetMouseLocation();
-                                    local bp = objs.valBox.Object.Position;
-                                    local bs = objs.valBox.Object.Size;
-                                    if not (mp.X >= bp.X and mp.X <= bp.X + bs.X and mp.Y >= bp.Y and mp.Y <= bp.Y + bs.Y) then
-                                        releaseValueFocus(true);
-                                    end
-                                elseif inp.KeyCode == Enum.KeyCode.Backspace then
-                                    inputNumber = inputNumber:sub(1, -2);
-                                    blink = true;
-                                    lastBlink = tick();
-                                    objs.valText.Text = inputNumber .. '|';
-                                else
-                                    local char = parseSliderKey(inp.KeyCode);
-                                    if char ~= nil then
-                                        if char == '-' and #inputNumber > 0 then
-                                            -- don't allow minus in middle
-                                        elseif char == '.' and inputNumber:find('%.') then
-                                            -- don't allow multiple dots
-                                        else
-                                            inputNumber = inputNumber .. char;
-                                            blink = true;
-                                            lastBlink = tick();
-                                            objs.valText.Text = inputNumber .. '|';
-                                        end
-                                    end
-                                end
-                            end)
-                        end
-
-                        utility:Connection(objs.valBox.MouseEnter, function()
-                            if not slider.focused then
-                                objs.valBorder1.ThemeColor = 'Accent';
-                            end
-                        end)
-
-                        utility:Connection(objs.valBox.MouseLeave, function()
-                            if not slider.focused then
-                                objs.valBorder1.ThemeColor = 'Option Border 1';
-                            end
-                        end)
-
-                        utility:Connection(objs.valBox.MouseButton1Down, function()
-                            captureValueFocus();
-                        end)
-
-                        utility:Connection(objs.text.MouseButton1Down, function()
-                            captureValueFocus();
+                            objs.text.ThemeColor = slider.dragging and (slider.risky and 'Risky Text Enabled' or 'Option Text 1') or ((slider.min < 0 and slider.value == 0 or slider.value == slider.min) and (slider.risky and 'Risky Text' or 'Option Text 3') or (slider.risky and 'Risky Text Enabled' or 'Option Text 1'));
                         end)
 
                         utility:Connection(slider.objects.plusDetector.MouseButton1Down, function()
-                            if slider.focused then releaseValueFocus(true) end
                             slider:SetValue(slider.value + (inputservice:IsKeyDown(Enum.KeyCode.LeftShift) and 10 or slider.increment))
                         end)
 
                         utility:Connection(slider.objects.minusDetector.MouseButton1Down, function()
-                            if slider.focused then releaseValueFocus(true) end
                             slider:SetValue(slider.value - (inputservice:IsKeyDown(Enum.KeyCode.LeftShift) and 10 or slider.increment))
                         end)
 
-                        utility:Connection(objs.background.MouseButton1Down, function()
-                            if slider.focused then releaseValueFocus(true) end
-                            slider.dragging = true;
-                            library.draggingSlider = slider;
-                            library.isDragging = true;
-                        end)
-
-                        utility:Connection(objs.holder.MouseButton1Down, function(pos)
-                            local relY = pos.Y - objs.holder.Object.Position.Y
-                            if relY >= 18 then
-                                if slider.focused then releaseValueFocus(true) end
+                        local c;
+                        local inputNumber = '';
+                        utility:Connection(slider.objects.holder.MouseButton1Down, function()
+                            if inputservice:IsKeyDown(Enum.KeyCode.LeftControl) then
+                                if slider.focused then
+                                    slider.focused = false;
+                                    if c then c:Disconnect() end;
+                                else
+                                    objs.text.Text = slider.text..': '..string.format("%.14g", slider.value)..tostring(slider.suffix)..' []';
+                                    slider.focused = true;
+                                    inputNumber = '';
+                                    c = utility:Connection(inputservice.InputBegan, function(inp)
+                                        if library.numberStrings[inp.KeyCode.Name] then
+                                            local number = library.numberStrings[inp.KeyCode.Name];
+                                            inputNumber = inputNumber..tostring(number);
+                                            objs.text.Text = slider.text..': '..string.format("%.14g", slider.value)..tostring(slider.suffix)..' ['..inputNumber..']';
+                                        elseif inp.KeyCode == Enum.KeyCode.Backspace then
+                                            inputNumber = inputNumber:sub(1,-2);
+                                            objs.text.Text = slider.text..': '..string.format("%.14g", slider.value)..tostring(slider.suffix)..' ['..inputNumber..']';
+                                        elseif inp.KeyCode == Enum.KeyCode.Return then
+                                            slider:SetValue(tonumber(inputNumber))
+                                            slider.focused = false;
+                                            if c then c:Disconnect() end;
+                                        elseif inp.KeyCode == Enum.KeyCode.Escape then
+                                            slider:SetValue(slider.value, true)
+                                            slider.focused = false;
+                                            if c then c:Disconnect() end;
+                                        end
+                                    end)
+                                end
+                            else
                                 slider.dragging = true;
                                 library.draggingSlider = slider;
                                 library.isDragging = true;
@@ -4298,7 +4172,7 @@ function library:init()
 
                         utility:Connection(button1up, function()
                             objs.border1.ThemeColor = objs.holder.Hover and 'Accent' or 'Option Border 1';
-                            objs.text.ThemeColor = objs.holder.Hover and (slider.risky and 'Risky Text Enabled' or 'Option Text 1') or (slider.risky and 'Risky Text' or 'Option Text 3');
+                            objs.text.ThemeColor = objs.holder.Hover and (slider.risky and 'Risky Text Enabled' or 'Option Text 1') or ((slider.min < 0 and slider.value == 0 or slider.value == slider.min) and (slider.risky and 'Risky Text' or 'Option Text 3') or (slider.risky and 'Risky Text Enabled' or 'Option Text 1'));
                             if slider.dragging then
                                 slider.dragging = false;
                                 library.draggingSlider = nil;
@@ -4331,10 +4205,7 @@ function library:init()
 
                             self.value = newValue;
                             library.flags[self.flag] = newValue;
-                            self.objects.text.Text = slider.text;
-                            if not self.focused then
-                                self.objects.valText.Text = string.format("%.14g", newValue) .. tostring(self.suffix);
-                            end
+                            self.objects.text.Text = self.text..': '..string.format("%.14g", newValue)..tostring(self.suffix);
                             self.objects.text.ThemeColor = (self.min < 0 and newValue == 0 or newValue == self.min) and (self.risky and 'Risky Text' or 'Option Text 3') or (self.risky and 'Risky Text Enabled' or 'Option Text 1');
 
                             if not nocallback then
@@ -4347,7 +4218,7 @@ function library:init()
                     function slider:SetText(str)
                         if typeof(str) == 'string' then
                             self.text = str;
-                            self.objects.text.Text = str;
+                            self.objects.text.Text = str..': '..tostring(self.value)..tostring(self.suffix);
                         end
                     end
 
