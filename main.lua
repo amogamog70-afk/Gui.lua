@@ -714,8 +714,8 @@ do
             AbsoluteSize = newVector2(0,0);
             AbsolutePosition = newVector2(0,0);
             Hover = false;
-            Visible = true;
-            ActualVisible = true;
+            Visible = false;
+            ActualVisible = false;
             MouseButton1Down = library.signal.new();
             MouseButton2Down = library.signal.new();
             MouseButton1Up = library.signal.new();
@@ -733,33 +733,43 @@ do
         drawing.MouseLeave._owner = drawing;
 
         local function hideTree(d)
-            if d.ActualVisible ~= false then
-                d.ActualVisible = false
+            d.ActualVisible = false
+            pcall(function()
                 if d.Object and d.Object.Visible then
                     d.Object.Visible = false
                 end
-            end
+            end)
             for child in next, d.Children do
                 hideTree(child)
             end
         end
 
         function drawing:Update()
-            local parent = drawing.Parent ~= nil and library.drawings[drawing.Parent.Object] or nil
+            local parent = nil
+            if drawing.Parent ~= nil then
+                if drawing.Parent.Object and library.drawings[drawing.Parent.Object] then
+                    parent = library.drawings[drawing.Parent.Object]
+                elseif library.drawings[drawing.Parent] then
+                    parent = library.drawings[drawing.Parent]
+                else
+                    parent = drawing.Parent
+                end
+            end
+
             local parentSize, parentPos, parentVis = viewportSize, Vector2.new(0,0), true;
             if parent ~= nil then
-                parentSize = (parent.Class == 'Square' or parent.Class == 'Image') and (parent.AbsoluteSize or parent.Object.Size) or parent.Class == 'Text' and parent.TextBounds or viewportSize
-                parentPos = parent.AbsolutePosition or parent.Object.Position
-                parentVis = parent.ActualVisible
+                parentSize = (parent.Class == 'Square' or parent.Class == 'Image') and (parent.AbsoluteSize or (parent.Object and parent.Object.Size) or viewportSize) or (parent.Class == 'Text' and (parent.TextBounds or (parent.Object and parent.Object.TextBounds) or viewportSize)) or viewportSize
+                parentPos = parent.AbsolutePosition or (parent.Object and parent.Object.Position) or Vector2.new(0,0)
+                parentVis = (parent.ActualVisible ~= false) and (parent.Visible ~= false)
             end
 
             local isVis = (parentVis and drawing.Visible) and true or false
-            if drawing.ActualVisible ~= isVis then
-                drawing.ActualVisible = isVis
-                if drawing.Object.Visible ~= isVis then
+            drawing.ActualVisible = isVis
+            pcall(function()
+                if drawing.Object and drawing.Object.Visible ~= isVis then
                     drawing.Object.Visible = isVis
                 end
-            end
+            end)
 
             if not isVis then
                 hideTree(drawing)
@@ -768,16 +778,16 @@ do
 
             if drawing.Class == 'Square' or drawing.Class == 'Image' then
                 local newSize = typeof(drawing.Size) == 'Vector2' and drawing.Size or typeof(drawing.Size) == 'UDim2' and utility:UDim2ToVector2(drawing.Size, parentSize)
-                if drawing.AbsoluteSize ~= newSize then
-                    drawing.Object.Size = newSize
+                if newSize and drawing.AbsoluteSize ~= newSize then
+                    pcall(function() drawing.Object.Size = newSize end)
                     drawing.AbsoluteSize = newSize
                 end
             end
 
             if drawing.Class == 'Square' or drawing.Class == 'Image' or drawing.Class == 'Circle' or drawing.Class == 'Text' then
                 local newPos = parentPos + (typeof(drawing.Position) == 'Vector2' and drawing.Position or utility:UDim2ToVector2(drawing.Position, parentSize))
-                if drawing.AbsolutePosition ~= newPos then
-                    drawing.Object.Position = newPos
+                if newPos and drawing.AbsolutePosition ~= newPos then
+                    pcall(function() drawing.Object.Position = newPos end)
                     drawing.AbsolutePosition = newPos
                 end
             end
@@ -823,7 +833,7 @@ do
             if not table.find(blacklistedProperties,i) then
 
                 local lastval = drawing[i]
-                if lastval == v and i ~= 'Parent' then
+                if lastval == v and i ~= 'Parent' and i ~= 'Visible' then
                     return
                 end
 
@@ -841,7 +851,13 @@ do
                         v.Children[drawing] = true
                     end
                 elseif i == 'Visible' then
-                    drawing.Visible = v
+                    local boolV = (v and true or false)
+                    drawing.Visible = boolV
+                    pcall(function()
+                        if drawing.Object then
+                            drawing.Object.Visible = boolV
+                        end
+                    end)
                 elseif i == 'Font' and v == 2 and executor == 'ScriptWare' then
                     v = 1
                 elseif i == 'Text' and class == 'Text' then
@@ -855,7 +871,7 @@ do
                     drawing[i] = v
                 end
 
-                if table.find({'Size','Position','Position','Visible','Parent'},i) then
+                if table.find({'Size','Position','Visible','Parent'},i) then
                     drawing:Update()
                 end
 
@@ -1583,6 +1599,8 @@ function library:init()
                 end
                 return
             end
+
+            self.objects.background.Visible = true
 
             local xSize  = 190
             local yPos  = 0
@@ -2896,7 +2914,14 @@ function library:init()
                 self.open = bool;
 
                 if bool then
-                    self.objects.background.Visible = true;
+                    if self.objects.background then
+                        pcall(function()
+                            if self.objects.background.Object then
+                                self.objects.background.Object.Transparency = 1
+                            end
+                        end)
+                        self.objects.background.Visible = true;
+                    end
                 else
                     if self.dropdown and self.dropdown.selected then
                         local list = self.dropdown.selected
@@ -2921,40 +2946,10 @@ function library:init()
                     if self.keybindMenu and self.keybindMenu.open then
                         self.keybindMenu:Close()
                     end
-                end
-
-                if self.fadeConn then
-                    self.fadeConn:Disconnect()
-                    self.fadeConn = nil
-                end
-
-                local startAlpha = bool and 0.05 or 1
-                local targetAlpha = bool and 1 or 0.05
-                local duration = 0.16
-                local elapsed = 0
-
-                self.fadeConn = utility:Connection(runservice.RenderStepped, function(dt)
-                    elapsed = elapsed + dt
-                    local t = math.clamp(elapsed / duration, 0, 1)
-                    local smooth = tweenService:GetValue(t, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-                    local alpha = utility:Lerp(startAlpha, targetAlpha, smooth)
-
-                    pcall(function()
-                        if self.objects.background and self.objects.background.Object then
-                            self.objects.background.Object.Transparency = alpha
-                        end
-                    end)
-
-                    if t >= 1 then
-                        if self.fadeConn then
-                            self.fadeConn:Disconnect()
-                            self.fadeConn = nil
-                        end
-                        if not bool then
-                            self.objects.background.Visible = false;
-                        end
+                    if self.objects.background then
+                        self.objects.background.Visible = false;
                     end
-                end)
+                end
             end
         end
 
