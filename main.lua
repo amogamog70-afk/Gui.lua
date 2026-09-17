@@ -618,6 +618,7 @@ do
             Object = safeCreateDrawing(class);
             Children = {};
             ThemeColor = '';
+            ThemeColorOutline = '';
             OutlineThemeColor = '';
             ThemeColorOffset = 0;
             OutlineThemeColorOffset = 0;
@@ -706,7 +707,16 @@ do
         -- this is really stupid lol
         local proxy = utility:DetectTableChange(
         function(obj,i)
-            return drawing[i] == nil and drawing.Object[i] or drawing[i]
+            if drawing[i] ~= nil then
+                return drawing[i]
+            end
+            local s, r = pcall(function()
+                return drawing.Object[i]
+            end)
+            if s then
+                return r
+            end
+            return nil
         end,
         function(obj,i,v)
             if not table.find(blacklistedProperties,i) then
@@ -735,24 +745,22 @@ do
                 pcall(function()
                     drawing.Object[i] = v
                 end)
-                if drawing[i] ~= nil or i == 'Parent' then
+                if drawing[i] ~= nil or i == 'Parent' or i == 'ThemeColor' or i == 'OutlineThemeColor' or i == 'ThemeColorOutline' or i == 'ThemeColorOffset' or i == 'OutlineThemeColorOffset' then
                     drawing[i] = v
                 end
 
                 if table.find({'Size','Position','Position','Visible','Parent'},i) then
                     drawing:Update()
                 end
-                if i == 'Color' then
-                    drawing.ThemeColor = nil
-                end
+
                 if (i == 'ThemeColor' or i == 'ThemeColorOffset') then
                     local themeName = drawing.ThemeColor
                     if themeName and library.theme[themeName] then
                         local offset = drawing.ThemeColorOffset or 0
                         drawing.Object.Color = utility:AddRGB(library.theme[themeName], fromrgb(offset, offset, offset))
                     end
-                elseif (i == 'OutlineThemeColor' or i == 'OutlineThemeColorOffset') then
-                    local themeName = drawing.ThemeColorOutline
+                elseif (i == 'OutlineThemeColor' or i == 'ThemeColorOutline' or i == 'OutlineThemeColorOffset') then
+                    local themeName = drawing.OutlineThemeColor or drawing.ThemeColorOutline
                     if themeName and library.theme[themeName] then
                         local offset = drawing.OutlineThemeColorOffset or 0
                         drawing.Object.OutlineColor = utility:AddRGB(library.theme[themeName], fromrgb(offset, offset, offset))
@@ -5548,8 +5556,9 @@ function library:init()
             for i,v in next, self.tabs do
                 local objs = v.objects;
                 v.selected = v == self.selectedTab;
-                objs.background.ThemeColor = v.selected and 'Selected Tab Background' or 'Unselected Tab Background';
-                objs.background.Color = library.theme[objs.background.ThemeColor];
+                local tabTheme = v.selected and 'Selected Tab Background' or 'Unselected Tab Background';
+                objs.background.ThemeColor = tabTheme;
+                objs.background.Color = library.theme[tabTheme];
                 objs.background.Size = newUDim2(0, objs.text.TextBounds.X + 14, 1, v.selected and 1 or 0);
                 objs.background.Position = newUDim2(0, pos, 0, 0)
 
