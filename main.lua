@@ -462,6 +462,8 @@ local button1down, button1up, mousemove = library.button1down, library.button1up
 local mb1down = false;
 
 local utility = library.utility
+local camera = workspace.CurrentCamera
+local viewportSize = camera and camera.ViewportSize or Vector2.new(1920, 1080)
 do
 
     function utility:Connection(signal, func)
@@ -614,17 +616,16 @@ do
         local bestObj = nil
         local bestZ = -999999
         for _, v in next, library.interactiveDrawings do
-            if v.Visible and v.Class == 'Square' then
-                local obj = v.Object
-                if obj and obj.Visible then
-                    local pos = v.AbsolutePosition or obj.Position
-                    local size = v.AbsoluteSize or obj.Size
+            if v.ActualVisible and v.Class == 'Square' then
+                local pos = v.AbsolutePosition
+                local size = v.AbsoluteSize
+                if pos and size then
                     local x1, y1 = pos.X, pos.Y
                     if mx >= x1 and mx <= x1 + size.X and my >= y1 and my <= y1 + size.Y then
-                        local z = obj.ZIndex
+                        local z = v.ZIndex or 0
                         if z > bestZ then
                             bestZ = z
-                            bestObj = obj
+                            bestObj = v.Object
                         end
                     end
                 end
@@ -714,6 +715,7 @@ do
             AbsolutePosition = newVector2(0,0);
             Hover = false;
             Visible = true;
+            ActualVisible = true;
             MouseButton1Down = library.signal.new();
             MouseButton2Down = library.signal.new();
             MouseButton1Up = library.signal.new();
@@ -731,25 +733,33 @@ do
         drawing.MouseLeave._owner = drawing;
 
         local function hideTree(d)
-            for child in next, d.Children do
-                if child.Object and child.Object.Visible then
-                    child.Object.Visible = false
+            if d.ActualVisible ~= false then
+                d.ActualVisible = false
+                if d.Object and d.Object.Visible then
+                    d.Object.Visible = false
                 end
+            end
+            for child in next, d.Children do
                 hideTree(child)
             end
         end
 
         function drawing:Update()
             local parent = drawing.Parent ~= nil and library.drawings[drawing.Parent.Object] or nil
-            local parentSize,parentPos,parentVis = workspace.CurrentCamera.ViewportSize, Vector2.new(0,0), true;
+            local parentSize, parentPos, parentVis = viewportSize, Vector2.new(0,0), true;
             if parent ~= nil then
-                parentSize = (parent.Class == 'Square' or parent.Class == 'Image') and (parent.AbsoluteSize or parent.Object.Size) or parent.Class == 'Text' and parent.TextBounds or workspace.CurrentCamera.ViewportSize
+                parentSize = (parent.Class == 'Square' or parent.Class == 'Image') and (parent.AbsoluteSize or parent.Object.Size) or parent.Class == 'Text' and parent.TextBounds or viewportSize
                 parentPos = parent.AbsolutePosition or parent.Object.Position
-                parentVis = parent.Object.Visible
+                parentVis = parent.ActualVisible
             end
 
             local isVis = (parentVis and drawing.Visible) and true or false
-            drawing.Object.Visible = isVis
+            if drawing.ActualVisible ~= isVis then
+                drawing.ActualVisible = isVis
+                if drawing.Object.Visible ~= isVis then
+                    drawing.Object.Visible = isVis
+                end
+            end
 
             if not isVis then
                 hideTree(drawing)
@@ -757,13 +767,19 @@ do
             end
 
             if drawing.Class == 'Square' or drawing.Class == 'Image' then
-                drawing.Object.Size = typeof(drawing.Size) == 'Vector2' and drawing.Size or typeof(drawing.Size) == 'UDim2' and utility:UDim2ToVector2(drawing.Size,parentSize)
-                drawing.AbsoluteSize = drawing.Object.Size
+                local newSize = typeof(drawing.Size) == 'Vector2' and drawing.Size or typeof(drawing.Size) == 'UDim2' and utility:UDim2ToVector2(drawing.Size, parentSize)
+                if drawing.AbsoluteSize ~= newSize then
+                    drawing.Object.Size = newSize
+                    drawing.AbsoluteSize = newSize
+                end
             end
 
             if drawing.Class == 'Square' or drawing.Class == 'Image' or drawing.Class == 'Circle' or drawing.Class == 'Text' then
-                drawing.Object.Position = parentPos + (typeof(drawing.Position) == 'Vector2' and drawing.Position or utility:UDim2ToVector2(drawing.Position,parentSize))
-                drawing.AbsolutePosition = drawing.Object.Position
+                local newPos = parentPos + (typeof(drawing.Position) == 'Vector2' and drawing.Position or utility:UDim2ToVector2(drawing.Position, parentSize))
+                if drawing.AbsolutePosition ~= newPos then
+                    drawing.Object.Position = newPos
+                    drawing.AbsolutePosition = newPos
+                end
             end
 
             drawing:UpdateChildren()
@@ -1245,8 +1261,7 @@ function library:init()
                         library.CurrentTooltip = nil
                         tooltipObjects.background.Visible = false
                     else
-                        tooltipObjects.background.Position = UDim2.new(0,mousePos.X + 15,0,mousePos.Y + 15)
-                        tooltipObjects.background.Size = UDim2.new(0,tooltipObjects.text.TextBounds.X + 6 + (library.CurrentTooltip.risky and 60 or 0),0,tooltipObjects.text.TextBounds.Y + 2)
+                        tooltipObjects.background.Position = UDim2.new(0, mousePos.X + 15, 0, mousePos.Y + 15)
                     end
                 end
 
@@ -1791,7 +1806,7 @@ function library:init()
         ----- Create Objects ----
         do
             local size = data.size or newUDim2(0, 525, 0, 650);
-            local position = data.position or newUDim2(0.5, -math.floor(size.X.Offset / 2) - 80, 0.5, -math.floor(size.Y.Offset / 2) - 40);
+            local position = data.position or data.pos or newUDim2(0.5, -math.floor(size.X.Offset / 2) - 20, 0.5, -math.floor(size.Y.Offset / 2) + 5);
             local objs = window.objects;
             local z = library.zindexOrder.window;
 
@@ -2623,196 +2638,227 @@ function library:init()
             function window.dropdown:Refresh()
                 if self.selected ~= nil then
                     local list = self.selected
+
+                    local function isSelected(val)
+                        if list.multi then
+                            if typeof(list.selected) == 'table' then
+                                return table.find(list.selected, val) ~= nil
+                            elseif typeof(list.selected) == 'string' then
+                                return list.selected == val
+                            end
+                        else
+                            return list.selected == val
+                        end
+                        return false
+                    end
+
+                    local function handleItemClick(idx)
+                        local currentList = self.selected
+                        if not currentList then return end
+                        local val = currentList.values[idx]
+                        if val == nil then return end
+
+                        if currentList.multi then
+                            local newSelected = {}
+                            local wasSelected = false
+                            if typeof(currentList.selected) == 'table' then
+                                for _, item in ipairs(currentList.selected) do
+                                    if item == val then
+                                        wasSelected = true
+                                    else
+                                        table.insert(newSelected, item)
+                                    end
+                                end
+                            elseif typeof(currentList.selected) == 'string' then
+                                if currentList.selected == val then
+                                    wasSelected = true
+                                else
+                                    table.insert(newSelected, currentList.selected)
+                                end
+                            end
+
+                            if not wasSelected then
+                                table.insert(newSelected, val)
+                            end
+
+                            currentList:Select(newSelected)
+                            self:Refresh()
+                        else
+                            currentList:Select(val)
+                            currentList.open = false
+                            if currentList.objects and currentList.objects.openText then
+                                currentList.objects.openText.Text = '+'
+                            end
+                            if currentList.objects and currentList.objects.border1 then
+                                currentList.objects.border1.ThemeColor = currentList.objects.holder and currentList.objects.holder.Hover and 'Accent' or 'Option Border 1'
+                            end
+                            if currentList.objects and currentList.objects.text then
+                                currentList.objects.text.ThemeColor = currentList.objects.holder and currentList.objects.holder.Hover and (currentList.risky and 'Risky Text Enabled' or 'Option Text 1') or (currentList.risky and 'Risky Text' or 'Option Text 2')
+                            end
+                            window.dropdown.selected = nil
+                            window.dropdown.objects.background.Visible = false
+                        end
+                    end
+
                     local function updateItemVisual(idx, isHovered)
                         local valueObj = self.objects.values[idx]
                         if not valueObj then return end
                         local val = list.values[idx]
                         if val == nil then return end
-                        local isSel = false
-                        if list.multi then
-                            if typeof(list.selected) == 'table' then
-                                isSel = table.find(list.selected, val) ~= nil
-                            elseif typeof(list.selected) == 'string' then
-                                isSel = (list.selected == val)
-                            end
-                        else
-                            isSel = (list.selected == val)
-                        end
+                        local isSel = isSelected(val)
 
                         if list.multi then
                             if valueObj.checkbox then
                                 valueObj.checkbox.Visible = true
-                                if valueObj.checkboxBorder then
-                                    valueObj.checkboxBorder.Visible = true
-                                    valueObj.checkboxBorder.ThemeColor = isSel and 'Accent' or (isHovered and 'Option Border 1' or 'Option Border 2')
-                                end
-                                if valueObj.checkMark then
-                                    valueObj.checkMark.Visible = isSel
-                                end
                             end
-                            valueObj.text.Position = newUDim2(0, 22, 0, 1)
+                            if valueObj.checkboxBorder then
+                                valueObj.checkboxBorder.Visible = true
+                                valueObj.checkboxBorder.ThemeColor = isSel and 'Accent' or (isHovered and 'Option Text 1' or 'Option Border 2')
+                            end
+                            if valueObj.checkMark then
+                                valueObj.checkMark.Visible = isSel
+                            end
+                            valueObj.text.Position = newUDim2(0, 22, 0, 2)
                         else
-                            if valueObj.checkbox then
-                                valueObj.checkbox.Visible = false
-                                if valueObj.checkboxBorder then valueObj.checkboxBorder.Visible = false end
-                                if valueObj.checkMark then valueObj.checkMark.Visible = false end
-                            end
-                            valueObj.text.Position = newUDim2(0, 6, 0, 1)
+                            if valueObj.checkbox then valueObj.checkbox.Visible = false end
+                            if valueObj.checkboxBorder then valueObj.checkboxBorder.Visible = false end
+                            if valueObj.checkMark then valueObj.checkMark.Visible = false end
+                            valueObj.text.Position = newUDim2(0, 8, 0, 2)
                         end
 
                         if isSel then
                             valueObj.background.Transparency = 1
-                            valueObj.background.Color = fromrgb(32, 40, 56)
+                            valueObj.background.Color = fromrgb(28, 34, 48)
                             valueObj.text.ThemeColor = 'Accent'
+                            if valueObj.activePip then
+                                valueObj.activePip.Visible = true
+                            end
                         elseif isHovered then
                             valueObj.background.Transparency = 1
                             valueObj.background.Color = fromrgb(26, 26, 32)
                             valueObj.text.ThemeColor = 'Primary Text'
+                            if valueObj.activePip then
+                                valueObj.activePip.Visible = false
+                            end
                         else
                             valueObj.background.Transparency = 0
                             valueObj.background.Color = fromrgb(20, 20, 22)
                             valueObj.text.ThemeColor = 'Option Text 2'
+                            if valueObj.activePip then
+                                valueObj.activePip.Visible = false
+                            end
                         end
                     end
 
-                    for idx, value in next, list.values do
+                    for idx = 1, #list.values do
+                        local value = list.values[idx]
                         local valueObject = self.objects.values[idx]
                         if valueObject == nil then
-                            valueObject = {};
+                            valueObject = {}
+                            local currentIdx = idx
                             valueObject.background = utility:Draw('Square', {
-                                Size = newUDim2(1,-4,0,18);
-                                Color = fromrgb(20, 20, 22);
-                                Transparency = 0;
-                                ZIndex = library.zindexOrder.dropdown+1;
-                                Parent = self.objects.background;
+                                Size = newUDim2(1, -4, 0, 19),
+                                Color = fromrgb(20, 20, 22),
+                                Transparency = 0,
+                                ZIndex = library.zindexOrder.dropdown + 1,
+                                Parent = self.objects.background,
+                            })
+                            valueObject.activePip = utility:Draw('Square', {
+                                Size = newUDim2(0, 2, 0, 11),
+                                Position = newUDim2(0, 2, 0, 4),
+                                ThemeColor = 'Accent',
+                                Visible = false,
+                                ZIndex = library.zindexOrder.dropdown + 2,
+                                Parent = valueObject.background,
                             })
                             valueObject.checkbox = utility:Draw('Square', {
-                                Size = newUDim2(0, 10, 0, 10);
-                                Position = newUDim2(0, 6, 0, 4);
-                                ThemeColor = 'Option Background';
-                                Visible = false;
-                                ZIndex = library.zindexOrder.dropdown+2;
-                                Parent = valueObject.background;
+                                Size = newUDim2(0, 10, 0, 10),
+                                Position = newUDim2(0, 6, 0, 4),
+                                ThemeColor = 'Option Background',
+                                Visible = false,
+                                ZIndex = library.zindexOrder.dropdown + 2,
+                                Parent = valueObject.background,
                             })
                             valueObject.checkboxBorder = utility:Draw('Square', {
-                                Size = newUDim2(1, 2, 1, 2);
-                                Position = newUDim2(0, -1, 0, -1);
-                                ThemeColor = 'Option Border 1';
-                                Visible = false;
-                                ZIndex = library.zindexOrder.dropdown+2;
-                                Parent = valueObject.checkbox;
+                                Size = newUDim2(1, 2, 1, 2),
+                                Position = newUDim2(0, -1, 0, -1),
+                                ThemeColor = 'Option Border 1',
+                                Visible = false,
+                                ZIndex = library.zindexOrder.dropdown + 2,
+                                Parent = valueObject.checkbox,
                             })
                             valueObject.checkMark = utility:Draw('Square', {
-                                Size = newUDim2(0, 6, 0, 6);
-                                Position = newUDim2(0, 2, 0, 2);
-                                ThemeColor = 'Accent';
-                                Visible = false;
-                                ZIndex = library.zindexOrder.dropdown+3;
-                                Parent = valueObject.checkbox;
+                                Size = newUDim2(0, 6, 0, 6),
+                                Position = newUDim2(0, 2, 0, 2),
+                                ThemeColor = 'Accent',
+                                Visible = false,
+                                ZIndex = library.zindexOrder.dropdown + 3,
+                                Parent = valueObject.checkbox,
                             })
                             valueObject.text = utility:Draw('Text', {
-                                Position = newUDim2(0,6,0,1);
-                                ThemeColor = 'Option Text 2';
-                                Text = tostring(value);
-                                Size = 13;
-                                Font = 2;
-                                ZIndex = library.zindexOrder.dropdown+2;
-                                Parent = valueObject.background;
+                                Position = newUDim2(0, 8, 0, 2),
+                                ThemeColor = 'Option Text 2',
+                                Text = tostring(value),
+                                Size = 13,
+                                Font = 2,
+                                ZIndex = library.zindexOrder.dropdown + 2,
+                                Parent = valueObject.background,
                             })
-                            valueObject.isHovered = false;
+                            valueObject.isHovered = false
+
                             utility:Connection(valueObject.background.MouseEnter, function()
-                                valueObject.isHovered = true;
-                                updateItemVisual(idx, true);
+                                valueObject.isHovered = true
+                                updateItemVisual(currentIdx, true)
                             end)
                             utility:Connection(valueObject.background.MouseLeave, function()
-                                valueObject.isHovered = false;
-                                updateItemVisual(idx, false);
+                                valueObject.isHovered = false
+                                updateItemVisual(currentIdx, false)
                             end)
-                            valueObject.connection = utility:Connection(valueObject.background.MouseButton1Down, function()
-                                local currentList = self.selected
-                                if currentList then
-                                    local val = currentList.values[idx]
-                                    local currentSelected = currentList.selected;
-                                    
-                                    if currentList.multi then
-                                        local newSelected = {}
-                                        if typeof(currentSelected) == 'table' then
-                                            for _, v in ipairs(currentSelected) do
-                                                if v ~= "none" and v ~= val then
-                                                    table.insert(newSelected, v)
-                                                end
-                                            end
-                                        elseif typeof(currentSelected) == 'string' and currentSelected ~= "none" and currentSelected ~= val then
-                                            table.insert(newSelected, currentSelected)
-                                        end
 
-                                        local wasSelected = false
-                                        if typeof(currentSelected) == 'table' then
-                                            wasSelected = table.find(currentSelected, val) ~= nil
-                                        elseif typeof(currentSelected) == 'string' then
-                                            wasSelected = (currentSelected == val)
-                                        end
-
-                                        if not wasSelected then
-                                            table.insert(newSelected, val)
-                                        end
-
-                                        currentList:Select(newSelected);
-                                        for vIdx, _ in next, currentList.values do
-                                            updateItemVisual(vIdx, self.objects.values[vIdx] and self.objects.values[vIdx].isHovered or false)
-                                        end
-                                    else
-                                        currentList:Select(val);
-                                        currentList.open = false;
-                                        currentList.objects.openText.Text = '+';
-                                        if currentList.objects.border1 then
-                                            currentList.objects.border1.ThemeColor = currentList.objects.holder.Hover and 'Accent' or 'Option Border 1';
-                                        end
-                                        if currentList.objects.text then
-                                            currentList.objects.text.ThemeColor = currentList.objects.holder.Hover and (currentList.risky and 'Risky Text Enabled' or 'Option Text 1') or (currentList.risky and 'Risky Text' or 'Option Text 2');
-                                        end
-                                        window.dropdown.selected = nil;
-                                        window.dropdown.objects.background.Visible = false;
-                                    end
-
-                                end
+                            utility:Connection(valueObject.background.MouseButton1Down, function()
+                                handleItemClick(currentIdx)
                             end)
+                            utility:Connection(valueObject.checkbox.MouseButton1Down, function()
+                                handleItemClick(currentIdx)
+                            end)
+                            utility:Connection(valueObject.checkMark.MouseButton1Down, function()
+                                handleItemClick(currentIdx)
+                            end)
+
                             self.objects.values[idx] = valueObject
                         end
                     end
 
-                    for idx, val in next, list.values do
-                        local valueObj = self.objects.values[idx]
-                        if valueObj then
-                            updateItemVisual(idx, valueObj.isHovered or false)
+                    -- Layout items in strict sequential order
+                    local y = 3
+                    local padding = 2
+                    for idx = 1, #list.values do
+                        local valStr = list.values[idx]
+                        local obj = self.objects.values[idx]
+                        if obj then
+                            obj.background.Visible = true
+                            obj.background.Position = newUDim2(0, 2, 0, y)
+                            obj.text.Text = tostring(valStr)
+                            obj.text.Visible = true
+                            updateItemVisual(idx, obj.isHovered or false)
+                            y = y + 19 + padding
                         end
                     end
 
-                    local y,padding = 3,2
-                    for idx, obj in next, self.objects.values do
-                        local valueStr = list.values[idx]
-                        obj.background.Visible = valueStr ~= nil
-                        if valueStr ~= nil then
-                            obj.background.Position = newUDim2(0,2,0,y);
-                            obj.text.Text = valueStr;
-                            if list.multi then
-                                obj.checkbox.Visible = true
-                                if obj.checkboxBorder then obj.checkboxBorder.Visible = true end
-                                obj.text.Position = newUDim2(0, 22, 0, 1)
-                            else
-                                obj.checkbox.Visible = false
-                                if obj.checkboxBorder then obj.checkboxBorder.Visible = false end
-                                if obj.checkMark then obj.checkMark.Visible = false end
-                                obj.text.Position = newUDim2(0, 6, 0, 1)
-                            end
-                            y = y + obj.background.Object.Size.Y + padding;
-                        else
+                    -- Hide any unused items beyond #list.values
+                    for idx = #list.values + 1, #self.objects.values do
+                        local obj = self.objects.values[idx]
+                        if obj then
+                            obj.background.Visible = false
+                            if obj.activePip then obj.activePip.Visible = false end
                             if obj.checkbox then obj.checkbox.Visible = false end
+                            if obj.checkboxBorder then obj.checkboxBorder.Visible = false end
+                            if obj.checkMark then obj.checkMark.Visible = false end
+                            if obj.text then obj.text.Visible = false end
                         end
                     end
 
-                    self.objects.background.Size = newUDim2(1,-6,0,y + 1);    
-
+                    self.objects.background.Size = newUDim2(1, -6, 0, y + 2)
                 end
             end
         
@@ -2825,10 +2871,15 @@ function library:init()
                 if (window.dropdown and window.dropdown.selected ~= nil) or (window.colorpicker and window.colorpicker.open) or (window.keybindMenu and window.keybindMenu.open) then
                     return
                 end
-                tooltipObjects.background.Visible = (not (option.tooltip == '' or option.tooltip == nil)) and true or false;
+                local tipText = tostring(option.tooltip or '')
+                if tipText == '' then return end
                 tooltipObjects.riskytext.Visible = option.risky;
                 tooltipObjects.text.Position = option.risky and newUDim2(0,60,0,0) or newUDim2(0,3,0,0)
-                tooltipObjects.text.Text = tostring(option.tooltip);
+                tooltipObjects.text.Text = tipText;
+                local tw = tooltipObjects.text.TextBounds.X + 8 + (option.risky and 60 or 0)
+                local th = tooltipObjects.text.TextBounds.Y + 4
+                tooltipObjects.background.Size = UDim2.new(0, tw, 0, th)
+                tooltipObjects.background.Visible = true;
                 library.CurrentTooltip = option;
             end)
             utility:Connection(option.objects.holder.MouseLeave, function()
@@ -4147,7 +4198,7 @@ function library:init()
                         function list:Select(option, nocallback)
                             if self.multi then
                                 if typeof(option) == 'string' then
-                                    option = (option == 'none' or option == '') and {} or {option}
+                                    option = (option == 'none' or option == '' or option == '...') and {} or {option}
                                 elseif typeof(option) ~= 'table' then
                                     option = {}
                                 end
@@ -4163,22 +4214,13 @@ function library:init()
                                 if self.multi then
                                     local count = #option
                                     if count == 0 then
-                                        text = 'none'
+                                        text = '...'
                                     elseif count == 1 then
                                         text = tostring(option[1])
+                                    elseif count == 2 then
+                                        text = tostring(option[1]) .. ', ' .. tostring(option[2])
                                     else
-                                        local full = table.concat(option, ', ')
-                                        local maxFit = self.objects.background.Object.Size.X - 25
-                                        self.objects.inputText.Text = full
-                                        if self.objects.inputText.TextBounds.X <= maxFit then
-                                            text = full
-                                        else
-                                            if count <= 3 then
-                                                text = full
-                                            else
-                                                text = count .. ' selected (' .. tostring(option[1]) .. ', ' .. tostring(option[2]) .. '...)'
-                                            end
-                                        end
+                                        text = count .. ' selected'
                                     end
                                 else
                                     text = tostring(option);
@@ -4187,15 +4229,8 @@ function library:init()
                                 local label = self.objects.inputText
                                 label.Text = text;
                                 local maxFit = self.objects.background.Object.Size.X - 25
-                                if label.TextBounds.X > maxFit then
-                                    local split = text:split('');
-                                    for i = 1, #split do
-                                        label.Text = table.concat(split, '', 1, i)
-                                        if label.TextBounds.X > maxFit - 6 then
-                                            label.Text = label.Text:sub(1, -4) .. '...';
-                                            break
-                                        end
-                                    end
+                                if maxFit > 10 and label.TextBounds.X > maxFit then
+                                    label.Text = text:sub(1, 14) .. '...'
                                 end
                                 if self.flag then
                                     library.flags[self.flag] = self.selected
@@ -5795,7 +5830,7 @@ function library:init()
                     function list:Select(option, nocallback)
                         if self.multi then
                             if typeof(option) == 'string' then
-                                option = (option == 'none' or option == '') and {} or {option}
+                                option = (option == 'none' or option == '' or option == '...') and {} or {option}
                             elseif typeof(option) ~= 'table' then
                                 option = {}
                             end
@@ -5811,22 +5846,13 @@ function library:init()
                             if self.multi then
                                 local count = #option
                                 if count == 0 then
-                                    text = 'none'
+                                    text = '...'
                                 elseif count == 1 then
                                     text = tostring(option[1])
+                                elseif count == 2 then
+                                    text = tostring(option[1]) .. ', ' .. tostring(option[2])
                                 else
-                                    local full = table.concat(option, ', ')
-                                    local maxFit = self.objects.background.Object.Size.X - 25
-                                    self.objects.inputText.Text = full
-                                    if self.objects.inputText.TextBounds.X <= maxFit then
-                                        text = full
-                                    else
-                                        if count <= 3 then
-                                            text = full
-                                        else
-                                            text = count .. ' selected (' .. tostring(option[1]) .. ', ' .. tostring(option[2]) .. '...)'
-                                        end
-                                    end
+                                    text = count .. ' selected'
                                 end
                             else
                                 text = tostring(option);
@@ -5835,15 +5861,8 @@ function library:init()
                             local label = self.objects.inputText
                             label.Text = text;
                             local maxFit = self.objects.background.Object.Size.X - 25
-                            if label.TextBounds.X > maxFit then
-                                local split = text:split('');
-                                for i = 1, #split do
-                                    label.Text = table.concat(split, '', 1, i)
-                                    if label.TextBounds.X > maxFit - 6 then
-                                        label.Text = label.Text:sub(1, -4) .. '...';
-                                        break
-                                    end
-                                end
+                            if maxFit > 10 and label.TextBounds.X > maxFit then
+                                label.Text = text:sub(1, 14) .. '...'
                             end
                             if self.flag then
                                 library.flags[self.flag] = self.selected
@@ -6051,9 +6070,9 @@ function library:init()
                     if section.objects.background.Visible ~= isVisible then
                         section.objects.background.Visible = isVisible
                     end
-                    section:UpdateOptions();
                     
                     if isVisible then
+                        section:UpdateOptions();
                         if section.side == 1 then
                             if last1 then
                                 section.objects.background.Position = last1.objects.background.Position + newUDim2(0,0,0,last1.objects.background.Object.Size.Y + padding);
@@ -6252,11 +6271,15 @@ function library:init()
                     end
                 end
 
-                self.objects.text.Text = table.concat(text,' | ')
+                local fullText = table.concat(text,' | ')
+                if self.lastText == fullText then return end
+                self.lastText = fullText
+
+                self.objects.text.Text = fullText
                 self.objects.background.Size = newUDim2(0, self.objects.text.TextBounds.X + 10, 0, 17)
 
                 local size = self.objects.background.Object.Size;
-                local screensize = workspace.CurrentCamera.ViewportSize;
+                local screensize = viewportSize;
 
                 if self.lock ~= 'Free' then
                     self.position = (
@@ -6371,15 +6394,17 @@ function library:init()
         library.stats.sendkbps = stats.DataSendKbps;
         library.stats.receivekbps = stats.DataReceiveKbps;
 
+        if camera then
+            viewportSize = camera.ViewportSize
+        end
+
         if (tick()-lasttick)*1000 > library.watermark.refreshrate then
             lasttick = tick();
             library.watermark:Update();
         end
 
         if self.open and inputservice.MouseIconEnabled then
-            pcall(function()
-                inputservice.MouseIconEnabled = false
-            end)
+            inputservice.MouseIconEnabled = false
         end
     end)
 
