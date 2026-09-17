@@ -536,21 +536,19 @@ do
             library.tweens[obj] = library.tweens[obj] or {};
             library.tweens[obj][prop] = tween;
 
+            local isNum = typeof(startVal) == 'number';
+            local styleVal = style or Enum.EasingStyle.Linear;
+            local dirVal = direction or Enum.EasingDirection.In;
+
             tween.Connection = self:Connection(runservice.RenderStepped, function(dt)
                 a = a + (dt / time);
+                local clampedA = a > 1 and 1 or (a < 0 and 0 or a)
+                local progress = tweenService:GetValue(clampedA, styleVal, dirVal)
+                local newVal = isNum and (startVal + (val - startVal) * progress) or startVal:Lerp(val, progress)
+                obj[prop] = newVal;
                 if a >= 1 or obj == nil then
                     tween:Cancel();
                 end
-                pcall(function()
-                    local progress = tweenService:GetValue(a, style or Enum.EasingStyle.Linear, direction or Enum.EasingDirection.In)
-                    local newVal
-                    if typeof(startVal) == 'number' then
-                        newVal = utility:Lerp(startVal, val, progress);
-                    else
-                        newVal = startVal:Lerp(val, progress);
-                    end
-                    obj[prop] = newVal;
-                end)
             end)
 
             function tween:Cancel()
@@ -609,10 +607,26 @@ do
         return (mp.X >= x1 and mp.X <= x2 and mp.Y >= y1 and mp.Y <= y2)
     end
 
-    function utility:GetHoverObject()
+    local lastHoverTime = 0
+    local cachedHoverObj = nil
+    local lastHoverMx = -9999
+    local lastHoverMy = -9999
+
+    function utility:GetHoverObject(force)
         if library.isDragging or library.draggingSlider ~= nil then return nil end
         local mousePos = inputservice:GetMouseLocation()
         local mx, my = mousePos.X, mousePos.Y
+        local now = os.clock()
+
+        -- Throttle: if mouse moved less than 3px and less than 16ms elapsed, use cache
+        if not force and (now - lastHoverTime < 0.016) and math.abs(mx - lastHoverMx) < 3 and math.abs(my - lastHoverMy) < 3 then
+            return cachedHoverObj
+        end
+
+        lastHoverTime = now
+        lastHoverMx = mx
+        lastHoverMy = my
+
         local bestObj = nil
         local bestZ = -999999
         for _, v in next, library.interactiveDrawings do
@@ -631,6 +645,7 @@ do
                 end
             end
         end
+        cachedHoverObj = bestObj
         return bestObj
     end
 
@@ -1172,7 +1187,7 @@ function library:init()
                 end)
             end
             if library.open then
-                local hoverObj = utility:GetHoverObject();
+                local hoverObj = utility:GetHoverObject(true);
                 local hoverObjData = library.drawings[hoverObj];
                 if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.MouseButton2 then
                     local mp = inputservice:GetMouseLocation()
@@ -1256,7 +1271,7 @@ function library:init()
 
     utility:Connection(inputservice.InputEnded, function(input, gpe)
         if self.hasInit and library.open then
-            local hoverObj = utility:GetHoverObject();
+            local hoverObj = utility:GetHoverObject(true);
             local hoverObjData = library.drawings[hoverObj];
 
             if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -7214,29 +7229,45 @@ function library:init()
     local smoothedFps = 60;
     local smoothedPing = 40;
     local lasttick = tick();
+    local lastPingUpdate = 0;
+    local pingStatItem = nil;
+    pcall(function()
+        pingStatItem = stats.Network.ServerStatsItem["Data Ping"]
+    end)
+
     utility:Connection(runservice.RenderStepped, function(step)
         if step and step > 0 then
             local rawFps = math.clamp(1 / step, 1, 999);
             smoothedFps = smoothedFps + (rawFps - smoothedFps) * math.clamp(step * 3.5, 0.01, 0.15);
         end
-        local ok, rawPing = pcall(function()
-            return stats.Network.ServerStatsItem["Data Ping"]:GetValue();
-        end)
-        if ok and typeof(rawPing) == 'number' and rawPing >= 0 then
-            smoothedPing = smoothedPing + (rawPing - smoothedPing) * math.clamp((step or 0.016) * 3.5, 0.01, 0.15);
+
+        local now = tick()
+        if now - lastPingUpdate >= 0.5 then
+            lastPingUpdate = now
+            if not pingStatItem then
+                pcall(function()
+                    pingStatItem = stats.Network.ServerStatsItem["Data Ping"]
+                end)
+            end
+            if pingStatItem then
+                local ok, rawPing = pcall(pingStatItem.GetValue, pingStatItem)
+                if ok and typeof(rawPing) == 'number' and rawPing >= 0 then
+                    smoothedPing = smoothedPing + (rawPing - smoothedPing) * 0.4
+                end
+            end
+            library.stats.sendkbps = stats.DataSendKbps;
+            library.stats.receivekbps = stats.DataReceiveKbps;
         end
 
         library.stats.fps = floor(smoothedFps + 0.5);
         library.stats.ping = floor(smoothedPing + 0.5);
-        library.stats.sendkbps = stats.DataSendKbps;
-        library.stats.receivekbps = stats.DataReceiveKbps;
 
         if camera then
             viewportSize = camera.ViewportSize
         end
 
-        if (tick()-lasttick)*1000 > library.watermark.refreshrate then
-            lasttick = tick();
+        if (now - lasttick) * 1000 > library.watermark.refreshrate then
+            lasttick = now;
             library.watermark:Update();
         end
 
