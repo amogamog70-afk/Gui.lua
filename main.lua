@@ -622,7 +622,7 @@ do
                 if pos and size then
                     local x1, y1 = pos.X, pos.Y
                     if mx >= x1 and mx <= x1 + size.X and my >= y1 and my <= y1 + size.Y then
-                        local z = v.ZIndex or 0
+                        local z = v.ZIndex or (v.Object and v.Object.ZIndex) or 0
                         if z > bestZ then
                             bestZ = z
                             bestObj = v.Object
@@ -716,6 +716,7 @@ do
             Hover = false;
             Visible = false;
             ActualVisible = false;
+            ZIndex = 0;
             MouseButton1Down = library.signal.new();
             MouseButton2Down = library.signal.new();
             MouseButton1Up = library.signal.new();
@@ -867,7 +868,7 @@ do
                 pcall(function()
                     drawing.Object[i] = v
                 end)
-                if drawing[i] ~= nil or i == 'Parent' or i == 'ThemeColor' or i == 'OutlineThemeColor' or i == 'ThemeColorOutline' or i == 'ThemeColorOffset' or i == 'OutlineThemeColorOffset' then
+                if drawing[i] ~= nil or i == 'Parent' or i == 'ThemeColor' or i == 'OutlineThemeColor' or i == 'ThemeColorOutline' or i == 'ThemeColorOffset' or i == 'OutlineThemeColorOffset' or i == 'ZIndex' then
                     drawing[i] = v
                 end
 
@@ -1943,7 +1944,8 @@ function library:init()
 
 
             objs.dragdetector = utility:Draw('Square',{
-                Size = newUDim2(1,0,1,0);
+                Size = newUDim2(1,0,0,24);
+                Position = newUDim2(0,0,0,0);
                 Parent = objs.midBorder;
                 Transparency = 0;
                 ZIndex = z+2;
@@ -3160,6 +3162,7 @@ function library:init()
                 utility:Connection(objs.background.MouseEnter, function()
                     if tab ~= window.selectedTab then
                         objs.background.Color = fromrgb(32, 32, 36);
+                        objs.innerBorder.ThemeColor = 'Border 2';
                         objs.text.ThemeColor = 'Primary Text';
                         objs.topBorder.ThemeColor = 'Accent';
                     end
@@ -3169,6 +3172,7 @@ function library:init()
                     if tab ~= window.selectedTab then
                         objs.background.ThemeColor = 'Unselected Tab Background';
                         objs.background.Color = library.theme['Unselected Tab Background'];
+                        objs.innerBorder.ThemeColor = 'Border 1';
                         objs.text.ThemeColor = 'Unselected Tab Text';
                         objs.topBorder.ThemeColor = 'Unselected Tab Background';
                     end
@@ -6163,6 +6167,7 @@ function library:init()
                 objs.text.Position = newUDim2(.5, 0, 0, 3);
 
                 objs.topBorder.ThemeColor = v.selected and 'Accent' or 'Unselected Tab Background';
+                objs.innerBorder.ThemeColor = 'Border 1';
 
                 pos += objs.background.Size.X.Offset + 1
 
