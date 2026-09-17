@@ -8156,8 +8156,19 @@ function library:CreateSettingsTab(menu)
     local configSection = settingsTab:AddSection('Config', 1);
     local mainSection = settingsTab:AddSection('Main', 1);
 
+    local autoLoadToggle;
+
     configSection:AddBox({text = 'Config Name', flag = 'configinput'})
-    configSection:AddList({text = 'Config', flag = 'selectedconfig'})
+    configSection:AddList({
+        text = 'Config',
+        flag = 'selectedconfig',
+        callback = function(selected)
+            if autoLoadToggle then
+                local isAuto = (library:GetAutoLoadConfig() == selected) and (selected ~= nil and selected ~= '')
+                autoLoadToggle:SetState(isAuto, true)
+            end
+        end
+    })
 
     local function refreshConfigs()
         library.options.selectedconfig:ClearValues();
@@ -8167,9 +8178,14 @@ function library:CreateSettingsTab(menu)
                 library.options.selectedconfig:AddValue(v:split('\\')[#v:split('\\')]:sub(1,-#ext-1))
             end
         end
+        local curAuto = library:GetAutoLoadConfig()
+        if curAuto and library:GetConfig(curAuto) then
+            library.options.selectedconfig:Select(curAuto, true)
+            if autoLoadToggle then
+                autoLoadToggle:SetState(true, true)
+            end
+        end
     end
-
-    local autoLoadSep;
 
     configSection:AddButton({text = 'Load', confirm = true, callback = function()
         library:LoadConfig(library.flags.selectedconfig);
@@ -8188,28 +8204,34 @@ function library:CreateSettingsTab(menu)
         if library:GetConfig(library.flags.selectedconfig) then
             if library:GetAutoLoadConfig() == library.flags.selectedconfig then
                 library:SetAutoLoadConfig(nil)
-                if autoLoadSep then autoLoadSep:SetText('Auto-Load: None') end
+                if autoLoadToggle then autoLoadToggle:SetState(false, true) end
             end
             delfile(self.cheatname..'/'..self.gamename..'/configs/'..library.flags.selectedconfig.. self.fileext);
             refreshConfigs()
         end
     end})
 
-    autoLoadSep = configSection:AddSeparator({text = 'Auto-Load: ' .. (library:GetAutoLoadConfig() or 'None')});
-
-    configSection:AddButton({text = 'Set Auto-Load', confirm = true, callback = function()
-        local selected = library.flags.selectedconfig
-        if selected and #selected > 0 then
-            if library:SetAutoLoadConfig(selected) then
-                autoLoadSep:SetText('Auto-Load: ' .. selected)
+    autoLoadToggle = configSection:AddToggle({
+        text = 'Auto Load',
+        flag = 'autoload_config_enabled',
+        state = false,
+        tooltip = 'Автоматически загружать выбранный конфиг при старте скрипта',
+        callback = function(enabled)
+            local selected = library.flags.selectedconfig
+            if enabled then
+                if selected and selected ~= '' and library:GetConfig(selected) then
+                    library:SetAutoLoadConfig(selected)
+                else
+                    library:SendNotification('Please select a valid config from the list!', 4, c3new(1, 0.4, 0.4))
+                    if autoLoadToggle then
+                        autoLoadToggle:SetState(false, true)
+                    end
+                end
+            else
+                library:SetAutoLoadConfig(nil)
             end
-        else
-            library:SendNotification('Please select a config first!', 4, c3new(1, 0.4, 0.4))
         end
-    end}):AddButton({text = 'Clear Auto-Load', confirm = true, callback = function()
-        library:SetAutoLoadConfig(nil)
-        autoLoadSep:SetText('Auto-Load: None')
-    end})
+    })
 
     refreshConfigs()
 
@@ -8238,13 +8260,25 @@ function library:CreateSettingsTab(menu)
            end
        end})
 
-    mainSection:AddSeparator({text = 'Auto-Inject'});
+    mainSection:AddSeparator({text = 'Auto-Execute'});
 
-    mainSection:AddButton({text = 'Install Auto-Inject', confirm = true, callback = function()
-        library:InstallAutoInject()
-    end}):AddButton({text = 'Remove Auto-Inject', confirm = true, callback = function()
-        library:RemoveAutoInject()
-    end})
+    local autoExecToggle;
+    autoExecToggle = mainSection:AddToggle({
+        text = 'Auto Execute',
+        flag = 'auto_execute_toggle',
+        state = library:IsAutoInjectInstalled(),
+        tooltip = 'Включение / выключение автозагрузчика в autoexec папке инжектора',
+        callback = function(enabled)
+            if enabled then
+                local success, path = library:InstallAutoInject()
+                if not success and autoExecToggle then
+                    autoExecToggle:SetState(false, true)
+                end
+            else
+                library:RemoveAutoInject()
+            end
+        end
+    })
 
     mainSection:AddToggle({text = 'Re-Inject on Teleport', flag = 'teleport_autoinject', state = false, callback = function(bool)
         library:SetTeleportAutoInject(bool)
