@@ -8354,51 +8354,39 @@ function library:CreateSettingsTab(menu)
     local configSection = settingsTab:AddSection('Config Manager', 1);
     local mainSection = settingsTab:AddSection('Main', 1);
 
-    local autoLoadSection = settingsTab:AddSection('Auto-Load Configs', 2);
-
     local autoLoadToggle;
-    local autoLoadTargetList;
-    local autoLoadStatus;
+    local autoLoadList;
 
     configSection:AddBox({text = 'Config Name', flag = 'configinput'})
     configSection:AddList({text = 'Config', flag = 'selectedconfig'})
 
     local function refreshConfigs()
         library.options.selectedconfig:ClearValues();
-        if library.options.autoload_target then
-            library.options.autoload_target:ClearValues();
+        if library.options.autoload_config_target then
+            library.options.autoload_config_target:ClearValues();
         end
         for _,v in next, listfiles(self.cheatname..'/'..self.gamename..'/configs') do
             local ext = '.'..v:split('.')[#v:split('.')];
             if ext == self.fileext then
                 local name = v:split('\\')[#v:split('\\')]:sub(1,-#ext-1)
                 library.options.selectedconfig:AddValue(name)
-                if library.options.autoload_target then
-                    library.options.autoload_target:AddValue(name)
+                if library.options.autoload_config_target then
+                    library.options.autoload_config_target:AddValue(name)
                 end
             end
         end
         local curAuto = library:GetAutoLoadConfig()
         if curAuto and library:GetConfig(curAuto) then
-            if library.options.autoload_target then
-                library.options.autoload_target:Select(curAuto, true)
+            if library.options.autoload_config_target then
+                library.options.autoload_config_target:Select(curAuto, true)
             end
             if autoLoadToggle then
                 autoLoadToggle:SetState(true, true)
-            end
-            if autoLoadStatus then
-                autoLoadStatus:SetText('Active: ' .. curAuto)
             end
         else
             if autoLoadToggle then
                 autoLoadToggle:SetState(false, true)
             end
-            if autoLoadStatus then
-                autoLoadStatus:SetText('Active: None')
-            end
-        end
-        if library.autoLoadFloatingWindow and library.autoLoadFloatingWindow.visible then
-            pcall(function() library.autoLoadFloatingWindow:Refresh() end)
         end
     end
     library.refreshAutoLoadTab = refreshConfigs
@@ -8421,7 +8409,6 @@ function library:CreateSettingsTab(menu)
             if library:GetAutoLoadConfig() == library.flags.selectedconfig then
                 library:SetAutoLoadConfig(nil)
                 if autoLoadToggle then autoLoadToggle:SetState(false, true) end
-                if autoLoadStatus then autoLoadStatus:SetText('Active: None') end
             end
             delfile(self.cheatname..'/'..self.gamename..'/configs/'..library.flags.selectedconfig.. self.fileext);
             refreshConfigs()
@@ -8431,67 +8418,6 @@ function library:CreateSettingsTab(menu)
     configSection:AddButton({text = 'Refresh Configs', callback = function()
         refreshConfigs()
     end})
-
-    -- [ОТДЕЛЬНОЕ ОКНО/СЕКЦИЯ ДЛЯ АВТО-ЛОАДА В КОЛОНКЕ 2]
-    autoLoadToggle = autoLoadSection:AddToggle({
-        text = 'Enable Auto-Load',
-        flag = 'autoload_enabled',
-        state = (library:GetAutoLoadConfig() ~= nil),
-        tooltip = 'Автоматически загружать выбранный конфиг при старте скрипта',
-        callback = function(enabled)
-            if enabled then
-                local chosen = library.flags.autoload_target or library.flags.selectedconfig
-                if chosen and chosen ~= '' and library:GetConfig(chosen) then
-                    library:SetAutoLoadConfig(chosen)
-                else
-                    library:SendNotification('Select a config from the list first!', 4, c3new(1, 0.4, 0.4))
-                    if autoLoadToggle then autoLoadToggle:SetState(false, true) end
-                end
-            else
-                library:SetAutoLoadConfig(nil)
-            end
-            if autoLoadStatus then
-                autoLoadStatus:SetText('Active: ' .. (library:GetAutoLoadConfig() or 'None'))
-            end
-        end
-    })
-
-    autoLoadTargetList = autoLoadSection:AddList({
-        text = 'Select Config to Auto-Load',
-        flag = 'autoload_target',
-        tooltip = 'Список всех твоих конфигов для назначения на автозагрузку',
-        callback = function(chosen)
-            if autoLoadToggle and autoLoadToggle.state then
-                library:SetAutoLoadConfig(chosen)
-                if autoLoadStatus then
-                    autoLoadStatus:SetText('Active: ' .. (chosen or 'None'))
-                end
-            end
-        end
-    })
-
-    autoLoadStatus = autoLoadSection:AddSeparator({text = 'Active: ' .. (library:GetAutoLoadConfig() or 'None')})
-
-    autoLoadSection:AddButton({text = 'Set Auto-Load', confirm = true, callback = function()
-        local chosen = library.flags.autoload_target or library.flags.selectedconfig
-        if chosen and chosen ~= '' and library:GetConfig(chosen) then
-            library:SetAutoLoadConfig(chosen)
-            if autoLoadToggle then autoLoadToggle:SetState(true, true) end
-            if autoLoadStatus then autoLoadStatus:SetText('Active: ' .. chosen) end
-        else
-            library:SendNotification('Please select a valid config first!', 4, c3new(1, 0.4, 0.4))
-        end
-    end}):AddButton({text = 'Clear Auto-Load', confirm = true, callback = function()
-        library:SetAutoLoadConfig(nil)
-        if autoLoadToggle then autoLoadToggle:SetState(false, true) end
-        if autoLoadStatus then autoLoadStatus:SetText('Active: None') end
-    end})
-
-    autoLoadSection:AddButton({text = 'Open Floating Window', callback = function()
-        library:OpenAutoLoadWindow()
-    end})
-
-    refreshConfigs()
 
     mainSection:AddBind({text = 'Open / Close', flag = 'togglebind', nomouse = true, noindicator = true, bind = Enum.KeyCode.End, callback = function()
         library:SetOpen(not library.open)
@@ -8537,6 +8463,43 @@ function library:CreateSettingsTab(menu)
             end
         end
     })
+
+    mainSection:AddSeparator({text = 'Auto-Load'});
+
+    autoLoadToggle = mainSection:AddToggle({
+        text = 'Auto Load',
+        flag = 'autoload_enabled',
+        state = (library:GetAutoLoadConfig() ~= nil),
+        tooltip = 'Автоматически загружать выбранный конфиг при старте скрипта',
+        callback = function(enabled)
+            if enabled then
+                local chosen = library.flags.autoload_config_target or library.flags.selectedconfig
+                if chosen and chosen ~= '' and library:GetConfig(chosen) then
+                    library:SetAutoLoadConfig(chosen)
+                else
+                    library:SendNotification('Select a config from the list first!', 4, c3new(1, 0.4, 0.4))
+                    if autoLoadToggle then autoLoadToggle:SetState(false, true) end
+                end
+            else
+                library:SetAutoLoadConfig(nil)
+            end
+        end
+    })
+
+    autoLoadList = mainSection:AddList({
+        text = 'Config to Auto-Load',
+        flag = 'autoload_config_target',
+        tooltip = 'Конфиг для автоматической загрузки при старте',
+        callback = function(chosen)
+            if autoLoadToggle and autoLoadToggle.state then
+                if chosen and chosen ~= '' and library:GetConfig(chosen) then
+                    library:SetAutoLoadConfig(chosen)
+                end
+            end
+        end
+    })
+
+    refreshConfigs()
 
     mainSection:AddSeparator({text = 'Indicators'});
 
