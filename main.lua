@@ -1213,6 +1213,10 @@ function library:Unload()
     if self.glowDrawings then
         table.clear(self.glowDrawings)
     end
+    if self._teleportConnection then
+        pcall(function() self._teleportConnection:Disconnect() end)
+        self._teleportConnection = nil
+    end
     for obj in next, self.drawings do
         obj:Remove()
     end
@@ -1367,6 +1371,217 @@ function library:init()
             self:SendNotification('Error saving config: '..tostring(e)..'. ('..tostring(name)..')', 5, c3new(1,0,0));
         end
     end
+
+    function self:GetAutoLoadConfig()
+        local autoLoadPath = self.cheatname..'/'..self.gamename..'/configs/autoload.txt'
+        local success, result = pcall(function()
+            if isfile and isfile(autoLoadPath) then
+                local str = readfile(autoLoadPath)
+                if str then
+                    str = (str:gsub('^%s*(.-)%s*$', '%1'))
+                    if #str > 0 then
+                        return str
+                    end
+                end
+            end
+            return nil
+        end)
+        return success and result or nil
+    end
+
+    function self:SetAutoLoadConfig(name)
+        local autoLoadPath = self.cheatname..'/'..self.gamename..'/configs/autoload.txt'
+        if not name or name == '' then
+            pcall(function()
+                if isfile and isfile(autoLoadPath) and delfile then
+                    delfile(autoLoadPath)
+                end
+            end)
+            self:SendNotification('Auto-load config disabled', 4, c3new(0.8, 0.8, 0.8))
+            return true
+        end
+
+        if not self:GetConfig(name) then
+            self:SendNotification('Config \''..tostring(name)..'\' does not exist.', 5, c3new(1, 0.3, 0.3))
+            return false
+        end
+
+        local ok, err = pcall(function()
+            if writefile then
+                writefile(autoLoadPath, tostring(name))
+            end
+        end)
+        if ok then
+            self:SendNotification('Auto-Load set to: '..tostring(name), 5, c3new(0.3, 1, 0.5))
+            return true
+        else
+            self:SendNotification('Failed to set auto-load: '..tostring(err), 5, c3new(1, 0.3, 0.3))
+            return false
+        end
+    end
+
+    function self:ApplyAutoLoadConfig()
+        local autoCfg = self:GetAutoLoadConfig()
+        if autoCfg and #autoCfg > 0 then
+            if self:GetConfig(autoCfg) then
+                self:LoadConfig(autoCfg)
+                self:SendNotification('Auto-loaded config: ' .. autoCfg, 5, c3new(0.4, 0.8, 1))
+                return true
+            else
+                self:SendNotification('Auto-load config \''..autoCfg..'\' not found on disk.', 5, c3new(1, 0.5, 0.2))
+            end
+        end
+        return false
+    end
+
+    local autoExecFileNames = { "Gemini_AutoExec.lua", "GeminiProject.lua" }
+    local autoExecFolders = {
+        "../autoexec/",
+        "../../autoexec/",
+        "autoexec/",
+        "../autoexecute/",
+        "../../autoexecute/",
+        "autoexecute/"
+    }
+
+    local defaultLoaderSource = [=[-- [Gemini Project Auto-Execute Loader]
+repeat task.wait() until game:IsLoaded() and game.Players and game.Players.LocalPlayer
+task.wait(1.5)
+
+local localPaths = {
+    "c:/Users/gebruiker/Desktop/Gemini Project/example_usage.lua",
+    "c:/Users/gebruiker/Desktop/Gemini Project/mainSoruceCode.lua",
+    "Gemini Project/example_usage.lua",
+    "Gemini Project/mainSoruceCode.lua",
+    "example_usage.lua",
+    "mainSoruceCode.lua"
+}
+
+local executed = false
+for _, path in ipairs(localPaths) do
+    if isfile and isfile(path) then
+        local success, content = pcall(readfile, path)
+        if success and content and #content > 50 then
+            local fn, err = loadstring(content)
+            if fn then
+                task.spawn(fn)
+                executed = true
+                break
+            end
+        end
+    end
+end
+
+if not executed then
+    local fallbackUrl = "https://raw.githubusercontent.com/amogamog70-afk/Gui.lua/main/main.lua"
+    pcall(function()
+        local code = game:HttpGet(fallbackUrl)
+        if code and #code > 50 then
+            local fn = loadstring(code)
+            if fn then task.spawn(fn) end
+        end
+    end)
+end
+]=]
+
+    function self:InstallAutoInject(customCode)
+        local code = (typeof(customCode) == 'string' and #customCode > 0) and customCode or defaultLoaderSource
+        local installedPath = nil
+
+        for _, folder in ipairs(autoExecFolders) do
+            local fullPath = folder .. "Gemini_AutoExec.lua"
+            local ok = pcall(function()
+                if writefile then
+                    writefile(fullPath, code)
+                    return true
+                end
+                return false
+            end)
+            if ok and isfile and isfile(fullPath) then
+                installedPath = fullPath
+                break
+            end
+        end
+
+        if installedPath then
+            self:SendNotification('Auto-Inject installed successfully!\n'..installedPath, 6, c3new(0.3, 1, 0.5))
+            return true, installedPath
+        else
+            if setclipboard then
+                pcall(function() setclipboard(code) end)
+                self:SendNotification('Executor sandboxed autoexec.\nLoader code copied to clipboard!', 7, c3new(1, 0.8, 0.2))
+            else
+                self:SendNotification('Failed to install to autoexec (sandbox restricted).', 5, c3new(1, 0.3, 0.3))
+            end
+            return false, nil
+        end
+    end
+
+    function self:RemoveAutoInject()
+        local removedCount = 0
+        for _, folder in ipairs(autoExecFolders) do
+            for _, name in ipairs(autoExecFileNames) do
+                local fullPath = folder .. name
+                pcall(function()
+                    if isfile and isfile(fullPath) and delfile then
+                        delfile(fullPath)
+                        removedCount = removedCount + 1
+                    end
+                end)
+            end
+        end
+
+        if removedCount > 0 then
+            self:SendNotification('Auto-Inject removed ('..removedCount..' file(s) deleted)', 5, c3new(0.3, 1, 0.5))
+            return true
+        else
+            self:SendNotification('No Auto-Inject files found in autoexec.', 5, c3new(0.8, 0.8, 0.8))
+            return false
+        end
+    end
+
+    function self:IsAutoInjectInstalled()
+        for _, folder in ipairs(autoExecFolders) do
+            for _, name in ipairs(autoExecFileNames) do
+                local fullPath = folder .. name
+                local exists = false
+                pcall(function()
+                    if isfile and isfile(fullPath) then
+                        exists = true
+                    end
+                end)
+                if exists then return true, fullPath end
+            end
+        end
+        return false, nil
+    end
+
+    function self:SetTeleportAutoInject(enabled)
+        self.teleportAutoInject = enabled
+        if enabled then
+            local qot = (syn and syn.queue_on_teleport) or queue_on_teleport or (fluxus and fluxus.queue_on_teleport)
+            if qot then
+                pcall(function() qot(defaultLoaderSource) end)
+                self:SendNotification('Teleport Auto-Inject armed', 4, c3new(0.4, 0.9, 1))
+            else
+                self:SendNotification('queue_on_teleport not supported by executor', 5, c3new(1, 0.5, 0.2))
+            end
+        end
+    end
+
+    pcall(function()
+        local lp = localplayer or (players and players.LocalPlayer)
+        if lp and not self._teleportConnection then
+            self._teleportConnection = lp.OnTeleport:Connect(function()
+                if self.teleportAutoInject then
+                    local qot = (syn and syn.queue_on_teleport) or queue_on_teleport or (fluxus and fluxus.queue_on_teleport)
+                    if qot then
+                        pcall(function() qot(defaultLoaderSource) end)
+                    end
+                end
+            end)
+        end
+    end)
 
     for i,v in next, self.images do
         pcall(function()
@@ -2419,7 +2634,7 @@ function library:init()
         ----- Create Objects ----
         do
             local size = data.size or newUDim2(0, 525, 0, 650);
-            local position = data.position or data.pos or newUDim2(0.5, -math.floor(size.X.Offset / 2) - 20, 0.5, -math.floor(size.Y.Offset / 2) + 5);
+            local position = data.position or data.pos or newUDim2(0.5, -math.floor(size.X.Offset / 2) + 120, 0.5, -math.floor(size.Y.Offset / 2) + 5);
             local objs = window.objects;
             local z = library.zindexOrder.window;
 
@@ -6185,12 +6400,54 @@ function library:init()
                         local lastBlink = tick()
                         self.objects.inputText.Text = input .. '|';
 
+                        local backspaceHeld = false
+                        local backspaceStartTime = 0
+                        local lastBackspaceRepeat = 0
+
+                        local function deleteChar()
+                            if #input > 0 then
+                                if inputservice:IsKeyDown(Enum.KeyCode.LeftControl) or inputservice:IsKeyDown(Enum.KeyCode.RightControl) then
+                                    local trimmed = input:gsub('%s+$', '')
+                                    local lastSpace = trimmed:match('^.*()%s')
+                                    if lastSpace then
+                                        input = input:sub(1, lastSpace)
+                                    else
+                                        input = ''
+                                    end
+                                else
+                                    input = input:sub(1, -2)
+                                end
+                                blink = true
+                                lastBlink = tick()
+                                self.objects.inputText.Text = input .. '|'
+                            end
+                        end
+
                         blinkConn = utility:Connection(runservice.RenderStepped, function()
                             if box.focused then
                                 if tick() - lastBlink > 0.45 then
                                     blink = not blink
                                     lastBlink = tick()
                                     self.objects.inputText.Text = input .. (blink and '|' or '')
+                                end
+
+                                if inputservice:IsKeyDown(Enum.KeyCode.Backspace) then
+                                    local now = tick()
+                                    if not backspaceHeld then
+                                        backspaceHeld = true
+                                        backspaceStartTime = now
+                                        lastBackspaceRepeat = now
+                                    else
+                                        local heldDuration = now - backspaceStartTime
+                                        if heldDuration > 0.35 then
+                                            if now - lastBackspaceRepeat >= 0.035 then
+                                                lastBackspaceRepeat = now
+                                                deleteChar()
+                                            end
+                                        end
+                                    end
+                                else
+                                    backspaceHeld = false
                                 end
                             end
                         end)
@@ -6209,10 +6466,10 @@ function library:init()
                                 input = self.input
                                 box:ReleaseFocus(false);
                             elseif inp.KeyCode == Enum.KeyCode.Backspace then
-                                input = input:sub(1,-2);
-                                blink = true;
-                                lastBlink = tick();
-                                self.objects.inputText.Text = input .. '|';
+                                backspaceHeld = true
+                                backspaceStartTime = tick()
+                                lastBackspaceRepeat = tick()
+                                deleteChar()
                             elseif #inp.KeyCode.Name == 1 or table.find(whitelistedBoxKeys, inp.KeyCode) or inp.KeyCode.Name == 'Space' or inp.KeyCode.Name == 'Minus' or inp.KeyCode.Name == 'Equals' or inp.KeyCode.Name == 'Backquote' then
                                 local wlIdx = table.find(whitelistedBoxKeys, inp.KeyCode)
                                 local keyString = inp.KeyCode.Name == 'Space' and ' ' or inp.KeyCode.Name == 'Minus' and '_' or inp.KeyCode.Name == 'Equals' and '+' or inp.KeyCode.Name == 'Backquote' and '~' or wlIdx ~= nil and tostring(wlIdx-1) or inp.KeyCode.Name
@@ -7668,11 +7925,12 @@ function library:init()
                 elseif DELTA_LOADED or (g and g.DELTA_LOADED) then name = 'Delta'
                 elseif CODEX_LOADED or (g and g.CODEX_LOADED) then name = 'Codex'
                 elseif ARCEUS_LOADED or (g and g.ARCEUS_LOADED) then name = 'Arceus X'
+                elseif XENO_LOADED or (g and g.XENO_LOADED) then name = 'Xeno'
+                elseif MACSPLOIT_LOADED or (g and g.macsploit) then name = 'MacSploit'
                 elseif runservice and runservice:IsStudio() then name = 'Studio'
-                else name = 'Universal'
                 end
             end
-            if version and typeof(version) == 'string' and #version > 0 and not name:find(version, 1, true) then
+            if name and version and typeof(version) == 'string' and #version > 0 and not name:find(version, 1, true) then
                 return name .. ' ' .. version
             end
             return name
@@ -7684,8 +7942,7 @@ function library:init()
             objects = {};
             text = {
                 {self.cheatname, true},
-                {activeExecutor, true},
-                {"Private", true},
+                {activeExecutor or '', activeExecutor ~= nil and #activeExecutor > 0},
                 {self.gamename, true},
                 {'0 fps', true},
                 {'0ms', true},
@@ -7700,14 +7957,22 @@ function library:init()
         function self.watermark:Update()
             self.objects.background.Visible = library.flags.watermark_enabled
             if library.flags.watermark_enabled then
+                if not activeExecutor then
+                    activeExecutor = getExecutorName()
+                    if activeExecutor and #activeExecutor > 0 then
+                        self.text[2][1] = activeExecutor
+                        self.text[2][2] = true
+                    end
+                end
+
                 local date = {os.date('%b',os.time()), os.date('%d',os.time()), os.date('%Y',os.time())}
                 local daySuffix = math.floor(date[2]%10)
                 date[2] = date[2]..(daySuffix == 1 and 'st' or daySuffix == 2 and 'nd' or daySuffix == 3 and 'rd' or 'th')
 
-                self.text[5][1] = library.stats.fps..' fps'
-                self.text[6][1] = floor(library.stats.ping)..'ms'
-                self.text[7][1] = os.date('%X', os.time())
-                self.text[8][1] = table.concat(date, ', ')
+                self.text[4][1] = library.stats.fps..' fps'
+                self.text[5][1] = floor(library.stats.ping)..'ms'
+                self.text[6][1] = os.date('%X', os.time())
+                self.text[7][1] = table.concat(date, ', ')
 
                 local text = {};
                 for _,v in next, self.text do
@@ -7904,6 +8169,8 @@ function library:CreateSettingsTab(menu)
         end
     end
 
+    local autoLoadSep;
+
     configSection:AddButton({text = 'Load', confirm = true, callback = function()
         library:LoadConfig(library.flags.selectedconfig);
     end}):AddButton({text = 'Save', confirm = true, callback = function()
@@ -7919,9 +8186,29 @@ function library:CreateSettingsTab(menu)
         refreshConfigs()
     end}):AddButton({text = 'Delete', confirm = true, callback = function()
         if library:GetConfig(library.flags.selectedconfig) then
+            if library:GetAutoLoadConfig() == library.flags.selectedconfig then
+                library:SetAutoLoadConfig(nil)
+                if autoLoadSep then autoLoadSep:SetText('Auto-Load: None') end
+            end
             delfile(self.cheatname..'/'..self.gamename..'/configs/'..library.flags.selectedconfig.. self.fileext);
             refreshConfigs()
         end
+    end})
+
+    autoLoadSep = configSection:AddSeparator({text = 'Auto-Load: ' .. (library:GetAutoLoadConfig() or 'None')});
+
+    configSection:AddButton({text = 'Set Auto-Load', confirm = true, callback = function()
+        local selected = library.flags.selectedconfig
+        if selected and #selected > 0 then
+            if library:SetAutoLoadConfig(selected) then
+                autoLoadSep:SetText('Auto-Load: ' .. selected)
+            end
+        else
+            library:SendNotification('Please select a config first!', 4, c3new(1, 0.4, 0.4))
+        end
+    end}):AddButton({text = 'Clear Auto-Load', confirm = true, callback = function()
+        library:SetAutoLoadConfig(nil)
+        autoLoadSep:SetText('Auto-Load: None')
     end})
 
     refreshConfigs()
@@ -7950,6 +8237,18 @@ function library:CreateSettingsTab(menu)
                library:Unload() 
            end
        end})
+
+    mainSection:AddSeparator({text = 'Auto-Inject'});
+
+    mainSection:AddButton({text = 'Install Auto-Inject', confirm = true, callback = function()
+        library:InstallAutoInject()
+    end}):AddButton({text = 'Remove Auto-Inject', confirm = true, callback = function()
+        library:RemoveAutoInject()
+    end})
+
+    mainSection:AddToggle({text = 'Re-Inject on Teleport', flag = 'teleport_autoinject', state = false, callback = function(bool)
+        library:SetTeleportAutoInject(bool)
+    end})
 
     mainSection:AddSeparator({text = 'Indicators'});
 
@@ -8003,6 +8302,12 @@ themeSection:AddList({text = 'Presets', flag = 'preset_theme', values = themeStr
             end
         end});
     end
+
+    task.defer(function()
+        pcall(function()
+            library:ApplyAutoLoadConfig()
+        end)
+    end)
 
     return settingsTab;
 end
