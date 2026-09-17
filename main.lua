@@ -1250,7 +1250,7 @@ function library:init()
         local indicator = {
             title = data.title or 'indicator',
             enabled = data.enabled or false,
-            position = data.position or newUDim2(0,15,0,300),
+            position = data.position or data.pos or newUDim2(0,15,0,300),
             values = {},
             objects = {valueObjects = {}},
             spacing = '   ',
