@@ -3147,7 +3147,8 @@ function library:init()
 
                     function toggle:AddBind(data)
                         local userCallback = data.callback;
-                        local bind = {
+                        local bind;
+                        bind = {
                             class = 'bind';
                             flag = data.flag;
                             text = '';
@@ -4869,7 +4870,8 @@ function library:init()
 
                 -- // Keybind
                 function section:AddBind(data)
-                    local bind = {
+                    local bind;
+                    bind = {
                         class = 'bind';
                         flag = data.flag;
                         text = '';
