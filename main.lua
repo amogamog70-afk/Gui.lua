@@ -231,7 +231,33 @@ end
 
 library.themes = {
     {
-        name = 'Default',
+        name = 'Gemini',
+        theme = {
+            ['Accent']                    = fromrgb(88, 145, 255);
+            ['Background']                = fromrgb(16, 17, 22);
+            ['Border']                    = fromrgb(0, 0, 0);
+            ['Border 1']                  = fromrgb(42, 48, 64);
+            ['Border 2']                  = fromrgb(24, 26, 34);
+            ['Border 3']                  = fromrgb(10, 11, 14);
+            ['Primary Text']              = fromrgb(255, 255, 255);
+            ['Group Background']          = fromrgb(22, 24, 30);
+            ['Selected Tab Background']   = fromrgb(28, 32, 42);
+            ['Unselected Tab Background'] = fromrgb(14, 15, 19);
+            ['Selected Tab Text']         = fromrgb(255, 255, 255);
+            ['Unselected Tab Text']       = fromrgb(160, 170, 195);
+            ['Section Background']        = fromrgb(19, 20, 26);
+            ['Option Text 1']             = fromrgb(255, 255, 255);
+            ['Option Text 2']             = fromrgb(220, 230, 248);
+            ['Option Text 3']             = fromrgb(150, 160, 185);
+            ['Option Border 1']           = fromrgb(42, 48, 64);
+            ['Option Border 2']           = fromrgb(10, 11, 14);
+            ['Option Background']         = fromrgb(24, 26, 34);
+            ['Risky Text']                = fromrgb(255, 65, 75);
+            ['Risky Text Enabled']        = fromrgb(255, 30, 40);
+        }
+    },
+    {
+        name = 'Cyber Cyan',
         theme = {
             ['Accent']                    = fromrgb(0, 245, 255);
             ['Background']                = fromrgb(18, 18, 20);
@@ -7966,7 +7992,7 @@ themeSection:AddList({text = 'Presets', flag = 'preset_theme', values = themeStr
             end
         end
         setByPreset = false
-    end}):Select('Default');
+    end}):Select('Gemini');
 
     for i, v in pairs(library.theme) do
         themeSection:AddColor({text = i, flag = i, color = library.theme[i], callback = function(c3)
