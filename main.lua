@@ -854,11 +854,20 @@ do
                 end
 
                 if i == 'Size' and (class == 'Square' or class == 'Image') then
-                    drawing.Object.Size = utility:UDim2ToVector2(v,drawing.Parent == nil and workspace.CurrentCamera.ViewportSize or drawing.Parent.Object.Size);
-                    drawing.AbsoluteSize = drawing.Object.Size;
-                elseif i == 'Position' and (class == 'Square' or class == 'Image' or class == 'Text') then
-                    drawing.Object.Position =  utility:UDim2ToVector2(v,drawing.Parent == nil and newVector2(0,0) or drawing.Parent.Object.Position);
-                    drawing.AbsolutePosition = drawing.Object.Position;
+                    local pSize = (drawing.Parent and drawing.Parent.AbsoluteSize) or (drawing.Parent and drawing.Parent.Object and drawing.Parent.Object.Size) or (workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize) or newVector2(1920, 1080)
+                    local s = (typeof(v) == 'Vector2' and v) or utility:UDim2ToVector2(v, pSize)
+                    pcall(function()
+                        if drawing.Object then drawing.Object.Size = s end
+                    end)
+                    drawing.AbsoluteSize = s;
+                elseif i == 'Position' and (class == 'Square' or class == 'Image' or class == 'Text' or class == 'Circle') then
+                    local pPos = (drawing.Parent and drawing.Parent.AbsolutePosition) or (drawing.Parent and drawing.Parent.Object and drawing.Parent.Object.Position) or newVector2(0, 0)
+                    local pSize = (drawing.Parent and drawing.Parent.AbsoluteSize) or (drawing.Parent and drawing.Parent.Object and drawing.Parent.Object.Size) or (workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize) or newVector2(1920, 1080)
+                    local p = (typeof(v) == 'Vector2' and v) or (pPos + utility:UDim2ToVector2(v, pSize))
+                    pcall(function()
+                        if drawing.Object then drawing.Object.Position = p end
+                    end)
+                    drawing.AbsolutePosition = p;
                 elseif i == 'Parent' then
                     if drawing.Parent ~= nil and drawing.Parent.Children then
                         drawing.Parent.Children[drawing] = nil
@@ -1096,7 +1105,15 @@ function library:init()
                         option.trans,
                     }
                 elseif option.class == 'list' then
-                    cfg[flag] = option.selected;
+                    if option.multi and typeof(option.selected) == 'table' then
+                        local pureArray = {}
+                        for _, v in ipairs(option.selected) do
+                            table.insert(pureArray, tostring(v))
+                        end
+                        cfg[flag] = pureArray
+                    else
+                        cfg[flag] = option.selected;
+                    end
                 elseif option.class == 'box' then
                     cfg[flag] = option.input
                 end
@@ -2988,120 +3005,158 @@ function library:init()
 
             end
 
+            function window.dropdown:IsSelected(val)
+                local list = self.selected
+                if not list or not list.selected or val == nil then return false end
+                if list.multi then
+                    if typeof(list.selected) == 'table' then
+                        if list.selected[val] == true or list.selected[tostring(val)] == true then return true end
+                        for k, v in pairs(list.selected) do
+                            if v == val or k == val or tostring(v) == tostring(val) or tostring(k) == tostring(val) then return true end
+                        end
+                    elseif typeof(list.selected) == 'string' then
+                        return list.selected == val or tostring(list.selected) == tostring(val)
+                    end
+                else
+                    return tostring(list.selected) == tostring(val)
+                end
+                return false
+            end
+
+            function window.dropdown:UpdateItemVisual(idx, isHovered)
+                local list = self.selected
+                if not list then return end
+                local valueObj = self.objects.values[idx]
+                if not valueObj then return end
+                local val = list.values[idx]
+                if val == nil then return end
+                local isSel = self:IsSelected(val)
+
+                if list.multi then
+                    if valueObj.activePip then
+                        valueObj.activePip.Visible = false
+                        pcall(function() if valueObj.activePip.Object then valueObj.activePip.Object.Visible = false end end)
+                    end
+                    if valueObj.checkbox then
+                        valueObj.checkbox.Visible = true
+                        pcall(function() if valueObj.checkbox.Object then valueObj.checkbox.Object.Visible = true end end)
+                    end
+                    if valueObj.checkboxBorder then
+                        valueObj.checkboxBorder.Visible = true
+                        valueObj.checkboxBorder.ThemeColor = isSel and 'Accent' or (isHovered and 'Option Text 1' or 'Option Border 2')
+                        pcall(function() if valueObj.checkboxBorder.Object then valueObj.checkboxBorder.Object.Visible = true end end)
+                    end
+                    if valueObj.checkMark then
+                        valueObj.checkMark.Visible = isSel
+                        pcall(function() if valueObj.checkMark.Object then valueObj.checkMark.Object.Visible = isSel end end)
+                    end
+                    valueObj.text.Position = newUDim2(0, 22, 0, 2)
+                else
+                    if valueObj.checkbox then
+                        valueObj.checkbox.Visible = false
+                        pcall(function() if valueObj.checkbox.Object then valueObj.checkbox.Object.Visible = false end end)
+                    end
+                    if valueObj.checkboxBorder then
+                        valueObj.checkboxBorder.Visible = false
+                        pcall(function() if valueObj.checkboxBorder.Object then valueObj.checkboxBorder.Object.Visible = false end end)
+                    end
+                    if valueObj.checkMark then
+                        valueObj.checkMark.Visible = false
+                        pcall(function() if valueObj.checkMark.Object then valueObj.checkMark.Object.Visible = false end end)
+                    end
+                    if valueObj.activePip then
+                        valueObj.activePip.Visible = isSel
+                        pcall(function() if valueObj.activePip.Object then valueObj.activePip.Object.Visible = isSel end end)
+                    end
+                    valueObj.text.Position = newUDim2(0, 8, 0, 2)
+                end
+
+                if isSel then
+                    valueObj.background.Transparency = 1
+                    valueObj.background.Color = fromrgb(28, 34, 48)
+                    valueObj.text.ThemeColor = 'Accent'
+                    if not list.multi and valueObj.activePip then
+                        valueObj.activePip.Visible = true
+                        pcall(function() if valueObj.activePip.Object then valueObj.activePip.Object.Visible = true end end)
+                    end
+                elseif isHovered then
+                    valueObj.background.Transparency = 1
+                    valueObj.background.Color = fromrgb(26, 26, 32)
+                    valueObj.text.ThemeColor = 'Primary Text'
+                    if valueObj.activePip and not isSel then
+                        valueObj.activePip.Visible = false
+                        pcall(function() if valueObj.activePip.Object then valueObj.activePip.Object.Visible = false end end)
+                    end
+                else
+                    valueObj.background.Transparency = 0
+                    valueObj.background.Color = fromrgb(20, 20, 22)
+                    valueObj.text.ThemeColor = 'Option Text 2'
+                    if valueObj.activePip and not isSel then
+                        valueObj.activePip.Visible = false
+                        pcall(function() if valueObj.activePip.Object then valueObj.activePip.Object.Visible = false end end)
+                    end
+                end
+            end
+
+            function window.dropdown:HandleItemClick(idx)
+                local currentList = self.selected
+                if not currentList then return end
+                local val = currentList.values[idx]
+                if val == nil then return end
+
+                if currentList.multi then
+                    local currentMap = {}
+                    if typeof(currentList.selected) == 'table' then
+                        for k, v in pairs(currentList.selected) do
+                            if typeof(k) == 'string' and (v == true or v == 1) then
+                                currentMap[k] = true
+                            elseif typeof(v) == 'string' and v ~= '' and v ~= '...' and v ~= 'none' then
+                                currentMap[v] = true
+                            end
+                        end
+                    elseif typeof(currentList.selected) == 'string' and currentList.selected ~= '' and currentList.selected ~= '...' and currentList.selected ~= 'none' then
+                        currentMap[currentList.selected] = true
+                    end
+
+                    if currentMap[val] then
+                        currentMap[val] = nil
+                    else
+                        currentMap[val] = true
+                    end
+
+                    local newSelected = {}
+                    for _, vName in ipairs(currentList.values) do
+                        local vStr = tostring(vName)
+                        if currentMap[vStr] or currentMap[vName] then
+                            table.insert(newSelected, vStr)
+                            newSelected[vStr] = true
+                        else
+                            newSelected[vStr] = false
+                        end
+                    end
+
+                    currentList:Select(newSelected)
+                    self:Refresh()
+                else
+                    currentList:Select(val)
+                    currentList.open = false
+                    if currentList.objects and currentList.objects.openText then
+                        currentList.objects.openText.Text = '+'
+                    end
+                    if currentList.objects and currentList.objects.border1 then
+                        currentList.objects.border1.ThemeColor = currentList.objects.holder and currentList.objects.holder.Hover and 'Accent' or 'Option Border 1'
+                    end
+                    if currentList.objects and currentList.objects.text then
+                        currentList.objects.text.ThemeColor = currentList.objects.holder and currentList.objects.holder.Hover and (currentList.risky and 'Risky Text Enabled' or 'Option Text 1') or (currentList.risky and 'Risky Text' or 'Option Text 2')
+                    end
+                    window.dropdown.selected = nil
+                    window.dropdown.objects.background.Visible = false
+                end
+            end
+
             function window.dropdown:Refresh()
                 if self.selected ~= nil then
                     local list = self.selected
-
-                    local function isSelected(val)
-                        if list.multi then
-                            if typeof(list.selected) == 'table' then
-                                return table.find(list.selected, val) ~= nil
-                            elseif typeof(list.selected) == 'string' then
-                                return list.selected == val
-                            end
-                        else
-                            return list.selected == val
-                        end
-                        return false
-                    end
-
-                    local function handleItemClick(idx)
-                        local currentList = self.selected
-                        if not currentList then return end
-                        local val = currentList.values[idx]
-                        if val == nil then return end
-
-                        if currentList.multi then
-                            local newSelected = {}
-                            local wasSelected = false
-                            if typeof(currentList.selected) == 'table' then
-                                for _, item in ipairs(currentList.selected) do
-                                    if item == val then
-                                        wasSelected = true
-                                    else
-                                        table.insert(newSelected, item)
-                                    end
-                                end
-                            elseif typeof(currentList.selected) == 'string' then
-                                if currentList.selected == val then
-                                    wasSelected = true
-                                else
-                                    table.insert(newSelected, currentList.selected)
-                                end
-                            end
-
-                            if not wasSelected then
-                                table.insert(newSelected, val)
-                            end
-
-                            currentList:Select(newSelected)
-                            self:Refresh()
-                        else
-                            currentList:Select(val)
-                            currentList.open = false
-                            if currentList.objects and currentList.objects.openText then
-                                currentList.objects.openText.Text = '+'
-                            end
-                            if currentList.objects and currentList.objects.border1 then
-                                currentList.objects.border1.ThemeColor = currentList.objects.holder and currentList.objects.holder.Hover and 'Accent' or 'Option Border 1'
-                            end
-                            if currentList.objects and currentList.objects.text then
-                                currentList.objects.text.ThemeColor = currentList.objects.holder and currentList.objects.holder.Hover and (currentList.risky and 'Risky Text Enabled' or 'Option Text 1') or (currentList.risky and 'Risky Text' or 'Option Text 2')
-                            end
-                            window.dropdown.selected = nil
-                            window.dropdown.objects.background.Visible = false
-                        end
-                    end
-
-                    local function updateItemVisual(idx, isHovered)
-                        local valueObj = self.objects.values[idx]
-                        if not valueObj then return end
-                        local val = list.values[idx]
-                        if val == nil then return end
-                        local isSel = isSelected(val)
-
-                        if list.multi then
-                            if valueObj.checkbox then
-                                valueObj.checkbox.Visible = true
-                            end
-                            if valueObj.checkboxBorder then
-                                valueObj.checkboxBorder.Visible = true
-                                valueObj.checkboxBorder.ThemeColor = isSel and 'Accent' or (isHovered and 'Option Text 1' or 'Option Border 2')
-                            end
-                            if valueObj.checkMark then
-                                valueObj.checkMark.Visible = isSel
-                            end
-                            valueObj.text.Position = newUDim2(0, 22, 0, 2)
-                        else
-                            if valueObj.checkbox then valueObj.checkbox.Visible = false end
-                            if valueObj.checkboxBorder then valueObj.checkboxBorder.Visible = false end
-                            if valueObj.checkMark then valueObj.checkMark.Visible = false end
-                            valueObj.text.Position = newUDim2(0, 8, 0, 2)
-                        end
-
-                        if isSel then
-                            valueObj.background.Transparency = 1
-                            valueObj.background.Color = fromrgb(28, 34, 48)
-                            valueObj.text.ThemeColor = 'Accent'
-                            if valueObj.activePip then
-                                valueObj.activePip.Visible = true
-                            end
-                        elseif isHovered then
-                            valueObj.background.Transparency = 1
-                            valueObj.background.Color = fromrgb(26, 26, 32)
-                            valueObj.text.ThemeColor = 'Primary Text'
-                            if valueObj.activePip then
-                                valueObj.activePip.Visible = false
-                            end
-                        else
-                            valueObj.background.Transparency = 0
-                            valueObj.background.Color = fromrgb(20, 20, 22)
-                            valueObj.text.ThemeColor = 'Option Text 2'
-                            if valueObj.activePip then
-                                valueObj.activePip.Visible = false
-                            end
-                        end
-                    end
 
                     for idx = 1, #list.values do
                         local value = list.values[idx]
@@ -3161,21 +3216,32 @@ function library:init()
 
                             utility:Connection(valueObject.background.MouseEnter, function()
                                 valueObject.isHovered = true
-                                updateItemVisual(currentIdx, true)
+                                window.dropdown:UpdateItemVisual(currentIdx, true)
                             end)
                             utility:Connection(valueObject.background.MouseLeave, function()
                                 valueObject.isHovered = false
-                                updateItemVisual(currentIdx, false)
+                                window.dropdown:UpdateItemVisual(currentIdx, false)
+                            end)
+                            utility:Connection(valueObject.checkbox.MouseEnter, function()
+                                valueObject.isHovered = true
+                                window.dropdown:UpdateItemVisual(currentIdx, true)
+                            end)
+                            utility:Connection(valueObject.checkbox.MouseLeave, function()
+                                valueObject.isHovered = false
+                                window.dropdown:UpdateItemVisual(currentIdx, false)
                             end)
 
                             utility:Connection(valueObject.background.MouseButton1Down, function()
-                                handleItemClick(currentIdx)
+                                window.dropdown:HandleItemClick(currentIdx)
                             end)
                             utility:Connection(valueObject.checkbox.MouseButton1Down, function()
-                                handleItemClick(currentIdx)
+                                window.dropdown:HandleItemClick(currentIdx)
+                            end)
+                            utility:Connection(valueObject.checkboxBorder.MouseButton1Down, function()
+                                window.dropdown:HandleItemClick(currentIdx)
                             end)
                             utility:Connection(valueObject.checkMark.MouseButton1Down, function()
-                                handleItemClick(currentIdx)
+                                window.dropdown:HandleItemClick(currentIdx)
                             end)
 
                             self.objects.values[idx] = valueObject
@@ -3193,7 +3259,7 @@ function library:init()
                             obj.background.Position = newUDim2(0, 2, 0, y)
                             obj.text.Text = tostring(valStr)
                             obj.text.Visible = true
-                            updateItemVisual(idx, obj.isHovered or false)
+                            self:UpdateItemVisual(idx, obj.isHovered or false)
                             y = y + 19 + padding
                         end
                     end
@@ -4583,11 +4649,51 @@ function library:init()
     
                         function list:Select(option, nocallback)
                             if self.multi then
-                                if typeof(option) == 'string' then
-                                    option = (option == 'none' or option == '' or option == '...') and {} or {option}
-                                elseif typeof(option) ~= 'table' then
-                                    option = {}
+                                local selectedMap = {}
+                                if typeof(option) == 'table' then
+                                    for k, v in pairs(option) do
+                                        if typeof(k) == 'string' and (v == true or v == 1) then
+                                            selectedMap[k] = true
+                                        elseif typeof(v) == 'string' and v ~= '' and v ~= '...' and v ~= 'none' then
+                                            selectedMap[v] = true
+                                        end
+                                    end
+                                elseif typeof(option) == 'string' and option ~= '' and option ~= '...' and option ~= 'none' then
+                                    selectedMap[option] = true
                                 end
+
+                                local normalized = {}
+                                if typeof(self.values) == 'table' and #self.values > 0 then
+                                    for _, val in ipairs(self.values) do
+                                        local valStr = tostring(val)
+                                        if selectedMap[valStr] or selectedMap[val] then
+                                            table.insert(normalized, valStr)
+                                            normalized[valStr] = true
+                                        else
+                                            normalized[valStr] = false
+                                        end
+                                    end
+                                else
+                                    for k in pairs(selectedMap) do
+                                        table.insert(normalized, tostring(k))
+                                        normalized[tostring(k)] = true
+                                    end
+                                end
+
+                                setmetatable(normalized, {
+                                    __tostring = function(t)
+                                        if #t == 0 then return '...' end
+                                        return table.concat(t, ', ')
+                                    end,
+                                    __index = function(t, k)
+                                        if typeof(k) == 'string' then
+                                            return rawget(t, k) == true
+                                        end
+                                        return rawget(t, k)
+                                    end
+                                })
+
+                                option = normalized
                             else
                                 if typeof(option) == 'table' then
                                     option = #option > 0 and option[1] or nil
@@ -4606,7 +4712,8 @@ function library:init()
                                     elseif count == 2 then
                                         text = tostring(option[1]) .. ', ' .. tostring(option[2])
                                     else
-                                        text = count .. ' selected'
+                                        local joined = table.concat(option, ', ')
+                                        text = joined
                                     end
                                 else
                                     text = tostring(option);
@@ -4614,15 +4721,45 @@ function library:init()
 
                                 local label = self.objects.inputText
                                 label.Text = text;
-                                local maxFit = self.objects.background.Object.Size.X - 25
-                                if maxFit > 10 and label.TextBounds.X > maxFit then
-                                    label.Text = text:sub(1, 14) .. '...'
+                                local maxFit = (self.objects.background and self.objects.background.AbsoluteSize and self.objects.background.AbsoluteSize.X)
+                                    or (self.objects.background and self.objects.background.Object and self.objects.background.Object.Size and self.objects.background.Object.Size.X)
+                                    or 150
+                                maxFit = maxFit - 25
+                                if maxFit > 10 and label.TextBounds and label.TextBounds.X > maxFit then
+                                    if self.multi and #option >= 3 then
+                                        label.Text = #option .. ' selected'
+                                        if label.TextBounds.X > maxFit then
+                                            label.Text = (#option .. ' selected'):sub(1, 14) .. '...'
+                                        end
+                                    else
+                                        label.Text = text:sub(1, 14) .. '...'
+                                    end
                                 end
                                 if self.flag then
                                     library.flags[self.flag] = self.selected
                                 end
                                 if not nocallback then
                                     self.callback(self.selected);
+                                end
+                                if window.dropdown and window.dropdown.selected == self then
+                                    window.dropdown:Refresh()
+                                end
+                            end
+                        end
+
+                        list.SetValue = list.Select
+                        list.Set = list.Select
+                        list.Get = function(self) return self.selected end
+                        list.GetValue = function(self) return self.selected end
+
+                        function list:SetValues(newValues)
+                            if typeof(newValues) == 'table' then
+                                table.clear(self.values)
+                                for _, v in ipairs(newValues) do
+                                    table.insert(self.values, tostring(v))
+                                end
+                                if window.dropdown and window.dropdown.selected == self then
+                                    window.dropdown:Refresh()
                                 end
                             end
                         end
@@ -4654,6 +4791,22 @@ function library:init()
                         list:Select((data.value or data.selected) or (list.multi and {} or list.values[1]), true);
                         self:UpdateOptions();
                         return list
+                    end
+
+                    function toggle:AddMultiselect(data, values, default, callback)
+                        if typeof(data) == 'string' then
+                            data = {
+                                text = data,
+                                values = values or {},
+                                value = default or {},
+                                callback = callback or function() end,
+                                multi = true
+                            }
+                        else
+                            data = data or {}
+                            data.multi = true
+                        end
+                        return self:AddList(data)
                     end
 
                     tooltip(toggle);
@@ -6276,11 +6429,51 @@ function library:init()
 
                     function list:Select(option, nocallback)
                         if self.multi then
-                            if typeof(option) == 'string' then
-                                option = (option == 'none' or option == '' or option == '...') and {} or {option}
-                            elseif typeof(option) ~= 'table' then
-                                option = {}
+                            local selectedMap = {}
+                            if typeof(option) == 'table' then
+                                for k, v in pairs(option) do
+                                    if typeof(k) == 'string' and (v == true or v == 1) then
+                                        selectedMap[k] = true
+                                    elseif typeof(v) == 'string' and v ~= '' and v ~= '...' and v ~= 'none' then
+                                        selectedMap[v] = true
+                                    end
+                                end
+                            elseif typeof(option) == 'string' and option ~= '' and option ~= '...' and option ~= 'none' then
+                                selectedMap[option] = true
                             end
+
+                            local normalized = {}
+                            if typeof(self.values) == 'table' and #self.values > 0 then
+                                for _, val in ipairs(self.values) do
+                                    local valStr = tostring(val)
+                                    if selectedMap[valStr] or selectedMap[val] then
+                                        table.insert(normalized, valStr)
+                                        normalized[valStr] = true
+                                    else
+                                        normalized[valStr] = false
+                                    end
+                                end
+                            else
+                                for k in pairs(selectedMap) do
+                                    table.insert(normalized, tostring(k))
+                                    normalized[tostring(k)] = true
+                                end
+                            end
+
+                            setmetatable(normalized, {
+                                __tostring = function(t)
+                                    if #t == 0 then return '...' end
+                                    return table.concat(t, ', ')
+                                end,
+                                __index = function(t, k)
+                                    if typeof(k) == 'string' then
+                                        return rawget(t, k) == true
+                                    end
+                                    return rawget(t, k)
+                                end
+                            })
+
+                            option = normalized
                         else
                             if typeof(option) == 'table' then
                                 option = #option > 0 and option[1] or nil
@@ -6299,7 +6492,8 @@ function library:init()
                                 elseif count == 2 then
                                     text = tostring(option[1]) .. ', ' .. tostring(option[2])
                                 else
-                                    text = count .. ' selected'
+                                    local joined = table.concat(option, ', ')
+                                    text = joined
                                 end
                             else
                                 text = tostring(option);
@@ -6307,15 +6501,45 @@ function library:init()
 
                             local label = self.objects.inputText
                             label.Text = text;
-                            local maxFit = self.objects.background.Object.Size.X - 25
-                            if maxFit > 10 and label.TextBounds.X > maxFit then
-                                label.Text = text:sub(1, 14) .. '...'
+                            local maxFit = (self.objects.background and self.objects.background.AbsoluteSize and self.objects.background.AbsoluteSize.X)
+                                or (self.objects.background and self.objects.background.Object and self.objects.background.Object.Size and self.objects.background.Object.Size.X)
+                                or 150
+                            maxFit = maxFit - 25
+                            if maxFit > 10 and label.TextBounds and label.TextBounds.X > maxFit then
+                                if self.multi and #option >= 3 then
+                                    label.Text = #option .. ' selected'
+                                    if label.TextBounds.X > maxFit then
+                                        label.Text = (#option .. ' selected'):sub(1, 14) .. '...'
+                                    end
+                                else
+                                    label.Text = text:sub(1, 14) .. '...'
+                                end
                             end
                             if self.flag then
                                 library.flags[self.flag] = self.selected
                             end
                             if not nocallback then
                                 self.callback(self.selected);
+                            end
+                            if window.dropdown and window.dropdown.selected == self then
+                                window.dropdown:Refresh()
+                            end
+                        end
+                    end
+
+                    list.SetValue = list.Select
+                    list.Set = list.Select
+                    list.Get = function(self) return self.selected end
+                    list.GetValue = function(self) return self.selected end
+
+                    function list:SetValues(newValues)
+                        if typeof(newValues) == 'table' then
+                            table.clear(self.values)
+                            for _, v in ipairs(newValues) do
+                                table.insert(self.values, tostring(v))
+                            end
+                            if window.dropdown and window.dropdown.selected == self then
+                                window.dropdown:Refresh()
                             end
                         end
                     end
@@ -6348,6 +6572,22 @@ function library:init()
                     list:SetText(list.text);
                     self:UpdateOptions();
                     return list
+                end
+
+                function section:AddMultiselect(data, values, default, callback)
+                    if typeof(data) == 'string' then
+                        data = {
+                            text = data,
+                            values = values or {},
+                            value = default or {},
+                            callback = callback or function() end,
+                            multi = true
+                        }
+                    else
+                        data = data or {}
+                        data.multi = true
+                    end
+                    return self:AddList(data)
                 end
 
                 -- Text
