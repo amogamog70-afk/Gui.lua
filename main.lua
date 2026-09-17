@@ -3008,17 +3008,27 @@ function library:init()
             function window.dropdown:IsSelected(val)
                 local list = self.selected
                 if not list or not list.selected or val == nil then return false end
+                local valStr = tostring(val)
                 if list.multi then
                     if typeof(list.selected) == 'table' then
-                        if list.selected[val] == true or list.selected[tostring(val)] == true then return true end
+                        if list.selected[val] == true or list.selected[valStr] == true then
+                            return true
+                        end
+                        if list.selected[val] == false or list.selected[valStr] == false then
+                            return false
+                        end
                         for k, v in pairs(list.selected) do
-                            if v == val or k == val or tostring(v) == tostring(val) or tostring(k) == tostring(val) then return true end
+                            if typeof(k) == 'number' and (v == val or tostring(v) == valStr) then
+                                return true
+                            elseif typeof(k) == 'string' and (k == val or k == valStr) and (v == true or v == 1) then
+                                return true
+                            end
                         end
                     elseif typeof(list.selected) == 'string' then
-                        return list.selected == val or tostring(list.selected) == tostring(val)
+                        return list.selected == val or tostring(list.selected) == valStr
                     end
                 else
-                    return tostring(list.selected) == tostring(val)
+                    return tostring(list.selected) == valStr
                 end
                 return false
             end
@@ -3037,20 +3047,41 @@ function library:init()
                         valueObj.activePip.Visible = false
                         pcall(function() if valueObj.activePip.Object then valueObj.activePip.Object.Visible = false end end)
                     end
-                    if valueObj.checkbox then
-                        valueObj.checkbox.Visible = true
-                        pcall(function() if valueObj.checkbox.Object then valueObj.checkbox.Object.Visible = true end end)
-                    end
                     if valueObj.checkboxBorder then
                         valueObj.checkboxBorder.Visible = true
-                        valueObj.checkboxBorder.ThemeColor = isSel and 'Accent' or (isHovered and 'Option Text 1' or 'Option Border 2')
-                        pcall(function() if valueObj.checkboxBorder.Object then valueObj.checkboxBorder.Object.Visible = true end end)
+                        local bTheme = (isSel or isHovered) and 'Accent' or 'Option Border 1'
+                        valueObj.checkboxBorder.ThemeColor = bTheme
+                        valueObj.checkboxBorder.Color = library.theme[bTheme]
+                        pcall(function()
+                            if valueObj.checkboxBorder.Object then
+                                valueObj.checkboxBorder.Object.Visible = true
+                                valueObj.checkboxBorder.Object.Color = library.theme[bTheme]
+                            end
+                        end)
+                    end
+                    if valueObj.checkbox then
+                        valueObj.checkbox.Visible = true
+                        local bgTheme = isSel and 'Accent' or 'Option Background'
+                        valueObj.checkbox.ThemeColor = bgTheme
+                        valueObj.checkbox.Color = library.theme[bgTheme]
+                        pcall(function()
+                            if valueObj.checkbox.Object then
+                                valueObj.checkbox.Object.Visible = true
+                                valueObj.checkbox.Object.Color = library.theme[bgTheme]
+                            end
+                        end)
                     end
                     if valueObj.checkMark then
                         valueObj.checkMark.Visible = isSel
-                        pcall(function() if valueObj.checkMark.Object then valueObj.checkMark.Object.Visible = isSel end end)
+                        valueObj.checkMark.Color = fromrgb(18, 18, 22)
+                        pcall(function()
+                            if valueObj.checkMark.Object then
+                                valueObj.checkMark.Object.Visible = isSel
+                                valueObj.checkMark.Object.Color = fromrgb(18, 18, 22)
+                            end
+                        end)
                     end
-                    valueObj.text.Position = newUDim2(0, 22, 0, 2)
+                    valueObj.text.Position = newUDim2(0, 25, 0, 3)
                 else
                     if valueObj.checkbox then
                         valueObj.checkbox.Visible = false
@@ -3066,35 +3097,48 @@ function library:init()
                     end
                     if valueObj.activePip then
                         valueObj.activePip.Visible = isSel
-                        pcall(function() if valueObj.activePip.Object then valueObj.activePip.Object.Visible = isSel end end)
+                        valueObj.activePip.ThemeColor = 'Accent'
+                        valueObj.activePip.Color = library.theme['Accent']
+                        pcall(function()
+                            if valueObj.activePip.Object then
+                                valueObj.activePip.Object.Visible = isSel
+                                valueObj.activePip.Object.Color = library.theme['Accent']
+                            end
+                        end)
                     end
-                    valueObj.text.Position = newUDim2(0, 8, 0, 2)
+                    valueObj.text.Position = newUDim2(0, 8, 0, 3)
                 end
 
                 if isSel then
                     valueObj.background.Transparency = 1
-                    valueObj.background.Color = fromrgb(28, 34, 48)
+                    valueObj.background.Color = fromrgb(24, 28, 38)
                     valueObj.text.ThemeColor = 'Accent'
-                    if not list.multi and valueObj.activePip then
-                        valueObj.activePip.Visible = true
-                        pcall(function() if valueObj.activePip.Object then valueObj.activePip.Object.Visible = true end end)
-                    end
+                    valueObj.text.Color = library.theme['Accent']
+                    pcall(function()
+                        if valueObj.text.Object then
+                            valueObj.text.Object.Color = library.theme['Accent']
+                        end
+                    end)
                 elseif isHovered then
                     valueObj.background.Transparency = 1
                     valueObj.background.Color = fromrgb(26, 26, 32)
-                    valueObj.text.ThemeColor = 'Primary Text'
-                    if valueObj.activePip and not isSel then
-                        valueObj.activePip.Visible = false
-                        pcall(function() if valueObj.activePip.Object then valueObj.activePip.Object.Visible = false end end)
-                    end
+                    valueObj.text.ThemeColor = 'Option Text 1'
+                    valueObj.text.Color = library.theme['Option Text 1']
+                    pcall(function()
+                        if valueObj.text.Object then
+                            valueObj.text.Object.Color = library.theme['Option Text 1']
+                        end
+                    end)
                 else
                     valueObj.background.Transparency = 0
                     valueObj.background.Color = fromrgb(20, 20, 22)
                     valueObj.text.ThemeColor = 'Option Text 2'
-                    if valueObj.activePip and not isSel then
-                        valueObj.activePip.Visible = false
-                        pcall(function() if valueObj.activePip.Object then valueObj.activePip.Object.Visible = false end end)
-                    end
+                    valueObj.text.Color = library.theme['Option Text 2']
+                    pcall(function()
+                        if valueObj.text.Object then
+                            valueObj.text.Object.Color = library.theme['Option Text 2']
+                        end
+                    end)
                 end
             end
 
@@ -3108,20 +3152,22 @@ function library:init()
                     local currentMap = {}
                     if typeof(currentList.selected) == 'table' then
                         for k, v in pairs(currentList.selected) do
-                            if typeof(k) == 'string' and (v == true or v == 1) then
-                                currentMap[k] = true
-                            elseif typeof(v) == 'string' and v ~= '' and v ~= '...' and v ~= 'none' then
+                            if typeof(k) == 'number' and typeof(v) == 'string' and v ~= '' and v ~= '...' and v ~= 'none' then
                                 currentMap[v] = true
+                            elseif typeof(k) == 'string' and (v == true or v == 1) then
+                                currentMap[k] = true
                             end
                         end
                     elseif typeof(currentList.selected) == 'string' and currentList.selected ~= '' and currentList.selected ~= '...' and currentList.selected ~= 'none' then
                         currentMap[currentList.selected] = true
                     end
 
-                    if currentMap[val] then
+                    local valStr = tostring(val)
+                    if currentMap[valStr] or currentMap[val] then
+                        currentMap[valStr] = nil
                         currentMap[val] = nil
                     else
-                        currentMap[val] = true
+                        currentMap[valStr] = true
                     end
 
                     local newSelected = {}
@@ -3144,10 +3190,14 @@ function library:init()
                         currentList.objects.openText.Text = '+'
                     end
                     if currentList.objects and currentList.objects.border1 then
-                        currentList.objects.border1.ThemeColor = currentList.objects.holder and currentList.objects.holder.Hover and 'Accent' or 'Option Border 1'
+                        local bTheme = currentList.objects.holder and currentList.objects.holder.Hover and 'Accent' or 'Option Border 1'
+                        currentList.objects.border1.ThemeColor = bTheme
+                        currentList.objects.border1.Color = library.theme[bTheme]
                     end
                     if currentList.objects and currentList.objects.text then
-                        currentList.objects.text.ThemeColor = currentList.objects.holder and currentList.objects.holder.Hover and (currentList.risky and 'Risky Text Enabled' or 'Option Text 1') or (currentList.risky and 'Risky Text' or 'Option Text 2')
+                        local tTheme = currentList.objects.holder and currentList.objects.holder.Hover and (currentList.risky and 'Risky Text Enabled' or 'Option Text 1') or (currentList.risky and 'Risky Text' or 'Option Text 2')
+                        currentList.objects.text.ThemeColor = tTheme
+                        currentList.objects.text.Color = library.theme[tTheme]
                     end
                     window.dropdown.selected = nil
                     window.dropdown.objects.background.Visible = false
@@ -3165,51 +3215,57 @@ function library:init()
                             valueObject = {}
                             local currentIdx = idx
                             valueObject.background = utility:Draw('Square', {
-                                Size = newUDim2(1, -4, 0, 19),
+                                Size = newUDim2(1, -4, 0, 20),
                                 Color = fromrgb(20, 20, 22),
                                 Transparency = 0,
                                 ZIndex = library.zindexOrder.dropdown + 1,
                                 Parent = self.objects.background,
                             })
                             valueObject.activePip = utility:Draw('Square', {
-                                Size = newUDim2(0, 2, 0, 11),
+                                Size = newUDim2(0, 2, 0, 12),
                                 Position = newUDim2(0, 2, 0, 4),
+                                Color = library.theme['Accent'],
                                 ThemeColor = 'Accent',
+                                Visible = false,
+                                ZIndex = library.zindexOrder.dropdown + 3,
+                                Parent = valueObject.background,
+                            })
+                            valueObject.checkboxBorder = utility:Draw('Square', {
+                                Size = newUDim2(0, 13, 0, 13),
+                                Position = newUDim2(0, 6, 0, 3),
+                                Color = library.theme['Option Border 1'],
+                                ThemeColor = 'Option Border 1',
                                 Visible = false,
                                 ZIndex = library.zindexOrder.dropdown + 2,
                                 Parent = valueObject.background,
                             })
                             valueObject.checkbox = utility:Draw('Square', {
-                                Size = newUDim2(0, 10, 0, 10),
-                                Position = newUDim2(0, 6, 0, 4),
+                                Size = newUDim2(0, 11, 0, 11),
+                                Position = newUDim2(0, 7, 0, 4),
+                                Color = library.theme['Option Background'],
                                 ThemeColor = 'Option Background',
                                 Visible = false,
-                                ZIndex = library.zindexOrder.dropdown + 2,
+                                ZIndex = library.zindexOrder.dropdown + 3,
                                 Parent = valueObject.background,
                             })
-                            valueObject.checkboxBorder = utility:Draw('Square', {
-                                Size = newUDim2(1, 2, 1, 2),
-                                Position = newUDim2(0, -1, 0, -1),
-                                ThemeColor = 'Option Border 1',
-                                Visible = false,
-                                ZIndex = library.zindexOrder.dropdown + 2,
-                                Parent = valueObject.checkbox,
-                            })
                             valueObject.checkMark = utility:Draw('Square', {
-                                Size = newUDim2(0, 6, 0, 6),
-                                Position = newUDim2(0, 2, 0, 2),
-                                ThemeColor = 'Accent',
+                                Size = newUDim2(0, 5, 0, 5),
+                                Position = newUDim2(0, 3, 0, 3),
+                                Color = fromrgb(18, 18, 22),
+                                ThemeColor = 'Option Background',
                                 Visible = false,
-                                ZIndex = library.zindexOrder.dropdown + 3,
+                                ZIndex = library.zindexOrder.dropdown + 4,
                                 Parent = valueObject.checkbox,
                             })
                             valueObject.text = utility:Draw('Text', {
-                                Position = newUDim2(0, 8, 0, 2),
+                                Position = newUDim2(0, 8, 0, 3),
+                                Color = library.theme['Option Text 2'],
                                 ThemeColor = 'Option Text 2',
                                 Text = tostring(value),
                                 Size = 13,
                                 Font = 2,
-                                ZIndex = library.zindexOrder.dropdown + 2,
+                                Outline = true,
+                                ZIndex = library.zindexOrder.dropdown + 3,
                                 Parent = valueObject.background,
                             })
                             valueObject.isHovered = false
@@ -3260,7 +3316,7 @@ function library:init()
                             obj.text.Text = tostring(valStr)
                             obj.text.Visible = true
                             self:UpdateItemVisual(idx, obj.isHovered or false)
-                            y = y + 19 + padding
+                            y = y + 20 + padding
                         end
                     end
 
@@ -4227,7 +4283,11 @@ function library:init()
                             end
 
                             if self.bind ~= 'none' and self.mode ~= 'always' then
-                                bind.state = toggle.state;
+                                if string.lower(tostring(self.mode)) == 'hold' then
+                                    bind.state = false;
+                                else
+                                    bind.state = toggle.state;
+                                end
                                 if bind.flag then
                                     library.flags[bind.flag] = bind.state;
                                 end
@@ -6159,6 +6219,9 @@ function library:init()
                         end
 
                         if self.bind ~= 'none' and self.mode ~= 'always' then
+                            if string.lower(tostring(self.mode)) == 'hold' then
+                                bind.state = false;
+                            end
                             if bind.flag then
                                 library.flags[bind.flag] = bind.state;
                             end
@@ -7328,10 +7391,49 @@ function library:init()
                 User = "admin"
             }
         end
+
+        local function getExecutorName()
+            local name, version
+            if identifyexecutor then
+                local ok, n, v = pcall(identifyexecutor)
+                if ok and typeof(n) == 'string' and #n > 0 then
+                    name = n
+                    version = v
+                end
+            end
+            if not name and getexecutorname then
+                local ok, n = pcall(getexecutorname)
+                if ok and typeof(n) == 'string' and #n > 0 then
+                    name = n
+                end
+            end
+            if not name then
+                local g = (getgenv and getgenv()) or _G
+                if syn then name = 'Synapse'
+                elseif KRNL_LOADED or (g and g.KRNL_LOADED) then name = 'Krnl'
+                elseif FLUXUS_LOADED or (g and g.FLUXUS_LOADED) then name = 'Fluxus'
+                elseif SOLARA_LOADED or (g and g.SOLARA_LOADED) then name = 'Solara'
+                elseif WAVE_LOADED or (g and g.WAVE_LOADED) then name = 'Wave'
+                elseif DELTA_LOADED or (g and g.DELTA_LOADED) then name = 'Delta'
+                elseif CODEX_LOADED or (g and g.CODEX_LOADED) then name = 'Codex'
+                elseif ARCEUS_LOADED or (g and g.ARCEUS_LOADED) then name = 'Arceus X'
+                elseif runservice and runservice:IsStudio() then name = 'Studio'
+                else name = 'Universal'
+                end
+            end
+            if version and typeof(version) == 'string' and #version > 0 and not name:find(version, 1, true) then
+                return name .. ' ' .. version
+            end
+            return name
+        end
+
+        local activeExecutor = getExecutorName()
+
         self.watermark = {
             objects = {};
             text = {
                 {self.cheatname, true},
+                {activeExecutor, true},
                 {"Private", true},
                 {self.gamename, true},
                 {'0 fps', true},
@@ -7351,10 +7453,10 @@ function library:init()
                 local daySuffix = math.floor(date[2]%10)
                 date[2] = date[2]..(daySuffix == 1 and 'st' or daySuffix == 2 and 'nd' or daySuffix == 3 and 'rd' or 'th')
 
-                self.text[4][1] = library.stats.fps..' fps'
-                self.text[5][1] = floor(library.stats.ping)..'ms'
-                self.text[6][1] = os.date('%X', os.time())
-                self.text[7][1] = table.concat(date, ', ')
+                self.text[5][1] = library.stats.fps..' fps'
+                self.text[6][1] = floor(library.stats.ping)..'ms'
+                self.text[7][1] = os.date('%X', os.time())
+                self.text[8][1] = table.concat(date, ', ')
 
                 local text = {};
                 for _,v in next, self.text do
