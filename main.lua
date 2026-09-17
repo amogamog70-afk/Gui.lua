@@ -807,6 +807,9 @@ do
             if not table.find(blacklistedProperties,i) then
 
                 local lastval = drawing[i]
+                if lastval == v and i ~= 'Parent' then
+                    return
+                end
 
                 if i == 'Size' and (class == 'Square' or class == 'Image') then
                     drawing.Object.Size = utility:UDim2ToVector2(v,drawing.Parent == nil and workspace.CurrentCamera.ViewportSize or drawing.Parent.Object.Size);
@@ -1544,31 +1547,64 @@ function library:init()
         end
         --------------------
 
+        local updateQueued = false
+        function indicator:QueueUpdate()
+            if updateQueued then return end
+            updateQueued = true
+            local deferFn = (task and task.defer) or function(fn) coroutine.wrap(fn)() end
+            deferFn(function()
+                updateQueued = false
+                indicator:Update()
+            end)
+        end
+
         function indicator:Update()
+            if not self.enabled then
+                self.objects.background.Visible = false
+                for _, v in ipairs(self.values) do
+                    if v.objects and v.objects.background then
+                        v.objects.background.Visible = false
+                    end
+                end
+                return
+            end
+
             local xSize  = 190
             local yPos  = 0
             table.sort(self.values, function(a,b)
                 return a.order < b.order;
             end)
 
-            for _,v in next, self.values do
-                v.objects.keyLabel.Text = tostring(v.key);
-                v.objects.valueLabel.Text = tostring(v.value);
-            
-                v.objects.valueLabel.Position = newUDim2(1,-(v.objects.valueLabel.TextBounds.X + 5),0,0)
-                v.objects.background.Position = newUDim2(0,0,1,3 + yPos)
-                v.objects.background.Visible = v.enabled and self.enabled
+            for _,v in ipairs(self.values) do
+                local isRowVis = (v.enabled and self.enabled) and true or false
+                if v.objects.background.Visible ~= isRowVis then
+                    v.objects.background.Visible = isRowVis
+                end
 
-                if v.enabled and self.enabled then
+                if isRowVis then
+                    local keyStr = tostring(v.key or '')
+                    local valStr = tostring(v.value or '')
+                    if v.objects.keyLabel.Text ~= keyStr then
+                        v.objects.keyLabel.Text = keyStr
+                    end
+                    if v.objects.valueLabel.Text ~= valStr then
+                        v.objects.valueLabel.Text = valStr
+                    end
+                
+                    local valW = v.objects.valueLabel.TextBounds.X
+                    local keyW = v.objects.keyLabel.TextBounds.X
+                    v.objects.valueLabel.Position = newUDim2(1, -(valW + 6), 0, 0)
+                    v.objects.background.Position = newUDim2(0, 0, 1, 3 + yPos)
+
                     yPos = yPos + 16 + 3
-                    local x = (v.objects.keyLabel.TextBounds.X + 16 + v.objects.valueLabel.TextBounds.X)
+                    local x = (keyW + 20 + valW)
                     if x > xSize then
                         xSize = x
                     end
                 end
             end
 
-            self.objects.background.Size = newUDim2(0,xSize + 10,0,16)
+            self.objects.background.Size = newUDim2(0, xSize + 10, 0, 16)
             self.objects.background.Position = self.position
         end
 
@@ -1579,6 +1615,7 @@ function library:init()
                 order = data.order or #self.values+1,
                 enabled = data.enabled == nil and true or data.enabled,
                 objects = {},
+                indicator = indicator,
             }
 
             table.insert(self.values, value);
@@ -1612,8 +1649,8 @@ function library:init()
                 })
     
                 objs.activeBar = utility:Draw('Square', {
-                    Size = newUDim2(0, 3, 1, 0);
-                    Position = newUDim2(0, 0, 0, 0);
+                    Size = newUDim2(0, 2, 0, 10);
+                    Position = newUDim2(0, 2, 0, 3);
                     ThemeColor = 'Accent';
                     Visible = false;
                     ZIndex = z+3;
@@ -1632,7 +1669,7 @@ function library:init()
 
                 objs.valueLabel = utility:Draw('Text', {
                     Position = newUDim2(0,0,0,1);
-                    ThemeColor = 'Option Text 2';
+                    ThemeColor = 'Option Text 3';
                     Size = 13;
                     Font = 2;
                     ZIndex = z+2;
@@ -1647,57 +1684,51 @@ function library:init()
                 table.remove(indicator.values, table.find(indicator.values, value))
                 self.objects.background:Remove()
                 table.clear(self)
-                indicator:Update();
+                indicator:QueueUpdate();
             end
 
             function value:SetEnabled(bool)
-                if typeof(bool) == 'boolean' then
+                if typeof(bool) == 'boolean' and self.enabled ~= bool then
                     self.enabled = bool
-                    indicator:Update()
+                    indicator:QueueUpdate()
                 end
             end
 
             function value:SetValue(str)
-                if typeof(str) == 'string' then
+                if typeof(str) == 'string' and self.value ~= str then
                     self.value = str
-                    indicator:Update()
+                    indicator:QueueUpdate()
                 end
             end
 
             function value:SetKey(str)
-                if typeof(str) == 'string' then
+                if typeof(str) == 'string' and self.key ~= str then
                     self.key = str
-                    indicator:Update()
+                    indicator:QueueUpdate()
                 end
             end
 
             function value:SetActive(bool)
-                self.active = bool and true or false
+                bool = bool and true or false
+                if self.active == bool then return end
+                self.active = bool
+
                 if self.objects.activeBar then
                     self.objects.activeBar.Visible = self.active
                 end
-                if self.objects.border1 then
-                    self.objects.border1.ThemeColor = self.active and 'Accent' or 'Border 2'
-                end
-                if self.objects.background then
-                    if self.active then
-                        self.objects.background.ThemeColor = 'Accent'
-                        self.objects.background.ThemeColorOffset = -35
-                    else
-                        self.objects.background.ThemeColor = 'Background'
-                        self.objects.background.ThemeColorOffset = 0
-                    end
-                end
                 if self.objects.keyLabel then
-                    self.objects.keyLabel.Position = self.active and newUDim2(0, 8, 0, 1) or newUDim2(0, 4, 0, 1)
+                    self.objects.keyLabel.Position = self.active and newUDim2(0, 7, 0, 1) or newUDim2(0, 4, 0, 1)
                     self.objects.keyLabel.ThemeColor = self.active and 'Primary Text' or 'Option Text 2'
                 end
                 if self.objects.valueLabel then
-                    self.objects.valueLabel.ThemeColor = self.active and 'Accent' or 'Option Text 2'
+                    self.objects.valueLabel.ThemeColor = self.active and 'Accent' or 'Option Text 3'
+                end
+                if self.objects.background then
+                    self.objects.background.ThemeColorOffset = self.active and 6 or 0
                 end
             end
 
-            self:Update()
+            indicator:QueueUpdate()
             return value
         end
 
@@ -3312,15 +3343,18 @@ function library:init()
 
                     function toggle:SetState(bool, nocallback)
                         if typeof(bool) == 'boolean' then
+                            local stateChanged = (self.state ~= bool);
                             self.state = bool;
                             if self.flag then
                                 library.flags[self.flag] = bool;
                             end
 
-                            self.objects.border1.ThemeColor = bool and 'Accent' or (self.objects.holder.Hover and 'Accent' or 'Option Border 1');
-                            self.objects.text.ThemeColor = (bool or self.objects.holder.Hover) and (self.risky and 'Risky Text Enabled' or 'Option Text 1') or (self.risky and 'Risky Text' or 'Option Text 3');
-                            self.objects.background.ThemeColor = bool and 'Accent' or 'Option Background';
-                            self.objects.background.ThemeColorOffset = bool and -55 or 0
+                            if stateChanged then
+                                self.objects.border1.ThemeColor = bool and 'Accent' or (self.objects.holder.Hover and 'Accent' or 'Option Border 1');
+                                self.objects.text.ThemeColor = (bool or self.objects.holder.Hover) and (self.risky and 'Risky Text Enabled' or 'Option Text 1') or (self.risky and 'Risky Text' or 'Option Text 3');
+                                self.objects.background.ThemeColor = bool and 'Accent' or 'Option Background';
+                                self.objects.background.ThemeColorOffset = bool and -55 or 0
+                            end
 
                             if not nocallback then
                                 self.callback(bool);
@@ -3329,7 +3363,9 @@ function library:init()
                             for _, opt in ipairs(self.options) do
                                 if opt.class == 'bind' then
                                     opt.state = bool;
-                                    if opt.UpdateIndicator then
+                                    if opt.indicatorValue then
+                                        opt.indicatorValue:SetActive(bool);
+                                    elseif opt.UpdateIndicator then
                                         opt:UpdateIndicator();
                                     end
                                 end
@@ -3551,7 +3587,11 @@ function library:init()
                                 if userCallback then
                                     userCallback(state);
                                 end
-                                bind:UpdateIndicator();
+                                if bind.indicatorValue then
+                                    bind.indicatorValue:SetActive(state == true);
+                                else
+                                    bind:UpdateIndicator();
+                                end
                             end;
                             keycallback = function() end;
                             indicatorValue = library.keyIndicator:AddValue({value = 'value', key = 'key', enabled = false});
@@ -3647,7 +3687,11 @@ function library:init()
                             local modeSuffix = (self.mode and self.mode ~= 'always') and (' [' .. self.mode:sub(1,1):upper() .. self.mode:sub(2) .. ']') or '';
                             self.indicatorValue:SetValue('[' .. keyName .. ']' .. modeSuffix);
                             self.indicatorValue:SetActive(self.state == true);
-                            library.keyIndicator:Update();
+                            if self.indicatorValue and self.indicatorValue.indicator then
+                                self.indicatorValue.indicator:QueueUpdate();
+                            elseif library.keyIndicator then
+                                library.keyIndicator:QueueUpdate();
+                            end
                         end
 
                         function bind:SetMode(newMode)
@@ -3732,14 +3776,14 @@ function library:init()
                                         library.flags[bind.flag] = bind.state;
                                     end
                                     bind.callback(bind.state)
-                                    bind:UpdateIndicator();
                                 elseif mode == 'hold' then
-                                    bind.state = true
-                                    if bind.flag then
-                                        library.flags[bind.flag] = true;
+                                    if not bind.state then
+                                        bind.state = true
+                                        if bind.flag then
+                                            library.flags[bind.flag] = true;
+                                        end
+                                        bind.callback(true);
                                     end
-                                    bind.callback(true);
-                                    bind:UpdateIndicator();
                                 end
                             end
                         end)
@@ -3748,13 +3792,12 @@ function library:init()
                             if bind.bind ~= 'none' then
                                 if inp.KeyCode == bind.bind or inp.UserInputType == bind.bind then
                                     local mode = string.lower(tostring(bind.mode or 'toggle'))
-                                    if mode == 'hold' then
+                                    if mode == 'hold' and bind.state then
                                         bind.state = false
                                         if bind.flag then
                                             library.flags[bind.flag] = false;
                                         end
                                         bind.callback(false);
-                                        bind:UpdateIndicator();
                                     end
                                 end
                             end
@@ -5444,7 +5487,11 @@ function library:init()
                         local modeSuffix = (self.mode and self.mode ~= 'always') and (' [' .. self.mode:sub(1,1):upper() .. self.mode:sub(2) .. ']') or '';
                         self.indicatorValue:SetValue('[' .. keyName .. ']' .. modeSuffix);
                         self.indicatorValue:SetActive(self.state == true);
-                        library.keyIndicator:Update();
+                        if self.indicatorValue and self.indicatorValue.indicator then
+                            self.indicatorValue.indicator:QueueUpdate();
+                        elseif library.keyIndicator then
+                            library.keyIndicator:QueueUpdate();
+                        end
                     end
 
                     function bind:SetMode(newMode)
@@ -5535,14 +5582,20 @@ function library:init()
                                     library.flags[bind.flag] = bind.state;
                                 end
                                 bind.callback(bind.state)
-                                bind:UpdateIndicator();
-                            elseif mode == 'hold' then
-                                bind.state = true
-                                if bind.flag then
-                                    library.flags[bind.flag] = true;
+                                if bind.indicatorValue then
+                                    bind.indicatorValue:SetActive(bind.state == true);
                                 end
-                                bind.callback(true);
-                                bind:UpdateIndicator();
+                            elseif mode == 'hold' then
+                                if not bind.state then
+                                    bind.state = true
+                                    if bind.flag then
+                                        library.flags[bind.flag] = true;
+                                    end
+                                    bind.callback(true);
+                                    if bind.indicatorValue then
+                                        bind.indicatorValue:SetActive(true);
+                                    end
+                                end
                             end
                         end
                     end)
@@ -5551,13 +5604,15 @@ function library:init()
                         if bind.bind ~= 'none' then
                             if inp.KeyCode == bind.bind or inp.UserInputType == bind.bind then
                                 local mode = string.lower(tostring(bind.mode or 'toggle'))
-                                if mode == 'hold' then
+                                if mode == 'hold' and bind.state then
                                     bind.state = false
                                     if bind.flag then
                                         library.flags[bind.flag] = false;
                                     end
                                     bind.callback(false);
-                                    bind:UpdateIndicator();
+                                    if bind.indicatorValue then
+                                        bind.indicatorValue:SetActive(false);
+                                    end
                                 end
                             end
                         end
