@@ -1213,9 +1213,9 @@ function library:Unload()
     if self.glowDrawings then
         table.clear(self.glowDrawings)
     end
-    if self._teleportConnection then
-        pcall(function() self._teleportConnection:Disconnect() end)
-        self._teleportConnection = nil
+    if self.autoLoadFloatingWindow and self.autoLoadFloatingWindow.objects and self.autoLoadFloatingWindow.objects.background then
+        pcall(function() self.autoLoadFloatingWindow.objects.background:Remove() end)
+        self.autoLoadFloatingWindow = nil
     end
     for obj in next, self.drawings do
         obj:Remove()
@@ -1556,32 +1556,230 @@ end
         return false, nil
     end
 
-    function self:SetTeleportAutoInject(enabled)
-        self.teleportAutoInject = enabled
-        if enabled then
-            local qot = (syn and syn.queue_on_teleport) or queue_on_teleport or (fluxus and fluxus.queue_on_teleport)
-            if qot then
-                pcall(function() qot(defaultLoaderSource) end)
-                self:SendNotification('Teleport Auto-Inject armed', 4, c3new(0.4, 0.9, 1))
-            else
-                self:SendNotification('queue_on_teleport not supported by executor', 5, c3new(1, 0.5, 0.2))
+    function self:OpenAutoLoadWindow()
+        if self.autoLoadFloatingWindow then
+            local isVis = not self.autoLoadFloatingWindow.visible
+            self.autoLoadFloatingWindow:SetVisible(isVis)
+            if isVis then
+                self.autoLoadFloatingWindow:Refresh()
+            end
+            return self.autoLoadFloatingWindow
+        end
+
+        local win = {
+            visible = true,
+            objects = {},
+            connections = {},
+            buttons = {}
+        }
+        self.autoLoadFloatingWindow = win
+
+        local z = self.zindexOrder.window + 30
+        local winW, winH = 260, 280
+        local winPos = newUDim2(0.5, 130, 0.5, -140)
+
+        local bg = utility:Draw('Square', {
+            Size = newUDim2(0, winW, 0, winH),
+            Position = winPos,
+            ThemeColor = 'Background',
+            ZIndex = z
+        })
+        win.objects.background = bg
+
+        local b1 = utility:Draw('Square', {
+            Size = newUDim2(1, 2, 1, 2),
+            Position = newUDim2(0, -1, 0, -1),
+            ThemeColor = 'Border 2',
+            Parent = bg,
+            ZIndex = z - 1
+        })
+        win.objects.border1 = b1
+
+        local b2 = utility:Draw('Square', {
+            Size = newUDim2(1, 2, 1, 2),
+            Position = newUDim2(0, -1, 0, -1),
+            ThemeColor = 'Border 3',
+            Parent = b1,
+            ZIndex = z - 2
+        })
+        win.objects.border2 = b2
+
+        win.objects.glow = utility:AddGlow(b2, z - 2, 'Accent', 5, 1)
+
+        local topBar = utility:Draw('Square', {
+            Size = newUDim2(1, 0, 0, 24),
+            ThemeColor = 'Tab Holder',
+            Parent = bg,
+            ZIndex = z + 1
+        })
+        win.objects.topBar = topBar
+
+        local accentLine = utility:Draw('Square', {
+            Size = newUDim2(1, 0, 0, 1),
+            Position = newUDim2(0, 0, 1, -1),
+            ThemeColor = 'Accent',
+            Parent = topBar,
+            ZIndex = z + 2
+        })
+        win.objects.accentLine = accentLine
+
+        local title = utility:Draw('Text', {
+            Text = 'Auto-Load Configs',
+            Font = 2,
+            Size = 13,
+            Outline = true,
+            Position = newUDim2(0, 8, 0, 4),
+            ThemeColor = 'Primary Text',
+            Parent = topBar,
+            ZIndex = z + 3
+        })
+        win.objects.title = title
+
+        local closeBtn = utility:Draw('Text', {
+            Text = '[X]',
+            Font = 2,
+            Size = 13,
+            Outline = true,
+            Position = newUDim2(1, -22, 0, 4),
+            ThemeColor = 'Option Text 2',
+            Parent = topBar,
+            ZIndex = z + 3
+        })
+        win.objects.closeBtn = closeBtn
+
+        local statusText = utility:Draw('Text', {
+            Text = 'Active: ' .. (self:GetAutoLoadConfig() or 'None'),
+            Font = 2,
+            Size = 12,
+            Outline = true,
+            Position = newUDim2(0, 10, 0, 30),
+            ThemeColor = 'Accent',
+            Parent = bg,
+            ZIndex = z + 2
+        })
+        win.objects.statusText = statusText
+
+        local listHolder = utility:Draw('Square', {
+            Size = newUDim2(1, -20, 1, -66),
+            Position = newUDim2(0, 10, 0, 52),
+            ThemeColor = 'Group Background',
+            Parent = bg,
+            ZIndex = z + 2
+        })
+        win.objects.listHolder = listHolder
+
+        local listBorder = utility:Draw('Square', {
+            Size = newUDim2(1, 2, 1, 2),
+            Position = newUDim2(0, -1, 0, -1),
+            ThemeColor = 'Border 1',
+            Parent = listHolder,
+            ZIndex = z + 1
+        })
+        win.objects.listBorder = listBorder
+
+        local dragging, mouseStart, objStart
+        local lastDragPx, lastDragPy = -9999, -9999
+        utility:Connection(topBar.MouseButton1Down, function(pos)
+            if win.visible then
+                dragging = true
+                self.isDragging = true
+                mouseStart = newVector2(pos.X, pos.Y)
+                objStart = bg.Object.Position
+            end
+        end)
+        utility:Connection(button1up, function()
+            dragging = false
+            self.isDragging = false
+        end)
+        utility:Connection(runservice.RenderStepped, function()
+            if dragging and win.visible then
+                local mPos = inputservice:GetMouseLocation()
+                local delta = mPos - mouseStart
+                local target = objStart + delta
+                local px, py = math.floor(target.X), math.floor(target.Y)
+                if px ~= lastDragPx or py ~= lastDragPy then
+                    lastDragPx, lastDragPy = px, py
+                    bg.Position = newUDim2(0, px, 0, py)
+                end
+            end
+        end)
+
+        utility:Connection(closeBtn.MouseButton1Down, function()
+            win:SetVisible(false)
+        end)
+
+        function win:SetVisible(bool)
+            self.visible = bool
+            bg.Visible = bool
+        end
+
+        function win:Refresh()
+            for _, b in ipairs(self.buttons) do
+                pcall(function() b:Remove() end)
+            end
+            table.clear(self.buttons)
+
+            local currentAuto = library:GetAutoLoadConfig()
+            statusText.Text = 'Active: ' .. (currentAuto or 'None')
+
+            local configsPath = library.cheatname .. '/' .. library.gamename .. '/configs'
+            local configs = {}
+            if listfiles then
+                pcall(function()
+                    for _, v in next, listfiles(configsPath) do
+                        local ext = '.' .. v:split('.')[#v:split('.')]
+                        if ext == library.fileext then
+                            local name = v:split('\\')[#v:split('\\')]:sub(1, -#ext - 1)
+                            table.insert(configs, name)
+                        end
+                    end
+                end)
+            end
+
+            local y = 4
+            for _, cfgName in ipairs(configs) do
+                local isCurrent = (cfgName == currentAuto)
+                local btn = utility:Draw('Square', {
+                    Size = newUDim2(1, -8, 0, 22),
+                    Position = newUDim2(0, 4, 0, y),
+                    ThemeColor = isCurrent and 'Accent' or 'Option Background',
+                    Parent = listHolder,
+                    ZIndex = z + 3
+                })
+                local btnText = utility:Draw('Text', {
+                    Text = (isCurrent and '★ ' or '  ') .. cfgName,
+                    Font = 2,
+                    Size = 12,
+                    Outline = true,
+                    Position = newUDim2(0, 6, 0, 3),
+                    ThemeColor = isCurrent and 'Primary Text' or 'Option Text 1',
+                    Parent = btn,
+                    ZIndex = z + 4
+                })
+                utility:Connection(btn.MouseButton1Down, function()
+                    if library:GetAutoLoadConfig() == cfgName then
+                        library:SetAutoLoadConfig(nil)
+                    else
+                        library:SetAutoLoadConfig(cfgName)
+                    end
+                    win:Refresh()
+                    if library.refreshAutoLoadTab then
+                        library.refreshAutoLoadTab()
+                    end
+                end)
+                table.insert(self.buttons, btn)
+                y = y + 26
+                if y > winH - 90 then break end
             end
         end
+
+        win:Refresh()
+        return win
     end
 
-    pcall(function()
-        local lp = localplayer or (players and players.LocalPlayer)
-        if lp and not self._teleportConnection then
-            self._teleportConnection = lp.OnTeleport:Connect(function()
-                if self.teleportAutoInject then
-                    local qot = (syn and syn.queue_on_teleport) or queue_on_teleport or (fluxus and fluxus.queue_on_teleport)
-                    if qot then
-                        pcall(function() qot(defaultLoaderSource) end)
-                    end
-                end
-            end)
-        end
-    end)
+    function self:ToggleAutoLoadWindow()
+        self:OpenAutoLoadWindow()
+    end
 
     for i,v in next, self.images do
         pcall(function()
@@ -8153,39 +8351,57 @@ end
 
 function library:CreateSettingsTab(menu)
     local settingsTab = menu:AddTab('  Settings  ', 999);
-    local configSection = settingsTab:AddSection('Config', 1);
+    local configSection = settingsTab:AddSection('Config Manager', 1);
     local mainSection = settingsTab:AddSection('Main', 1);
 
+    local autoLoadSection = settingsTab:AddSection('Auto-Load Configs', 2);
+
     local autoLoadToggle;
+    local autoLoadTargetList;
+    local autoLoadStatus;
 
     configSection:AddBox({text = 'Config Name', flag = 'configinput'})
-    configSection:AddList({
-        text = 'Config',
-        flag = 'selectedconfig',
-        callback = function(selected)
-            if autoLoadToggle then
-                local isAuto = (library:GetAutoLoadConfig() == selected) and (selected ~= nil and selected ~= '')
-                autoLoadToggle:SetState(isAuto, true)
-            end
-        end
-    })
+    configSection:AddList({text = 'Config', flag = 'selectedconfig'})
 
     local function refreshConfigs()
         library.options.selectedconfig:ClearValues();
+        if library.options.autoload_target then
+            library.options.autoload_target:ClearValues();
+        end
         for _,v in next, listfiles(self.cheatname..'/'..self.gamename..'/configs') do
             local ext = '.'..v:split('.')[#v:split('.')];
             if ext == self.fileext then
-                library.options.selectedconfig:AddValue(v:split('\\')[#v:split('\\')]:sub(1,-#ext-1))
+                local name = v:split('\\')[#v:split('\\')]:sub(1,-#ext-1)
+                library.options.selectedconfig:AddValue(name)
+                if library.options.autoload_target then
+                    library.options.autoload_target:AddValue(name)
+                end
             end
         end
         local curAuto = library:GetAutoLoadConfig()
         if curAuto and library:GetConfig(curAuto) then
-            library.options.selectedconfig:Select(curAuto, true)
+            if library.options.autoload_target then
+                library.options.autoload_target:Select(curAuto, true)
+            end
             if autoLoadToggle then
                 autoLoadToggle:SetState(true, true)
             end
+            if autoLoadStatus then
+                autoLoadStatus:SetText('Active: ' .. curAuto)
+            end
+        else
+            if autoLoadToggle then
+                autoLoadToggle:SetState(false, true)
+            end
+            if autoLoadStatus then
+                autoLoadStatus:SetText('Active: None')
+            end
+        end
+        if library.autoLoadFloatingWindow and library.autoLoadFloatingWindow.visible then
+            pcall(function() library.autoLoadFloatingWindow:Refresh() end)
         end
     end
+    library.refreshAutoLoadTab = refreshConfigs
 
     configSection:AddButton({text = 'Load', confirm = true, callback = function()
         library:LoadConfig(library.flags.selectedconfig);
@@ -8205,33 +8421,75 @@ function library:CreateSettingsTab(menu)
             if library:GetAutoLoadConfig() == library.flags.selectedconfig then
                 library:SetAutoLoadConfig(nil)
                 if autoLoadToggle then autoLoadToggle:SetState(false, true) end
+                if autoLoadStatus then autoLoadStatus:SetText('Active: None') end
             end
             delfile(self.cheatname..'/'..self.gamename..'/configs/'..library.flags.selectedconfig.. self.fileext);
             refreshConfigs()
         end
     end})
 
-    autoLoadToggle = configSection:AddToggle({
-        text = 'Auto Load',
-        flag = 'autoload_config_enabled',
-        state = false,
+    configSection:AddButton({text = 'Refresh Configs', callback = function()
+        refreshConfigs()
+    end})
+
+    -- [ОТДЕЛЬНОЕ ОКНО/СЕКЦИЯ ДЛЯ АВТО-ЛОАДА В КОЛОНКЕ 2]
+    autoLoadToggle = autoLoadSection:AddToggle({
+        text = 'Enable Auto-Load',
+        flag = 'autoload_enabled',
+        state = (library:GetAutoLoadConfig() ~= nil),
         tooltip = 'Автоматически загружать выбранный конфиг при старте скрипта',
         callback = function(enabled)
-            local selected = library.flags.selectedconfig
             if enabled then
-                if selected and selected ~= '' and library:GetConfig(selected) then
-                    library:SetAutoLoadConfig(selected)
+                local chosen = library.flags.autoload_target or library.flags.selectedconfig
+                if chosen and chosen ~= '' and library:GetConfig(chosen) then
+                    library:SetAutoLoadConfig(chosen)
                 else
-                    library:SendNotification('Please select a valid config from the list!', 4, c3new(1, 0.4, 0.4))
-                    if autoLoadToggle then
-                        autoLoadToggle:SetState(false, true)
-                    end
+                    library:SendNotification('Select a config from the list first!', 4, c3new(1, 0.4, 0.4))
+                    if autoLoadToggle then autoLoadToggle:SetState(false, true) end
                 end
             else
                 library:SetAutoLoadConfig(nil)
             end
+            if autoLoadStatus then
+                autoLoadStatus:SetText('Active: ' .. (library:GetAutoLoadConfig() or 'None'))
+            end
         end
     })
+
+    autoLoadTargetList = autoLoadSection:AddList({
+        text = 'Select Config to Auto-Load',
+        flag = 'autoload_target',
+        tooltip = 'Список всех твоих конфигов для назначения на автозагрузку',
+        callback = function(chosen)
+            if autoLoadToggle and autoLoadToggle.state then
+                library:SetAutoLoadConfig(chosen)
+                if autoLoadStatus then
+                    autoLoadStatus:SetText('Active: ' .. (chosen or 'None'))
+                end
+            end
+        end
+    })
+
+    autoLoadStatus = autoLoadSection:AddSeparator({text = 'Active: ' .. (library:GetAutoLoadConfig() or 'None')})
+
+    autoLoadSection:AddButton({text = 'Set Auto-Load', confirm = true, callback = function()
+        local chosen = library.flags.autoload_target or library.flags.selectedconfig
+        if chosen and chosen ~= '' and library:GetConfig(chosen) then
+            library:SetAutoLoadConfig(chosen)
+            if autoLoadToggle then autoLoadToggle:SetState(true, true) end
+            if autoLoadStatus then autoLoadStatus:SetText('Active: ' .. chosen) end
+        else
+            library:SendNotification('Please select a valid config first!', 4, c3new(1, 0.4, 0.4))
+        end
+    end}):AddButton({text = 'Clear Auto-Load', confirm = true, callback = function()
+        library:SetAutoLoadConfig(nil)
+        if autoLoadToggle then autoLoadToggle:SetState(false, true) end
+        if autoLoadStatus then autoLoadStatus:SetText('Active: None') end
+    end})
+
+    autoLoadSection:AddButton({text = 'Open Floating Window', callback = function()
+        library:OpenAutoLoadWindow()
+    end})
 
     refreshConfigs()
 
@@ -8279,10 +8537,6 @@ function library:CreateSettingsTab(menu)
             end
         end
     })
-
-    mainSection:AddToggle({text = 'Re-Inject on Teleport', flag = 'teleport_autoinject', state = false, callback = function(bool)
-        library:SetTeleportAutoInject(bool)
-    end})
 
     mainSection:AddSeparator({text = 'Indicators'});
 
