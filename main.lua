@@ -1816,6 +1816,309 @@ function library:init()
         return indicator
     end
 
+    function self.NewCanvasWindow(data)
+        data = data or {}
+        local cwin = {
+            title = data.title or '2D Canvas',
+            visible = data.visible ~= false,
+            alwaysVisible = data.alwaysVisible or false,
+            position = data.position or data.pos or newUDim2(0, 150, 0, 150),
+            size = data.size or newUDim2(0, 240, 0, 260),
+            objects = {},
+            drawings = {},
+            connections = {},
+        }
+
+        if typeof(cwin.position) == 'Vector2' then
+            cwin.position = newUDim2(0, cwin.position.X, 0, cwin.position.Y)
+        end
+        if typeof(cwin.size) == 'Vector2' then
+            cwin.size = newUDim2(0, cwin.size.X, 0, cwin.size.Y)
+        end
+
+        local z = (self.zindexOrder and self.zindexOrder.window or 1000) + 50
+        local objs = cwin.objects
+
+        objs.background = utility:Draw('Square', {
+            Size = cwin.size,
+            Position = cwin.position,
+            ThemeColor = 'Background',
+            ZIndex = z,
+        })
+
+        objs.border1 = utility:Draw('Square', {
+            Size = newUDim2(1, 2, 1, 2),
+            Position = newUDim2(0, -1, 0, -1),
+            ThemeColor = 'Border 2',
+            Parent = objs.background,
+            ZIndex = z - 1,
+        })
+
+        objs.border2 = utility:Draw('Square', {
+            Size = newUDim2(1, 2, 1, 2),
+            Position = newUDim2(0, -1, 0, -1),
+            ThemeColor = 'Border 3',
+            Parent = objs.border1,
+            ZIndex = z - 2,
+        })
+
+        objs.topbar = utility:Draw('Square', {
+            Size = newUDim2(1, 0, 0, 1),
+            Position = newUDim2(0, 0, 0, 0),
+            ThemeColor = 'Accent',
+            Parent = objs.background,
+            ZIndex = z + 1,
+        })
+
+        objs.title = utility:Draw('Text', {
+            Position = newUDim2(0, 8, 0, 3),
+            ThemeColor = 'Primary Text',
+            Text = cwin.title,
+            Size = 13,
+            Font = 2,
+            ZIndex = z + 2,
+            Outline = true,
+            Parent = objs.background,
+        })
+
+        objs.canvasBg = utility:Draw('Square', {
+            Size = newUDim2(1, -12, 1, -26),
+            Position = newUDim2(0, 6, 0, 20),
+            ThemeColor = 'Inner Border 2',
+            Parent = objs.background,
+            ZIndex = z + 1,
+        })
+
+        objs.canvasBorder = utility:Draw('Square', {
+            Size = newUDim2(1, 2, 1, 2),
+            Position = newUDim2(0, -1, 0, -1),
+            ThemeColor = 'Border 1',
+            Parent = objs.canvasBg,
+            ZIndex = z,
+        })
+
+        local isDragging = false
+        local dragMouseStart, dragObjStart
+
+        local c1 = utility:Connection(objs.background.MouseButton1Down, function(pos)
+            if library.open then
+                isDragging = true
+                dragMouseStart = newVector2(pos.X, pos.Y)
+                dragObjStart = objs.background.Object.Position
+            end
+        end)
+        table.insert(cwin.connections, c1)
+
+        local c2 = utility:Connection(button1up, function()
+            isDragging = false
+        end)
+        table.insert(cwin.connections, c2)
+
+        local c3 = utility:Connection(runservice.RenderStepped, function()
+            if isDragging and library.open then
+                local mPos = inputservice:GetMouseLocation()
+                local delta = mPos - dragMouseStart
+                local target = dragObjStart + delta
+                cwin.position = newUDim2(0, target.X, 0, target.Y)
+                objs.background.Position = cwin.position
+                cwin:UpdateDrawings()
+            else
+                isDragging = false
+            end
+        end)
+        table.insert(cwin.connections, c3)
+
+        function cwin:GetCanvasOrigin()
+            local bgPos = objs.background.Object.Position
+            return newVector2(bgPos.X + 6, bgPos.Y + 20)
+        end
+
+        function cwin:UpdateDrawings()
+            local origin = self:GetCanvasOrigin()
+            local isVis = self.visible and (library.open or self.alwaysVisible)
+            for _, d in ipairs(self.drawings) do
+                if d.type == 'Line' then
+                    d.drawing.From = origin + d.from
+                    d.drawing.To = origin + d.to
+                    d.drawing.Visible = isVis and (d.visible ~= false)
+                elseif d.type == 'Square' then
+                    d.drawing.Position = origin + d.position
+                    d.drawing.Size = d.size
+                    d.drawing.Visible = isVis and (d.visible ~= false)
+                    if d.outlineDrawing then
+                        d.outlineDrawing.Position = origin + d.position - newVector2(1, 1)
+                        d.outlineDrawing.Size = d.size + newVector2(2, 2)
+                        d.outlineDrawing.Visible = isVis and (d.visible ~= false)
+                    end
+                elseif d.type == 'Circle' then
+                    d.drawing.Position = origin + d.position
+                    d.drawing.Radius = d.radius
+                    d.drawing.Visible = isVis and (d.visible ~= false)
+                elseif d.type == 'Text' then
+                    d.drawing.Position = origin + d.position
+                    d.drawing.Text = tostring(d.text or '')
+                    d.drawing.Visible = isVis and (d.visible ~= false)
+                end
+            end
+        end
+
+        function cwin:AddLine(ddata)
+            local line = Drawing.new('Line')
+            line.Thickness = ddata.thickness or 1
+            line.Color = ddata.color or c3new(1, 1, 1)
+            line.Transparency = ddata.transparency or 1
+            line.ZIndex = z + 3
+            line.Visible = false
+
+            local entry = {
+                type = 'Line',
+                drawing = line,
+                from = ddata.from or newVector2(0, 0),
+                to = ddata.to or newVector2(0, 0),
+                visible = ddata.visible ~= false,
+            }
+            table.insert(self.drawings, entry)
+            self:UpdateDrawings()
+            return entry
+        end
+
+        function cwin:AddBox(ddata)
+            local box = Drawing.new('Square')
+            box.Filled = ddata.filled or false
+            box.Thickness = ddata.thickness or 1
+            box.Color = ddata.color or c3new(1, 1, 1)
+            box.Transparency = ddata.transparency or 1
+            box.ZIndex = z + 3
+            box.Visible = false
+
+            local outBox = nil
+            if ddata.outline then
+                outBox = Drawing.new('Square')
+                outBox.Filled = false
+                outBox.Thickness = 1
+                outBox.Color = ddata.outlineColor or c3new(0, 0, 0)
+                outBox.Transparency = ddata.transparency or 1
+                outBox.ZIndex = z + 2
+                outBox.Visible = false
+            end
+
+            local entry = {
+                type = 'Square',
+                drawing = box,
+                outlineDrawing = outBox,
+                position = ddata.position or newVector2(0, 0),
+                size = ddata.size or newVector2(10, 10),
+                visible = ddata.visible ~= false,
+            }
+            table.insert(self.drawings, entry)
+            self:UpdateDrawings()
+            return entry
+        end
+
+        function cwin:AddCircle(ddata)
+            local circ = Drawing.new('Circle')
+            circ.Filled = ddata.filled or false
+            circ.Thickness = ddata.thickness or 1
+            circ.Color = ddata.color or c3new(1, 1, 1)
+            circ.Transparency = ddata.transparency or 1
+            circ.NumSides = ddata.numSides or 24
+            circ.ZIndex = z + 3
+            circ.Visible = false
+
+            local entry = {
+                type = 'Circle',
+                drawing = circ,
+                position = ddata.position or newVector2(0, 0),
+                radius = ddata.radius or 10,
+                visible = ddata.visible ~= false,
+            }
+            table.insert(self.drawings, entry)
+            self:UpdateDrawings()
+            return entry
+        end
+
+        function cwin:AddText(ddata)
+            local txt = Drawing.new('Text')
+            txt.Text = tostring(ddata.text or '')
+            txt.Size = ddata.size or 13
+            txt.Font = ddata.font or 2
+            txt.Color = ddata.color or c3new(1, 1, 1)
+            txt.Outline = ddata.outline ~= false
+            txt.Center = ddata.center or false
+            txt.ZIndex = z + 4
+            txt.Visible = false
+
+            local entry = {
+                type = 'Text',
+                drawing = txt,
+                position = ddata.position or newVector2(0, 0),
+                text = ddata.text or '',
+                visible = ddata.visible ~= false,
+            }
+            table.insert(self.drawings, entry)
+            self:UpdateDrawings()
+            return entry
+        end
+
+        function cwin:Clear()
+            for _, d in ipairs(self.drawings) do
+                pcall(function() d.drawing:Remove() end)
+                if d.outlineDrawing then
+                    pcall(function() d.outlineDrawing:Remove() end)
+                end
+            end
+            table.clear(self.drawings)
+        end
+
+        function cwin:Draw(builder)
+            if typeof(builder) == 'function' then
+                builder(self)
+                self:UpdateDrawings()
+            end
+        end
+
+        function cwin:SetTitle(title)
+            self.title = tostring(title)
+            objs.title.Text = self.title
+        end
+
+        function cwin:SetVisible(state)
+            self.visible = state and true or false
+            objs.background.Visible = self.visible
+            self:UpdateDrawings()
+        end
+
+        function cwin:SetPosition(pos)
+            if typeof(pos) == 'Vector2' then
+                pos = newUDim2(0, pos.X, 0, pos.Y)
+            end
+            self.position = pos
+            objs.background.Position = pos
+            self:UpdateDrawings()
+        end
+
+        function cwin:SetSize(sz)
+            if typeof(sz) == 'Vector2' then
+                sz = newUDim2(0, sz.X, 0, sz.Y)
+            end
+            self.size = sz
+            objs.background.Size = sz
+            self:UpdateDrawings()
+        end
+
+        function cwin:Destroy()
+            self:Clear()
+            for _, c in ipairs(self.connections) do
+                pcall(function() c:Disconnect() end)
+            end
+            objs.background:Remove()
+            table.clear(self)
+        end
+
+        cwin:SetVisible(cwin.visible)
+        return cwin
+    end
+
     function self.NewWindow(data)
         local window = {
             title = data.title or '',
@@ -3113,9 +3416,15 @@ function library:init()
             end
         end
 
-        function window:AddTab(text, order)
+        function window:AddTab(text, order, icon)
+            if typeof(text) == 'table' then
+                icon = text.icon or icon
+                order = text.order or order
+                text = text.text or text.title or text.name or ''
+            end
             local tab = {
                 text = text;
+                icon = icon;
                 order = order or #self.tabs+1;
                 callback = function() end;
                 objects = {};
@@ -3159,9 +3468,10 @@ function library:init()
                     Parent = objs.background;
                 })
 
+                local disp = (tab.icon and tab.icon ~= '') and (tab.icon .. ' ' .. text) or text
                 objs.text = utility:Draw('Text', {
                     ThemeColor = 'Unselected Tab Text';
-                    Text = text;
+                    Text = disp;
                     Size = 13;
                     Font = 2;
                     ZIndex = z+1;
@@ -6151,6 +6461,146 @@ function library:init()
                     return custom
                 end
 
+                -- // Section 2D Canvas
+                function section:AddCanvas(data, builder)
+                    if typeof(data) == 'number' then
+                        data = { height = data }
+                    elseif typeof(data) == 'function' and builder == nil then
+                        builder = data
+                        data = {}
+                    end
+                    data = data or {}
+                    local height = data.height or 140
+                    local canvas = {
+                        class = 'canvas';
+                        flag = data.flag;
+                        order = data.order or (#self.options + 1);
+                        enabled = true;
+                        height = height;
+                        objects = {};
+                        elements = {};
+                    }
+
+                    local z = library.zindexOrder.window + 25
+                    local objs = canvas.objects
+
+                    objs.holder = utility:Draw('Square', {
+                        Size = newUDim2(1, 0, 0, height + 8);
+                        Transparency = 0;
+                        ZIndex = z + 4;
+                        Parent = section.objects.optionholder;
+                    })
+
+                    objs.background = utility:Draw('Square', {
+                        Size = newUDim2(1, -4, 1, -4);
+                        Position = newUDim2(0, 2, 0, 2);
+                        ThemeColor = 'Group Background';
+                        ZIndex = z + 5;
+                        Parent = objs.holder;
+                    })
+
+                    objs.border1 = utility:Draw('Square', {
+                        Size = newUDim2(1, 2, 1, 2);
+                        Position = newUDim2(0, -1, 0, -1);
+                        ThemeColor = 'Option Border 1';
+                        ZIndex = z + 4;
+                        Parent = objs.background;
+                    })
+
+                    function canvas:SetHeight(h)
+                        self.height = h
+                        self.objects.holder.Size = newUDim2(1, 0, 0, h + 8)
+                        section:UpdateOptions()
+                    end
+
+                    function canvas:Clear()
+                        for _, el in ipairs(self.elements) do
+                            pcall(function()
+                                if el.Remove then el:Remove() end
+                            end)
+                        end
+                        table.clear(self.elements)
+                    end
+
+                    function canvas:Draw(class, props)
+                        props = props or {}
+                        props.Parent = props.Parent or objs.background
+                        props.ZIndex = (props.ZIndex or 0) + z + 6
+                        local d = utility:Draw(class, props)
+                        table.insert(self.elements, d)
+                        return d
+                    end
+
+                    function canvas:AddLine(from, to, color, thickness)
+                        return self:Draw('Line', {
+                            From = from,
+                            To = to,
+                            Color = color or Color3.fromRGB(255, 255, 255),
+                            Thickness = thickness or 1.5,
+                            Visible = true
+                        })
+                    end
+
+                    function canvas:AddBox(pos, size, color, filled, thickness)
+                        return self:Draw('Square', {
+                            Position = pos,
+                            Size = size,
+                            Color = color or Color3.fromRGB(255, 255, 255),
+                            Filled = (filled == true),
+                            Thickness = thickness or 1,
+                            Visible = true
+                        })
+                    end
+
+                    function canvas:AddCircle(pos, radius, color, filled)
+                        return self:Draw('Circle', {
+                            Position = pos,
+                            Radius = radius or 10,
+                            Color = color or Color3.fromRGB(255, 255, 255),
+                            Filled = (filled == true),
+                            Visible = true
+                        })
+                    end
+
+                    function canvas:AddText(text, pos, color, size, center)
+                        return self:Draw('Text', {
+                            Text = tostring(text or ''),
+                            Position = pos or newUDim2(0,0,0,0),
+                            Color = color or Color3.fromRGB(240, 240, 240),
+                            Size = size or 13,
+                            Center = (center == true),
+                            Outline = true,
+                            Font = 2,
+                            Visible = true
+                        })
+                    end
+
+                    function canvas:Remove()
+                        self:Clear()
+                        for i, opt in next, section.options do
+                            if opt == canvas then
+                                table.remove(section.options, i)
+                                break
+                            end
+                        end
+                        pcall(function() objs.holder:Remove() end)
+                        section:UpdateOptions()
+                    end
+
+                    table.insert(self.options, canvas)
+
+                    if canvas.flag then
+                        library.options[canvas.flag] = canvas
+                    end
+
+                    if builder then
+                        builder(canvas, objs.background, z + 6, utility, library)
+                    end
+
+                    self:UpdateOptions()
+                    return canvas
+                end
+
                 setmetatable(section, {
                     __index = function(tbl, key)
                         if library.customComponents[key] then
@@ -6219,9 +6669,15 @@ function library:init()
             function tab:SetText(str)
                 if typeof(str) == 'string' then
                     self.text = str;
-                    self.objects.text.Text = str;
+                    local disp = (self.icon and self.icon ~= '') and (self.icon .. ' ' .. str) or str;
+                    self.objects.text.Text = disp;
                     window:UpdateTabs();
                 end
+            end
+
+            function tab:SetIcon(newIcon)
+                self.icon = newIcon;
+                self:SetText(self.text);
             end
 
             function tab:Select()
@@ -6282,8 +6738,8 @@ function library:init()
                 v.selected = v == self.selectedTab;
                 local tabTheme = v.selected and 'Selected Tab Background' or 'Unselected Tab Background';
                 objs.background.ThemeColor = tabTheme;
-                objs.background.Color = library.theme[tabTheme];
-                objs.background.Size = newUDim2(0, objs.text.TextBounds.X + 14, 1, v.selected and 1 or 0);
+                local pad = (v.icon and v.icon ~= '') and 18 or 14;
+                objs.background.Size = newUDim2(0, objs.text.TextBounds.X + pad, 1, v.selected and 1 or 0);
                 objs.background.Position = newUDim2(0, pos, 0, 0)
 
                 local txtTheme = v.selected and 'Selected Tab Text' or 'Unselected Tab Text';
@@ -6306,6 +6762,259 @@ function library:init()
 
         window:SetOpen(true);
         return window;
+    end
+
+    -- // 2D Canvas Window (для ESP Model Preview, Radar, Grenade Prediction, Custom 2D Graphics)
+    function self.NewCanvasWindow(data)
+        data = data or {}
+        local canvasWin = {
+            title = data.title or '2D Canvas Preview',
+            size = data.size or newUDim2(0, 320, 0, 380),
+            position = data.position or data.pos or newUDim2(0.5, 60, 0.5, -190),
+            open = true,
+            visible = true,
+            objects = {},
+            elements = {}
+        }
+
+        local z = library.zindexOrder.window + 100
+        local objs = canvasWin.objects
+
+        -- Фоновая панель
+        objs.background = utility:Draw('Square', {
+            Size = canvasWin.size,
+            Position = canvasWin.position,
+            ThemeColor = 'Background',
+            ZIndex = z
+        })
+
+        objs.innerBorder1 = utility:Draw('Square', {
+            Size = newUDim2(1,2,1,2),
+            Position = newUDim2(0,-1,0,-1),
+            ThemeColor = 'Border 3',
+            ZIndex = z-1,
+            Parent = objs.background
+        })
+
+        objs.innerBorder2 = utility:Draw('Square', {
+            Size = newUDim2(1,2,1,2),
+            Position = newUDim2(0,-1,0,-1),
+            ThemeColor = 'Border 1',
+            ZIndex = z-2,
+            Parent = objs.innerBorder1
+        })
+
+        objs.midBorder = utility:Draw('Square', {
+            Size = newUDim2(1,10,1,25),
+            Position = newUDim2(0,-5,0,-20),
+            ThemeColor = 'Border 2',
+            ZIndex = z-3,
+            Parent = objs.innerBorder2
+        })
+
+        objs.outerBorder1 = utility:Draw('Square', {
+            Size = newUDim2(1,2,1,2),
+            Position = newUDim2(0,-1,0,-1),
+            ThemeColor = 'Border 1',
+            ZIndex = z-4,
+            Parent = objs.midBorder
+        })
+
+        objs.outerBorder2 = utility:Draw('Square', {
+            Size = newUDim2(1,2,1,2),
+            Position = newUDim2(0,-1,0,-1),
+            ThemeColor = 'Border 3',
+            ZIndex = z-5,
+            Parent = objs.outerBorder1
+        })
+
+        objs.topBorder = utility:Draw('Square', {
+            Size = newUDim2(1,0,0,1),
+            ThemeColor = 'Accent',
+            ZIndex = z+1,
+            Parent = objs.background
+        })
+
+        objs.title = utility:Draw('Text', {
+            Position = newUDim2(0,7,0,2),
+            ThemeColor = 'Primary Text',
+            Text = canvasWin.title,
+            Font = 2,
+            Size = 13,
+            ZIndex = z+1,
+            Outline = true,
+            Parent = objs.midBorder
+        })
+
+        -- Область холста (внутренний Canvas)
+        objs.canvas = utility:Draw('Square', {
+            Size = newUDim2(1,-16,1,-39),
+            Position = newUDim2(0,8,0,31),
+            ThemeColor = 'Group Background',
+            ZIndex = z+2,
+            Parent = objs.background
+        })
+
+        objs.canvasBorder = utility:Draw('Square', {
+            Size = newUDim2(1,2,1,2),
+            Position = newUDim2(0,-1,0,-1),
+            ThemeColor = 'Border 1',
+            ZIndex = z+1,
+            Parent = objs.canvas
+        })
+
+        -- Заголовок перетаскивания (Drag detector)
+        objs.dragdetector = utility:Draw('Square', {
+            Size = newUDim2(1,0,0,22),
+            Position = newUDim2(0,0,0,0),
+            Parent = objs.midBorder,
+            Transparency = 0,
+            ZIndex = z+4
+        })
+
+        local dragging, mouseStart, objStart
+        local lastDragPx, lastDragPy = -9999, -9999
+
+        utility:Connection(objs.dragdetector.MouseButton1Down, function(pos)
+            if canvasWin.open then
+                dragging = true
+                library.isDragging = true
+                mouseStart = newVector2(pos.X, pos.Y)
+                objStart = objs.background.Object.Position
+            end
+        end)
+
+        utility:Connection(button1up, function()
+            if dragging then
+                dragging = false
+                library.isDragging = false
+            end
+        end)
+
+        utility:Connection(runservice.RenderStepped, function()
+            if dragging and canvasWin.open then
+                library.isDragging = true
+                local mPos = inputservice:GetMouseLocation()
+                local delta = mPos - mouseStart
+                local target = objStart + delta
+                local px, py = math.floor(target.X), math.floor(target.Y)
+                if px ~= lastDragPx or py ~= lastDragPy then
+                    lastDragPx, lastDragPy = px, py
+                    objs.background.Position = newUDim2(0, px, 0, py)
+                end
+            end
+        end)
+
+        -- Методы холста
+        function canvasWin:SetTitle(newTitle)
+            self.title = tostring(newTitle)
+            self.objects.title.Text = self.title
+        end
+
+        function canvasWin:SetVisible(bool)
+            self.open = (bool == true)
+            self.objects.background.Visible = self.open
+        end
+
+        function canvasWin:SetPosition(udim2)
+            if typeof(udim2) == 'UDim2' then
+                self.position = udim2
+                self.objects.background.Position = udim2
+            end
+        end
+
+        function canvasWin:SetSize(udim2)
+            if typeof(udim2) == 'UDim2' then
+                self.size = udim2
+                self.objects.background.Size = udim2
+            end
+        end
+
+        function canvasWin:GetCanvas()
+            return self.objects.canvas
+        end
+
+        function canvasWin:GetCanvasSize()
+            local raw = self.objects.canvas.Object
+            return raw and raw.Size or Vector2.new(300, 340)
+        end
+
+        function canvasWin:GetCanvasPosition()
+            local raw = self.objects.canvas.Object
+            return raw and raw.Position or Vector2.new(0, 0)
+        end
+
+        function canvasWin:Clear()
+            for _, el in ipairs(self.elements) do
+                pcall(function()
+                    if el.Remove then el:Remove() end
+                end)
+            end
+            table.clear(self.elements)
+        end
+
+        function canvasWin:Draw(class, props)
+            props = props or {}
+            props.Parent = props.Parent or self.objects.canvas
+            props.ZIndex = (props.ZIndex or 0) + z + 5
+            local d = utility:Draw(class, props)
+            table.insert(self.elements, d)
+            return d
+        end
+
+        function canvasWin:AddLine(from, to, color, thickness)
+            return self:Draw('Line', {
+                From = from,
+                To = to,
+                Color = color or Color3.fromRGB(255, 255, 255),
+                Thickness = thickness or 1.5,
+                Visible = true
+            })
+        end
+
+        function canvasWin:AddBox(pos, size, color, filled, thickness)
+            return self:Draw('Square', {
+                Position = pos,
+                Size = size,
+                Color = color or Color3.fromRGB(255, 255, 255),
+                Filled = (filled == true),
+                Thickness = thickness or 1,
+                Visible = true
+            })
+        end
+
+        function canvasWin:AddCircle(pos, radius, color, filled)
+            return self:Draw('Circle', {
+                Position = pos,
+                Radius = radius or 10,
+                Color = color or Color3.fromRGB(255, 255, 255),
+                Filled = (filled == true),
+                Visible = true
+            })
+        end
+
+        function canvasWin:AddText(text, pos, color, size, center)
+            return self:Draw('Text', {
+                Text = tostring(text or ''),
+                Position = pos or newUDim2(0,0,0,0),
+                Color = color or Color3.fromRGB(240, 240, 240),
+                Size = size or 13,
+                Center = (center == true),
+                Outline = true,
+                Font = 2,
+                Visible = true
+            })
+        end
+
+        function canvasWin:Remove()
+            self:Clear()
+            pcall(function()
+                self.objects.background:Remove()
+            end)
+        end
+
+        table.insert(library.windows, canvasWin)
+        return canvasWin
     end
 
     -- Tooltip
