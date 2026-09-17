@@ -169,6 +169,7 @@ end
 local library = {
     windows = {};
     indicators = {};
+    glowDrawings = {};
     flags = {
         ['watermark_enabled'] = false;
         ['watermark_x'] = 6;
@@ -176,6 +177,7 @@ local library = {
         ['keybind_indicator'] = true;
         ['keybind_indicator_x'] = 0.5;
         ['keybind_indicator_y'] = 30;
+        ['glow_enabled'] = true;
     };
     options = {};
     connections = {};
@@ -231,208 +233,234 @@ library.themes = {
     {
         name = 'Default',
         theme = {
-            ['Accent']                    = fromrgb(0, 215, 255);
-            ['Background']                = fromrgb(22, 25, 34);
+            ['Accent']                    = fromrgb(0, 245, 255);
+            ['Background']                = fromrgb(18, 18, 20);
             ['Border']                    = fromrgb(0, 0, 0);
-            ['Border 1']                  = fromrgb(56, 64, 86);
-            ['Border 2']                  = fromrgb(28, 32, 44);
-            ['Border 3']                  = fromrgb(12, 14, 18);
+            ['Border 1']                  = fromrgb(46, 46, 50);
+            ['Border 2']                  = fromrgb(26, 26, 28);
+            ['Border 3']                  = fromrgb(12, 12, 14);
             ['Primary Text']              = fromrgb(255, 255, 255);
-            ['Group Background']          = fromrgb(28, 32, 44);
-            ['Selected Tab Background']   = fromrgb(36, 42, 58);
-            ['Unselected Tab Background'] = fromrgb(20, 22, 30);
+            ['Group Background']          = fromrgb(24, 24, 26);
+            ['Selected Tab Background']   = fromrgb(30, 30, 34);
+            ['Unselected Tab Background'] = fromrgb(16, 16, 18);
             ['Selected Tab Text']         = fromrgb(255, 255, 255);
-            ['Unselected Tab Text']       = fromrgb(170, 180, 200);
-            ['Section Background']        = fromrgb(25, 28, 38);
+            ['Unselected Tab Text']       = fromrgb(165, 165, 175);
+            ['Section Background']        = fromrgb(22, 22, 24);
             ['Option Text 1']             = fromrgb(255, 255, 255);
-            ['Option Text 2']             = fromrgb(215, 225, 240);
-            ['Option Text 3']             = fromrgb(165, 175, 195);
-            ['Option Border 1']           = fromrgb(52, 60, 82);
-            ['Option Border 2']           = fromrgb(12, 14, 18);
-            ['Option Background']         = fromrgb(32, 36, 48);
-            ['Risky Text']                = fromrgb(255, 75, 75);
-            ['Risky Text Enabled']        = fromrgb(255, 30, 30);
+            ['Option Text 2']             = fromrgb(220, 220, 225);
+            ['Option Text 3']             = fromrgb(155, 155, 165);
+            ['Option Border 1']           = fromrgb(46, 46, 50);
+            ['Option Border 2']           = fromrgb(10, 10, 12);
+            ['Option Background']         = fromrgb(26, 26, 30);
+            ['Risky Text']                = fromrgb(255, 65, 65);
+            ['Risky Text Enabled']        = fromrgb(255, 25, 25);
+        }
+    },
+    {
+        name = 'Monochrome White',
+        theme = {
+            ['Accent']                    = fromrgb(255, 255, 255);
+            ['Background']                = fromrgb(18, 18, 18);
+            ['Border']                    = fromrgb(0, 0, 0);
+            ['Border 1']                  = fromrgb(48, 48, 48);
+            ['Border 2']                  = fromrgb(28, 28, 28);
+            ['Border 3']                  = fromrgb(12, 12, 12);
+            ['Primary Text']              = fromrgb(255, 255, 255);
+            ['Group Background']          = fromrgb(24, 24, 24);
+            ['Selected Tab Background']   = fromrgb(32, 32, 32);
+            ['Unselected Tab Background'] = fromrgb(16, 16, 16);
+            ['Selected Tab Text']         = fromrgb(255, 255, 255);
+            ['Unselected Tab Text']       = fromrgb(160, 160, 160);
+            ['Section Background']        = fromrgb(22, 22, 22);
+            ['Option Text 1']             = fromrgb(255, 255, 255);
+            ['Option Text 2']             = fromrgb(220, 220, 220);
+            ['Option Text 3']             = fromrgb(150, 150, 150);
+            ['Option Border 1']           = fromrgb(48, 48, 48);
+            ['Option Border 2']           = fromrgb(10, 10, 10);
+            ['Option Background']         = fromrgb(26, 26, 26);
+            ['Risky Text']                = fromrgb(255, 65, 65);
+            ['Risky Text Enabled']        = fromrgb(255, 25, 25);
         }
     },
     {
         name = 'Midnight',
         theme = {
-            ['Accent']                    = fromrgb(160, 110, 255);
-            ['Background']                = fromrgb(26, 24, 38);
+            ['Accent']                    = fromrgb(175, 110, 255);
+            ['Background']                = fromrgb(18, 18, 20);
             ['Border']                    = fromrgb(0, 0, 0);
-            ['Border 1']                  = fromrgb(72, 64, 105);
-            ['Border 2']                  = fromrgb(32, 28, 48);
-            ['Border 3']                  = fromrgb(12, 10, 18);
+            ['Border 1']                  = fromrgb(48, 46, 56);
+            ['Border 2']                  = fromrgb(26, 26, 30);
+            ['Border 3']                  = fromrgb(12, 12, 14);
             ['Primary Text']              = fromrgb(255, 255, 255);
-            ['Group Background']          = fromrgb(34, 30, 50);
-            ['Selected Tab Background']   = fromrgb(42, 36, 62);
-            ['Unselected Tab Background'] = fromrgb(22, 20, 32);
+            ['Group Background']          = fromrgb(24, 24, 28);
+            ['Selected Tab Background']   = fromrgb(32, 30, 38);
+            ['Unselected Tab Background'] = fromrgb(16, 16, 18);
             ['Selected Tab Text']         = fromrgb(255, 255, 255);
-            ['Unselected Tab Text']       = fromrgb(175, 168, 205);
-            ['Section Background']        = fromrgb(30, 26, 44);
+            ['Unselected Tab Text']       = fromrgb(170, 165, 190);
+            ['Section Background']        = fromrgb(22, 22, 26);
             ['Option Text 1']             = fromrgb(255, 255, 255);
-            ['Option Text 2']             = fromrgb(225, 220, 245);
-            ['Option Text 3']             = fromrgb(170, 162, 200);
-            ['Option Border 1']           = fromrgb(72, 64, 105);
-            ['Option Border 2']           = fromrgb(14, 12, 20);
-            ['Option Background']         = fromrgb(36, 32, 54);
-            ['Risky Text']                = fromrgb(255, 75, 75);
-            ['Risky Text Enabled']        = fromrgb(255, 30, 30);
+            ['Option Text 2']             = fromrgb(225, 220, 240);
+            ['Option Text 3']             = fromrgb(160, 155, 175);
+            ['Option Border 1']           = fromrgb(48, 46, 56);
+            ['Option Border 2']           = fromrgb(10, 10, 12);
+            ['Option Background']         = fromrgb(26, 26, 32);
+            ['Risky Text']                = fromrgb(255, 65, 65);
+            ['Risky Text Enabled']        = fromrgb(255, 25, 25);
         }
     },
     {
         name = 'Nekocheat',
         theme = {
-            ['Accent']                    = fromrgb(255, 65, 155);
-            ['Background']                = fromrgb(28, 22, 30);
+            ['Accent']                    = fromrgb(255, 55, 165);
+            ['Background']                = fromrgb(18, 18, 20);
             ['Border']                    = fromrgb(0, 0, 0);
-            ['Border 1']                  = fromrgb(80, 60, 88);
-            ['Border 2']                  = fromrgb(34, 26, 38);
-            ['Border 3']                  = fromrgb(12, 10, 14);
+            ['Border 1']                  = fromrgb(52, 44, 52);
+            ['Border 2']                  = fromrgb(28, 24, 28);
+            ['Border 3']                  = fromrgb(12, 12, 14);
             ['Primary Text']              = fromrgb(255, 255, 255);
-            ['Group Background']          = fromrgb(36, 28, 40);
-            ['Selected Tab Background']   = fromrgb(46, 34, 52);
-            ['Unselected Tab Background'] = fromrgb(24, 18, 26);
+            ['Group Background']          = fromrgb(24, 24, 26);
+            ['Selected Tab Background']   = fromrgb(34, 30, 36);
+            ['Unselected Tab Background'] = fromrgb(16, 16, 18);
             ['Selected Tab Text']         = fromrgb(255, 255, 255);
-            ['Unselected Tab Text']       = fromrgb(190, 170, 195);
-            ['Section Background']        = fromrgb(32, 25, 36);
+            ['Unselected Tab Text']       = fromrgb(180, 165, 180);
+            ['Section Background']        = fromrgb(22, 22, 24);
             ['Option Text 1']             = fromrgb(255, 255, 255);
-            ['Option Text 2']             = fromrgb(235, 215, 240);
-            ['Option Text 3']             = fromrgb(180, 160, 185);
-            ['Option Border 1']           = fromrgb(78, 58, 86);
-            ['Option Border 2']           = fromrgb(16, 12, 18);
-            ['Option Background']         = fromrgb(36, 28, 40);
-            ['Risky Text']                = fromrgb(255, 75, 75);
-            ['Risky Text Enabled']        = fromrgb(255, 30, 30);
+            ['Option Text 2']             = fromrgb(235, 215, 235);
+            ['Option Text 3']             = fromrgb(170, 155, 170);
+            ['Option Border 1']           = fromrgb(52, 44, 52);
+            ['Option Border 2']           = fromrgb(10, 10, 12);
+            ['Option Background']         = fromrgb(28, 26, 30);
+            ['Risky Text']                = fromrgb(255, 65, 65);
+            ['Risky Text Enabled']        = fromrgb(255, 25, 25);
         }
     },
     {
         name = 'Nekocheat Blue',
         theme = {
-            ['Accent']                    = fromrgb(0, 225, 255);
-            ['Background']                = fromrgb(20, 25, 36);
+            ['Accent']                    = fromrgb(0, 215, 255);
+            ['Background']                = fromrgb(18, 18, 20);
             ['Border']                    = fromrgb(0, 0, 0);
-            ['Border 1']                  = fromrgb(54, 72, 100);
-            ['Border 2']                  = fromrgb(26, 34, 48);
-            ['Border 3']                  = fromrgb(10, 14, 20);
+            ['Border 1']                  = fromrgb(44, 48, 56);
+            ['Border 2']                  = fromrgb(24, 26, 30);
+            ['Border 3']                  = fromrgb(12, 12, 14);
             ['Primary Text']              = fromrgb(255, 255, 255);
-            ['Group Background']          = fromrgb(26, 34, 48);
-            ['Selected Tab Background']   = fromrgb(34, 46, 65);
-            ['Unselected Tab Background'] = fromrgb(18, 22, 32);
+            ['Group Background']          = fromrgb(24, 24, 26);
+            ['Selected Tab Background']   = fromrgb(30, 32, 38);
+            ['Unselected Tab Background'] = fromrgb(16, 16, 18);
             ['Selected Tab Text']         = fromrgb(255, 255, 255);
-            ['Unselected Tab Text']       = fromrgb(170, 190, 215);
-            ['Section Background']        = fromrgb(22, 28, 40);
+            ['Unselected Tab Text']       = fromrgb(165, 175, 195);
+            ['Section Background']        = fromrgb(22, 22, 24);
             ['Option Text 1']             = fromrgb(255, 255, 255);
-            ['Option Text 2']             = fromrgb(220, 235, 250);
-            ['Option Text 3']             = fromrgb(165, 185, 210);
-            ['Option Border 1']           = fromrgb(52, 70, 96);
-            ['Option Border 2']           = fromrgb(12, 16, 24);
-            ['Option Background']         = fromrgb(28, 38, 54);
-            ['Risky Text']                = fromrgb(255, 75, 75);
-            ['Risky Text Enabled']        = fromrgb(255, 30, 30);
+            ['Option Text 2']             = fromrgb(220, 230, 245);
+            ['Option Text 3']             = fromrgb(160, 170, 185);
+            ['Option Border 1']           = fromrgb(44, 48, 56);
+            ['Option Border 2']           = fromrgb(10, 10, 12);
+            ['Option Background']         = fromrgb(26, 28, 32);
+            ['Risky Text']                = fromrgb(255, 65, 65);
+            ['Risky Text Enabled']        = fromrgb(255, 25, 25);
         }
     },
     {
         name = 'Fatality',
         theme = {
-            ['Accent']                    = fromrgb(235, 35, 95);
-            ['Background']                = fromrgb(28, 20, 44);
+            ['Accent']                    = fromrgb(255, 35, 95);
+            ['Background']                = fromrgb(18, 18, 20);
             ['Border']                    = fromrgb(0, 0, 0);
-            ['Border 1']                  = fromrgb(75, 55, 110);
-            ['Border 2']                  = fromrgb(36, 25, 58);
-            ['Border 3']                  = fromrgb(12, 10, 18);
+            ['Border 1']                  = fromrgb(54, 44, 52);
+            ['Border 2']                  = fromrgb(28, 24, 28);
+            ['Border 3']                  = fromrgb(12, 12, 14);
             ['Primary Text']              = fromrgb(255, 255, 255);
-            ['Group Background']          = fromrgb(36, 25, 58);
-            ['Selected Tab Background']   = fromrgb(48, 32, 76);
-            ['Unselected Tab Background'] = fromrgb(24, 18, 36);
+            ['Group Background']          = fromrgb(24, 24, 26);
+            ['Selected Tab Background']   = fromrgb(34, 28, 36);
+            ['Unselected Tab Background'] = fromrgb(16, 16, 18);
             ['Selected Tab Text']         = fromrgb(255, 255, 255);
-            ['Unselected Tab Text']       = fromrgb(185, 170, 210);
-            ['Section Background']        = fromrgb(32, 22, 50);
+            ['Unselected Tab Text']       = fromrgb(185, 165, 180);
+            ['Section Background']        = fromrgb(22, 22, 24);
             ['Option Text 1']             = fromrgb(255, 255, 255);
-            ['Option Text 2']             = fromrgb(230, 215, 245);
-            ['Option Text 3']             = fromrgb(175, 160, 200);
-            ['Option Border 1']           = fromrgb(75, 55, 110);
-            ['Option Border 2']           = fromrgb(14, 10, 20);
-            ['Option Background']         = fromrgb(38, 28, 62);
-            ['Risky Text']                = fromrgb(255, 75, 75);
-            ['Risky Text Enabled']        = fromrgb(255, 30, 30);
+            ['Option Text 2']             = fromrgb(235, 215, 230);
+            ['Option Text 3']             = fromrgb(170, 155, 165);
+            ['Option Border 1']           = fromrgb(54, 44, 52);
+            ['Option Border 2']           = fromrgb(10, 10, 12);
+            ['Option Background']         = fromrgb(28, 26, 30);
+            ['Risky Text']                = fromrgb(255, 65, 65);
+            ['Risky Text Enabled']        = fromrgb(255, 25, 25);
         }
     },
     {
         name = 'Gamesense',
         theme = {
-            ['Accent']                    = fromrgb(155, 225, 35);
-            ['Background']                = fromrgb(20, 26, 22);
+            ['Accent']                    = fromrgb(160, 245, 35);
+            ['Background']                = fromrgb(18, 18, 20);
             ['Border']                    = fromrgb(0, 0, 0);
-            ['Border 1']                  = fromrgb(58, 78, 65);
-            ['Border 2']                  = fromrgb(24, 32, 26);
-            ['Border 3']                  = fromrgb(10, 14, 11);
+            ['Border 1']                  = fromrgb(46, 52, 46);
+            ['Border 2']                  = fromrgb(26, 28, 26);
+            ['Border 3']                  = fromrgb(12, 12, 14);
             ['Primary Text']              = fromrgb(255, 255, 255);
-            ['Group Background']          = fromrgb(26, 34, 28);
-            ['Selected Tab Background']   = fromrgb(34, 46, 38);
-            ['Unselected Tab Background'] = fromrgb(18, 22, 19);
+            ['Group Background']          = fromrgb(24, 24, 26);
+            ['Selected Tab Background']   = fromrgb(30, 36, 30);
+            ['Unselected Tab Background'] = fromrgb(16, 16, 18);
             ['Selected Tab Text']         = fromrgb(255, 255, 255);
-            ['Unselected Tab Text']       = fromrgb(175, 205, 185);
-            ['Section Background']        = fromrgb(23, 30, 25);
+            ['Unselected Tab Text']       = fromrgb(170, 195, 170);
+            ['Section Background']        = fromrgb(22, 22, 24);
             ['Option Text 1']             = fromrgb(255, 255, 255);
-            ['Option Text 2']             = fromrgb(220, 240, 225);
-            ['Option Text 3']             = fromrgb(165, 190, 175);
-            ['Option Border 1']           = fromrgb(55, 75, 62);
-            ['Option Border 2']           = fromrgb(12, 16, 13);
-            ['Option Background']         = fromrgb(28, 38, 30);
-            ['Risky Text']                = fromrgb(255, 75, 75);
-            ['Risky Text Enabled']        = fromrgb(255, 30, 30);
+            ['Option Text 2']             = fromrgb(220, 240, 220);
+            ['Option Text 3']             = fromrgb(160, 180, 160);
+            ['Option Border 1']           = fromrgb(46, 52, 46);
+            ['Option Border 2']           = fromrgb(10, 10, 12);
+            ['Option Background']         = fromrgb(26, 28, 26);
+            ['Risky Text']                = fromrgb(255, 65, 65);
+            ['Risky Text Enabled']        = fromrgb(255, 25, 25);
         }
     },
     {
         name = 'Twitch',
         theme = {
-            ['Accent']                    = fromrgb(169, 112, 255);
-            ['Background']                = fromrgb(24, 22, 32);
+            ['Accent']                    = fromrgb(170, 115, 255);
+            ['Background']                = fromrgb(18, 18, 20);
             ['Border']                    = fromrgb(0, 0, 0);
-            ['Border 1']                  = fromrgb(68, 60, 90);
-            ['Border 2']                  = fromrgb(34, 30, 46);
-            ['Border 3']                  = fromrgb(12, 10, 16);
+            ['Border 1']                  = fromrgb(48, 46, 56);
+            ['Border 2']                  = fromrgb(26, 26, 30);
+            ['Border 3']                  = fromrgb(12, 12, 14);
             ['Primary Text']              = fromrgb(255, 255, 255);
-            ['Group Background']          = fromrgb(34, 30, 46);
-            ['Selected Tab Background']   = fromrgb(44, 38, 60);
-            ['Unselected Tab Background'] = fromrgb(20, 18, 26);
+            ['Group Background']          = fromrgb(24, 24, 26);
+            ['Selected Tab Background']   = fromrgb(32, 30, 38);
+            ['Unselected Tab Background'] = fromrgb(16, 16, 18);
             ['Selected Tab Text']         = fromrgb(255, 255, 255);
-            ['Unselected Tab Text']       = fromrgb(180, 170, 205);
-            ['Section Background']        = fromrgb(28, 25, 38);
+            ['Unselected Tab Text']       = fromrgb(175, 165, 195);
+            ['Section Background']        = fromrgb(22, 22, 24);
             ['Option Text 1']             = fromrgb(255, 255, 255);
-            ['Option Text 2']             = fromrgb(225, 218, 245);
-            ['Option Text 3']             = fromrgb(170, 160, 195);
-            ['Option Border 1']           = fromrgb(65, 58, 88);
-            ['Option Border 2']           = fromrgb(14, 12, 18);
-            ['Option Background']         = fromrgb(36, 32, 50);
-            ['Risky Text']                = fromrgb(255, 75, 75);
-            ['Risky Text Enabled']        = fromrgb(255, 30, 30);
+            ['Option Text 2']             = fromrgb(225, 220, 240);
+            ['Option Text 3']             = fromrgb(165, 155, 185);
+            ['Option Border 1']           = fromrgb(48, 46, 56);
+            ['Option Border 2']           = fromrgb(10, 10, 12);
+            ['Option Background']         = fromrgb(26, 26, 32);
+            ['Risky Text']                = fromrgb(255, 65, 65);
+            ['Risky Text Enabled']        = fromrgb(255, 25, 25);
         }
     },
     {
         name = 'Solar Flare',
         theme = {
-            ['Accent']                    = fromrgb(255, 175, 25);
-            ['Background']                = fromrgb(28, 24, 20);
+            ['Accent']                    = fromrgb(255, 180, 25);
+            ['Background']                = fromrgb(18, 18, 20);
             ['Border']                    = fromrgb(0, 0, 0);
-            ['Border 1']                  = fromrgb(82, 68, 52);
-            ['Border 2']                  = fromrgb(34, 28, 24);
-            ['Border 3']                  = fromrgb(14, 12, 10);
+            ['Border 1']                  = fromrgb(54, 48, 42);
+            ['Border 2']                  = fromrgb(28, 26, 24);
+            ['Border 3']                  = fromrgb(12, 12, 14);
             ['Primary Text']              = fromrgb(255, 255, 255);
-            ['Group Background']          = fromrgb(36, 30, 24);
-            ['Selected Tab Background']   = fromrgb(48, 38, 30);
-            ['Unselected Tab Background'] = fromrgb(22, 19, 16);
+            ['Group Background']          = fromrgb(24, 24, 26);
+            ['Selected Tab Background']   = fromrgb(36, 32, 28);
+            ['Unselected Tab Background'] = fromrgb(16, 16, 18);
             ['Selected Tab Text']         = fromrgb(255, 255, 255);
-            ['Unselected Tab Text']       = fromrgb(195, 180, 165);
-            ['Section Background']        = fromrgb(32, 27, 22);
+            ['Unselected Tab Text']       = fromrgb(190, 175, 160);
+            ['Section Background']        = fromrgb(22, 22, 24);
             ['Option Text 1']             = fromrgb(255, 255, 255);
             ['Option Text 2']             = fromrgb(240, 225, 210);
-            ['Option Text 3']             = fromrgb(185, 170, 155);
-            ['Option Border 1']           = fromrgb(80, 65, 50);
-            ['Option Border 2']           = fromrgb(16, 13, 10);
-            ['Option Background']         = fromrgb(38, 32, 26);
-            ['Risky Text']                = fromrgb(255, 75, 75);
+            ['Option Text 3']             = fromrgb(180, 165, 150);
+            ['Option Border 1']           = fromrgb(54, 48, 42);
+            ['Option Border 2']           = fromrgb(10, 10, 12);
+            ['Option Background']         = fromrgb(28, 26, 24);
+            ['Risky Text']                = fromrgb(255, 65, 65);
             ['Risky Text Enabled']        = fromrgb(255, 30, 30);
         }
     }
@@ -1096,9 +1124,45 @@ do
         end
         return proxy
     end
+    function utility:AddGlow(parentObj, zIndex, themeColor, layersCount, spreadStep)
+        layersCount = layersCount or 5
+        themeColor = themeColor or 'Accent'
+        spreadStep = spreadStep or 1
+        
+        local opacities = { 0.32, 0.20, 0.12, 0.06, 0.03, 0.015 }
+        local glowLayers = {}
+        local currentParent = parentObj
+        
+        for i = 1, layersCount do
+            local op = opacities[i] or (0.32 / (i * 1.6))
+            local glow = self:Draw('Square', {
+                Size = newUDim2(1, spreadStep * 2, 1, spreadStep * 2);
+                Position = newUDim2(0, -spreadStep, 0, -spreadStep);
+                ThemeColor = themeColor;
+                Transparency = op;
+                ZIndex = zIndex - i;
+                Parent = currentParent;
+            })
+            table.insert(glowLayers, glow)
+            table.insert(library.glowDrawings, glow)
+            currentParent = glow
+        end
+        return glowLayers
+    end
 end
 
 library.utility = utility
+
+function library:SetGlowEnabled(bool)
+    self.flags.glow_enabled = bool
+    for _, glow in ipairs(self.glowDrawings) do
+        if glow and glow.Object then
+            pcall(function()
+                glow.Visible = bool
+            end)
+        end
+    end
+end
 
 function library:Unload()
     library.unloaded:Fire();
@@ -1119,6 +1183,9 @@ function library:Unload()
             end
         end
         table.clear(self.tweens)
+    end
+    if self.glowDrawings then
+        table.clear(self.glowDrawings)
     end
     for obj in next, self.drawings do
         obj:Remove()
@@ -1724,6 +1791,8 @@ function library:init()
                 ZIndex = z-2;
             })
 
+            objs.glow = utility:AddGlow(objs.border2, z-2, 'Accent', 5, 1);
+
             objs.topborder = utility:Draw('Square', {
                 Size = newUDim2(1,0,0,1);
                 ThemeColor = 'Accent';
@@ -1875,7 +1944,9 @@ function library:init()
                     Parent = objs.border1;
                     ZIndex = z-2;
                 })
-    
+
+                objs.glow = utility:AddGlow(objs.border2, z-2, 'Accent', 3, 1);
+
                 objs.activeBar = utility:Draw('Square', {
                     Size = newUDim2(0, 2, 0, 10);
                     Position = newUDim2(0, 2, 0, 3);
@@ -2372,6 +2443,8 @@ function library:init()
                 ZIndex = z-5;
                 Parent = objs.outerBorder1;
             })
+
+            objs.glow = utility:AddGlow(objs.outerBorder2, z-5, 'Accent', 6, 1);
 
             objs.topBorder = utility:Draw('Square', {
                 Size = newUDim2(1,0,0,1);
@@ -3222,12 +3295,10 @@ function library:init()
                         end)
                     end
                     if valueObj.checkMark then
-                        valueObj.checkMark.Visible = isSel
-                        valueObj.checkMark.Color = fromrgb(18, 18, 22)
+                        valueObj.checkMark.Visible = false
                         pcall(function()
                             if valueObj.checkMark.Object then
-                                valueObj.checkMark.Object.Visible = isSel
-                                valueObj.checkMark.Object.Color = fromrgb(18, 18, 22)
+                                valueObj.checkMark.Object.Visible = false
                             end
                         end)
                     end
@@ -7671,6 +7742,8 @@ function library:init()
                 Parent = objs.border1;
                 ZIndex = z-2;
             })
+
+            objs.glow = utility:AddGlow(objs.border2, z-2, 'Accent', 4, 1);
             
             objs.topbar = utility:Draw('Square', {
                 Size = newUDim2(1,0,0,1);
@@ -7864,6 +7937,10 @@ function library:CreateSettingsTab(menu)
         if library.keyIndicator then
             library.keyIndicator:SetEnabled(bool)
         end
+    end});
+
+    mainSection:AddToggle({text = 'Glow Effect', flag = 'glow_enabled', state = true, callback = function(bool)
+        library:SetGlowEnabled(bool)
     end});
 
 
