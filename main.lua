@@ -834,7 +834,7 @@ do
             if not table.find(blacklistedProperties,i) then
 
                 local lastval = drawing[i]
-                if lastval == v and i ~= 'Parent' and i ~= 'Visible' then
+                if lastval == v and i ~= 'Parent' and i ~= 'Visible' and i ~= 'ThemeColor' and i ~= 'Color' and i ~= 'OutlineThemeColor' and i ~= 'ThemeColorOutline' then
                     return
                 end
 
@@ -863,12 +863,23 @@ do
                     v = 1
                 elseif i == 'Text' and class == 'Text' then
                     v = sanitizeDrawingText(v)
+                elseif i == 'Data' and class == 'Image' then
+                    if typeof(v) == 'string' and v:find('^https?://') then
+                        local ok, raw = pcall(function() return game:HttpGet(v) end)
+                        if ok and raw and #raw > 100 then
+                            v = raw
+                        else
+                            pcall(function() drawing.Object.Visible = false end)
+                            drawing.Visible = false
+                            return
+                        end
+                    end
                 end
 
                 pcall(function()
                     drawing.Object[i] = v
                 end)
-                if drawing[i] ~= nil or i == 'Parent' or i == 'ThemeColor' or i == 'OutlineThemeColor' or i == 'ThemeColorOutline' or i == 'ThemeColorOffset' or i == 'OutlineThemeColorOffset' or i == 'ZIndex' then
+                if drawing[i] ~= nil or i == 'Parent' or i == 'ThemeColor' or i == 'OutlineThemeColor' or i == 'ThemeColorOutline' or i == 'ThemeColorOffset' or i == 'OutlineThemeColorOffset' or i == 'ZIndex' or i == 'Color' or i == 'Filled' then
                     drawing[i] = v
                 end
 
@@ -1180,10 +1191,14 @@ function library:init()
                                     list.objects.openText.Text = '+'
                                 end
                                 if list.objects and list.objects.border1 then
-                                    list.objects.border1.ThemeColor = list.objects.holder and list.objects.holder.Hover and 'Accent' or 'Option Border 1'
+                                    local bTheme = list.objects.holder and list.objects.holder.Hover and 'Accent' or 'Option Border 1';
+                                    list.objects.border1.ThemeColor = bTheme;
+                                    list.objects.border1.Color = library.theme[bTheme];
                                 end
                                 if list.objects and list.objects.text then
-                                    list.objects.text.ThemeColor = list.objects.holder and list.objects.holder.Hover and (list.risky and 'Risky Text Enabled' or 'Option Text 1') or (list.risky and 'Risky Text' or 'Option Text 2')
+                                    local tTheme = list.objects.holder and list.objects.holder.Hover and (list.risky and 'Risky Text Enabled' or 'Option Text 1') or (list.risky and 'Risky Text' or 'Option Text 2');
+                                    list.objects.text.ThemeColor = tTheme;
+                                    list.objects.text.Color = library.theme[tTheme];
                                 end
                                 win.dropdown.selected = nil
                                 if ddBg then
@@ -3163,8 +3178,11 @@ function library:init()
                     if tab ~= window.selectedTab then
                         objs.background.Color = fromrgb(32, 32, 36);
                         objs.innerBorder.ThemeColor = 'Border 2';
+                        objs.innerBorder.Color = library.theme['Border 2'];
                         objs.text.ThemeColor = 'Primary Text';
+                        objs.text.Color = library.theme['Primary Text'];
                         objs.topBorder.ThemeColor = 'Accent';
+                        objs.topBorder.Color = library.theme['Accent'];
                     end
                 end)
 
@@ -3173,8 +3191,11 @@ function library:init()
                         objs.background.ThemeColor = 'Unselected Tab Background';
                         objs.background.Color = library.theme['Unselected Tab Background'];
                         objs.innerBorder.ThemeColor = 'Border 1';
+                        objs.innerBorder.Color = library.theme['Border 1'];
                         objs.text.ThemeColor = 'Unselected Tab Text';
+                        objs.text.Color = library.theme['Unselected Tab Text'];
                         objs.topBorder.ThemeColor = 'Unselected Tab Background';
+                        objs.topBorder.Color = library.theme['Unselected Tab Background'];
                     end
                 end)
 
@@ -3306,9 +3327,9 @@ function library:init()
                         objects = {};
                     };
 
-                    local blacklist = {'objects'};
+                    local blacklist = {'objects', 'options'};
                     for i,v in next, data do
-                        if not table.find(blacklist, i) ~= toggle[i] ~= nil then
+                        if not table.find(blacklist, i) and toggle[i] ~= nil then
                             toggle[i] = v
                         end
                     end
@@ -3340,10 +3361,10 @@ function library:init()
                             Parent = objs.holder;
                         })
 
-                        objs.gradient = utility:Draw('Image', {
+                        objs.gradient = utility:Draw('Square', {
                             Size = newUDim2(1,0,1,0);
-                            Data = library.images.gradientp45;
-                            Transparency = .25;
+                            Transparency = 0;
+                            Visible = false;
                             ZIndex = z+4;
                             Parent = objs.background;
                         })
@@ -3376,12 +3397,19 @@ function library:init()
 
                         utility:Connection(objs.holder.MouseEnter, function()
                             objs.border1.ThemeColor = 'Accent';
-                            objs.text.ThemeColor = toggle.risky and 'Risky Text Enabled' or 'Option Text 1';
+                            objs.border1.Color = library.theme['Accent'];
+                            local tColor = toggle.risky and 'Risky Text Enabled' or 'Option Text 1';
+                            objs.text.ThemeColor = tColor;
+                            objs.text.Color = library.theme[tColor];
                         end)
 
                         utility:Connection(objs.holder.MouseLeave, function()
-                            objs.border1.ThemeColor = toggle.state and 'Accent' or 'Option Border 1';
-                            objs.text.ThemeColor = toggle.state and (toggle.risky and 'Risky Text Enabled' or 'Option Text 1') or (toggle.risky and 'Risky Text' or 'Option Text 3');
+                            local bTheme = toggle.state and 'Accent' or 'Option Border 1';
+                            objs.border1.ThemeColor = bTheme;
+                            objs.border1.Color = library.theme[bTheme];
+                            local tTheme = toggle.state and (toggle.risky and 'Risky Text Enabled' or 'Option Text 1') or (toggle.risky and 'Risky Text' or 'Option Text 3');
+                            objs.text.ThemeColor = tTheme;
+                            objs.text.Color = library.theme[tTheme];
                         end)
 
                         utility:Connection(objs.holder.MouseButton1Down, function()
@@ -3393,20 +3421,25 @@ function library:init()
 
                     function toggle:SetState(bool, nocallback)
                         if typeof(bool) == 'boolean' then
-                            local stateChanged = (self.state ~= bool);
                             self.state = bool;
                             if self.flag then
                                 library.flags[self.flag] = bool;
                             end
 
-                            if stateChanged then
-                                self.objects.border1.ThemeColor = bool and 'Accent' or (self.objects.holder.Hover and 'Accent' or 'Option Border 1');
-                                self.objects.text.ThemeColor = (bool or self.objects.holder.Hover) and (self.risky and 'Risky Text Enabled' or 'Option Text 1') or (self.risky and 'Risky Text' or 'Option Text 3');
-                                self.objects.background.ThemeColor = bool and 'Accent' or 'Option Background';
-                                self.objects.background.ThemeColorOffset = bool and -55 or 0
-                            end
+                            local bTheme = (bool or (self.objects.holder and self.objects.holder.Hover)) and 'Accent' or 'Option Border 1';
+                            self.objects.border1.ThemeColor = bTheme;
+                            self.objects.border1.Color = library.theme[bTheme];
 
-                            if not nocallback then
+                            local tTheme = (bool or (self.objects.holder and self.objects.holder.Hover)) and (self.risky and 'Risky Text Enabled' or 'Option Text 1') or (self.risky and 'Risky Text' or 'Option Text 3');
+                            self.objects.text.ThemeColor = tTheme;
+                            self.objects.text.Color = library.theme[tTheme];
+
+                            local bgTheme = bool and 'Accent' or 'Option Background';
+                            self.objects.background.ThemeColor = bgTheme;
+                            self.objects.background.Color = library.theme[bgTheme];
+                            self.objects.background.ThemeColorOffset = 0;
+
+                            if not nocallback and self.callback then
                                 self.callback(bool);
                             end
 
@@ -3515,10 +3548,10 @@ function library:init()
                                 Parent = objs.holder;
                             })
     
-                            objs.gradient = utility:Draw('Image', {
+                            objs.gradient = utility:Draw('Square', {
                                 Size = newUDim2(1,0,1,0);
-                                Data = library.images.gradientp45;
-                                Transparency = .25;
+                                Transparency = 0;
+                                Visible = false;
                                 ZIndex = z+4;
                                 Parent = objs.background;
                             })
@@ -3541,10 +3574,13 @@ function library:init()
     
                             utility:Connection(objs.holder.MouseEnter, function()
                                 objs.border1.ThemeColor = 'Accent';
+                                objs.border1.Color = library.theme['Accent'];
                             end)
     
                             utility:Connection(objs.holder.MouseLeave, function()
-                                objs.border1.ThemeColor = color.state and 'Accent' or 'Option Border 1';
+                                local bTheme = color.open and 'Accent' or 'Option Border 1';
+                                objs.border1.ThemeColor = bTheme;
+                                objs.border1.Color = library.theme[bTheme];
                             end)
     
                             utility:Connection(objs.holder.MouseButton1Down, function()
@@ -3597,9 +3633,16 @@ function library:init()
                         function color:SetOpen(bool)
                             if typeof(bool) == 'boolean' then
                                 self.open = bool
+                                local bTheme = (bool or (self.objects.holder and self.objects.holder.Hover)) and 'Accent' or 'Option Border 1';
+                                self.objects.border1.ThemeColor = bTheme;
+                                self.objects.border1.Color = library.theme[bTheme];
                                 if bool then
                                     if window.colorpicker.selected then
                                         window.colorpicker.selected.open = false;
+                                        if window.colorpicker.selected.objects and window.colorpicker.selected.objects.border1 then
+                                            window.colorpicker.selected.objects.border1.ThemeColor = 'Option Border 1';
+                                            window.colorpicker.selected.objects.border1.Color = library.theme['Option Border 1'];
+                                        end
                                     end
                                     window.colorpicker.selected = color
                                     window.colorpicker.objects.background.Parent = self.objects.background;
@@ -3633,7 +3676,7 @@ function library:init()
                             order = #self.options+1;
                             callback = function(state)
                                 bind.state = state;
-                                toggle:SetState(state, true);
+                                toggle:SetState(state);
                                 if userCallback then
                                     userCallback(state);
                                 end
@@ -3693,10 +3736,13 @@ function library:init()
     
                             utility:Connection(objs.holder.MouseEnter, function()
                                 objs.keyText.ThemeColor = 'Accent';
+                                objs.keyText.Color = library.theme['Accent'];
                             end)
     
                             utility:Connection(objs.holder.MouseLeave, function()
-                                objs.keyText.ThemeColor = bind.binding and 'Accent' or 'Option Text 3';
+                                local kTheme = bind.binding and 'Accent' or 'Option Text 3';
+                                objs.keyText.ThemeColor = kTheme;
+                                objs.keyText.Color = library.theme[kTheme];
                             end)
     
                             utility:Connection(objs.holder.MouseButton1Down, function()
@@ -3790,17 +3836,18 @@ function library:init()
                             end
 
                             if self.bind ~= 'none' and self.mode ~= 'always' then
-                                bind.state = false
+                                bind.state = toggle.state;
                                 if bind.flag then
                                     library.flags[bind.flag] = bind.state;
                                 end
-                                self.callback(false)
                             end
 
                             self.keycallback(self.bind);
                             self:SetKeyText(keyName:upper());
                             self:UpdateIndicator();
-                            self.objects.keyText.ThemeColor = self.objects.holder.Hover and 'Accent' or 'Option Text 3';
+                            local kTheme = self.objects.holder.Hover and 'Accent' or 'Option Text 3';
+                            self.objects.keyText.ThemeColor = kTheme;
+                            self.objects.keyText.Color = library.theme[kTheme];
                         end
     
                         function bind:SetKeyText(str)
@@ -4071,7 +4118,7 @@ function library:init()
     
                         local blacklist = {'objects'};
                         for i,v in next, data do
-                            if not table.find(blacklist, i) ~= list[i] ~= nil then
+                            if not table.find(blacklist, i) and list[i] ~= nil then
                                 list[i] = v
                             end
                         end
@@ -4149,23 +4196,38 @@ function library:init()
     
                             utility:Connection(objs.holder.MouseEnter, function()
                                 objs.border1.ThemeColor = 'Accent';
+                                objs.border1.Color = library.theme['Accent'];
                                 objs.inputText.ThemeColor = 'Option Text 1';
+                                objs.inputText.Color = library.theme['Option Text 1'];
                                 objs.openText.ThemeColor = 'Option Text 1';
+                                objs.openText.Color = library.theme['Option Text 1'];
                             end)
     
                             utility:Connection(objs.holder.MouseLeave, function()
-                                objs.border1.ThemeColor = list.open and 'Accent' or 'Option Border 1';
-                                objs.inputText.ThemeColor = list.open and 'Option Text 1' or 'Option Text 2';
-                                objs.openText.ThemeColor = list.open and 'Option Text 1' or 'Option Text 3';
+                                local bTheme = list.open and 'Accent' or 'Option Border 1';
+                                objs.border1.ThemeColor = bTheme;
+                                objs.border1.Color = library.theme[bTheme];
+                                local tTheme = list.open and 'Option Text 1' or 'Option Text 2';
+                                objs.inputText.ThemeColor = tTheme;
+                                objs.inputText.Color = library.theme[tTheme];
+                                local oTheme = list.open and 'Option Text 1' or 'Option Text 3';
+                                objs.openText.ThemeColor = oTheme;
+                                objs.openText.Color = library.theme[oTheme];
                             end)
     
                             utility:Connection(objs.holder.MouseButton1Down, function()
                                 if list.open then
                                     list.open = false;
                                     objs.openText.Text = '+';
-                                    objs.border1.ThemeColor = objs.holder.Hover and 'Accent' or 'Option Border 1';
-                                    objs.inputText.ThemeColor = objs.holder.Hover and 'Option Text 1' or 'Option Text 2';
-                                    objs.openText.ThemeColor = objs.holder.Hover and 'Option Text 1' or 'Option Text 3';
+                                    local bTheme = objs.holder.Hover and 'Accent' or 'Option Border 1';
+                                    objs.border1.ThemeColor = bTheme;
+                                    objs.border1.Color = library.theme[bTheme];
+                                    local tTheme = objs.holder.Hover and 'Option Text 1' or 'Option Text 2';
+                                    objs.inputText.ThemeColor = tTheme;
+                                    objs.inputText.Color = library.theme[tTheme];
+                                    local oTheme = objs.holder.Hover and 'Option Text 1' or 'Option Text 3';
+                                    objs.openText.ThemeColor = oTheme;
+                                    objs.openText.Color = library.theme[oTheme];
                                     if window.dropdown.selected == list then
                                         window.dropdown.selected = nil;
                                         window.dropdown.objects.background.Visible = false;
@@ -4432,12 +4494,19 @@ function library:init()
 
                         utility:Connection(objs.holder.MouseEnter, function()
                             objs.border1.ThemeColor = 'Accent';
-                            objs.text.ThemeColor = slider.risky and 'Risky Text Enabled' or 'Option Text 1';
+                            objs.border1.Color = library.theme['Accent'];
+                            local tTheme = slider.risky and 'Risky Text Enabled' or 'Option Text 1';
+                            objs.text.ThemeColor = tTheme;
+                            objs.text.Color = library.theme[tTheme];
                         end)
 
                         utility:Connection(objs.holder.MouseLeave, function()
-                            objs.border1.ThemeColor = slider.dragging and 'Accent' or 'Option Border 1';
-                            objs.text.ThemeColor = slider.dragging and (slider.risky and 'Risky Text Enabled' or 'Option Text 1') or ((slider.min < 0 and slider.value == 0 or slider.value == slider.min) and (slider.risky and 'Risky Text' or 'Option Text 3') or (slider.risky and 'Risky Text Enabled' or 'Option Text 1'));
+                            local bTheme = slider.dragging and 'Accent' or 'Option Border 1';
+                            objs.border1.ThemeColor = bTheme;
+                            objs.border1.Color = library.theme[bTheme];
+                            local tTheme = slider.dragging and (slider.risky and 'Risky Text Enabled' or 'Option Text 1') or ((slider.min < 0 and slider.value == 0 or slider.value == slider.min) and (slider.risky and 'Risky Text' or 'Option Text 3') or (slider.risky and 'Risky Text Enabled' or 'Option Text 1'));
+                            objs.text.ThemeColor = tTheme;
+                            objs.text.Color = library.theme[tTheme];
                         end)
 
                         utility:Connection(slider.objects.plusDetector.MouseButton1Down, function()
@@ -4631,26 +4700,39 @@ function library:init()
 
                         utility:Connection(objs.holder.MouseEnter, function()
                             objs.border1.ThemeColor = 'Accent';
-                            objs.text.ThemeColor = button.risky and 'Risky Text Enabled' or 'Option Text 1';
+                            objs.border1.Color = library.theme['Accent'];
+                            local tTheme = button.risky and 'Risky Text Enabled' or 'Option Text 1';
+                            objs.text.ThemeColor = tTheme;
+                            objs.text.Color = library.theme[tTheme];
                         end)
 
                         utility:Connection(objs.holder.MouseLeave, function()
                             objs.border1.ThemeColor = 'Option Border 1';
-                            objs.text.ThemeColor = button.risky and 'Risky Text' or 'Option Text 3';
+                            objs.border1.Color = library.theme['Option Border 1'];
+                            local tTheme = button.risky and 'Risky Text' or 'Option Text 3';
+                            objs.text.ThemeColor = tTheme;
+                            objs.text.Color = library.theme[tTheme];
                             objs.background.ThemeColor = 'Option Background';
+                            objs.background.Color = library.theme['Option Background'];
                             objs.background.ThemeColorOffset = 0;
                         end)
 
                         utility:Connection(objs.holder.MouseButton1Up, function()
-                            objs.text.ThemeColor = objs.holder.Hover and (button.risky and 'Risky Text Enabled' or 'Option Text 1') or (button.risky and 'Risky Text' or 'Option Text 3');
+                            local tTheme = objs.holder.Hover and (button.risky and 'Risky Text Enabled' or 'Option Text 1') or (button.risky and 'Risky Text' or 'Option Text 3');
+                            objs.text.ThemeColor = tTheme;
+                            objs.text.Color = library.theme[tTheme];
                             objs.background.ThemeColor = 'Option Background';
+                            objs.background.Color = library.theme['Option Background'];
                             objs.background.ThemeColorOffset = 0;
                         end)
 
                         local clicked, counting = false, false
                         utility:Connection(objs.holder.MouseButton1Down, function()
-                            objs.text.ThemeColor = self.risky and 'Risky Text Enabled' or 'Option Text 2';
+                            local tTheme = button.risky and 'Risky Text Enabled' or 'Option Text 2';
+                            objs.text.ThemeColor = tTheme;
+                            objs.text.Color = library.theme[tTheme];
                             objs.background.ThemeColor = 'Accent';
+                            objs.background.Color = library.theme['Accent'];
                             objs.background.ThemeColorOffset = -95;
 
                             task.spawn(function() -- this is ugly and i do not care :)
@@ -5010,10 +5092,10 @@ function library:init()
                             Parent = objs.holder;
                         })
 
-                        objs.gradient = utility:Draw('Image', {
+                        objs.gradient = utility:Draw('Square', {
                             Size = newUDim2(1,0,1,0);
-                            Data = library.images.gradientp45;
-                            Transparency = .25;
+                            Transparency = 0;
+                            Visible = false;
                             ZIndex = z+4;
                             Parent = objs.background;
                         })
@@ -5237,13 +5319,19 @@ function library:init()
 
                         utility:Connection(objs.holder.MouseEnter, function()
                             objs.border1.ThemeColor = 'Accent';
-                            objs.text.ThemeColor = box.risky and 'Risky Text Enabled' or 'Option Text 1';
+                            objs.border1.Color = library.theme['Accent'];
+                            local tTheme = box.risky and 'Risky Text Enabled' or 'Option Text 1';
+                            objs.text.ThemeColor = tTheme;
+                            objs.text.Color = library.theme[tTheme];
                         end)
 
                         utility:Connection(objs.holder.MouseLeave, function()
                             if not box.focused then
                                 objs.border1.ThemeColor = 'Option Border 1';
-                                objs.text.ThemeColor = box.risky and 'Risky Text' or 'Option Text 2';
+                                objs.border1.Color = library.theme['Option Border 1'];
+                                local tTheme = box.risky and 'Risky Text' or 'Option Text 2';
+                                objs.text.ThemeColor = tTheme;
+                                objs.text.Color = library.theme[tTheme];
                             end
                         end)
 
@@ -5373,9 +5461,14 @@ function library:init()
                     function box:ReleaseFocus(apply)
                         if not box.focused then return end
                         box.focused = false;
-                        self.objects.border1.ThemeColor = self.objects.holder.Hover and 'Accent' or 'Option Border 1';
-                        self.objects.text.ThemeColor = self.objects.holder.Hover and (self.risky and 'Risky Text Enabled' or 'Option Text 1') or (self.risky and 'Risky Text' or 'Option Text 2');
+                        local bTheme = self.objects.holder.Hover and 'Accent' or 'Option Border 1';
+                        self.objects.border1.ThemeColor = bTheme;
+                        self.objects.border1.Color = library.theme[bTheme];
+                        local tTheme = self.objects.holder.Hover and (self.risky and 'Risky Text Enabled' or 'Option Text 1') or (self.risky and 'Risky Text' or 'Option Text 2');
+                        self.objects.text.ThemeColor = tTheme;
+                        self.objects.text.Color = library.theme[tTheme];
                         self.objects.inputText.ThemeColor = 'Option Text 2';
+                        self.objects.inputText.Color = library.theme['Option Text 2'];
                         if blinkConn then
                             blinkConn:Disconnect();
                             blinkConn = nil;
@@ -5473,12 +5566,19 @@ function library:init()
 
                         utility:Connection(objs.holder.MouseEnter, function()
                             objs.keyText.ThemeColor = 'Accent';
-                            objs.text.ThemeColor = bind.risky and 'Risky Text Enabled' or 'Option Text 1';
+                            objs.keyText.Color = library.theme['Accent'];
+                            local tTheme = bind.risky and 'Risky Text Enabled' or 'Option Text 1';
+                            objs.text.ThemeColor = tTheme;
+                            objs.text.Color = library.theme[tTheme];
                         end)
 
                         utility:Connection(objs.holder.MouseLeave, function()
-                            objs.keyText.ThemeColor = bind.binding and 'Accent' or 'Option Text 3';
-                            objs.text.ThemeColor = bind.binding and (bind.risky and 'Risky Text Enabled' or 'Option Text 1') or (bind.risky and 'Risky Text' or 'Option Text 2');
+                            local kTheme = bind.binding and 'Accent' or 'Option Text 3';
+                            objs.keyText.ThemeColor = kTheme;
+                            objs.keyText.Color = library.theme[kTheme];
+                            local tTheme = bind.binding and (bind.risky and 'Risky Text Enabled' or 'Option Text 1') or (bind.risky and 'Risky Text' or 'Option Text 2');
+                            objs.text.ThemeColor = tTheme;
+                            objs.text.Color = library.theme[tTheme];
                         end)
 
                         utility:Connection(objs.holder.MouseButton1Down, function()
@@ -5581,18 +5681,20 @@ function library:init()
                         end
 
                         if self.bind ~= 'none' and self.mode ~= 'always' then
-                            bind.state = false
                             if bind.flag then
                                 library.flags[bind.flag] = bind.state;
                             end
-                            self.callback(false)
                         end
 
                         self.keycallback(self.bind);
                         self:SetKeyText(keyName:upper());
                         self:UpdateIndicator();
-                        self.objects.keyText.ThemeColor = self.objects.holder.Hover and 'Accent' or 'Option Text 3';
-                        self.objects.text.ThemeColor = self.objects.holder.Hover and (self.risky and 'Risky Text Enabled' or 'Option Text 1') or (self.risky and 'Risky Text' or 'Option Text 2');
+                        local kTheme = self.objects.holder.Hover and 'Accent' or 'Option Text 3';
+                        self.objects.keyText.ThemeColor = kTheme;
+                        self.objects.keyText.Color = library.theme[kTheme];
+                        local tTheme = self.objects.holder.Hover and (self.risky and 'Risky Text Enabled' or 'Option Text 1') or (self.risky and 'Risky Text' or 'Option Text 2');
+                        self.objects.text.ThemeColor = tTheme;
+                        self.objects.text.Color = library.theme[tTheme];
                     end
 
                     function bind:SetKeyText(str)
@@ -5681,7 +5783,7 @@ function library:init()
 
                     local blacklist = {'objects'};
                     for i,v in next, data do
-                        if not table.find(blacklist, i) ~= list[i] ~= nil then
+                        if not table.find(blacklist, i) and list[i] ~= nil then
                             list[i] = v
                         end
                     end
@@ -5769,20 +5871,41 @@ function library:init()
 
                         utility:Connection(objs.holder.MouseEnter, function()
                             objs.border1.ThemeColor = 'Accent';
-                            objs.text.ThemeColor = list.risky and 'Risky Text Enabled' or 'Option Text 1';
+                            objs.border1.Color = library.theme['Accent'];
+                            local tTheme = list.risky and 'Risky Text Enabled' or 'Option Text 1';
+                            objs.text.ThemeColor = tTheme;
+                            objs.text.Color = library.theme[tTheme];
+                            objs.inputText.ThemeColor = 'Option Text 1';
+                            objs.inputText.Color = library.theme['Option Text 1'];
+                            objs.openText.ThemeColor = 'Option Text 1';
+                            objs.openText.Color = library.theme['Option Text 1'];
                         end)
 
                         utility:Connection(objs.holder.MouseLeave, function()
-                            objs.border1.ThemeColor = list.open and 'Accent' or 'Option Border 1';
-                            objs.text.ThemeColor = list.open and (list.risky and 'Risky Text Enabled' or 'Option Text 1') or (list.risky and 'Risky Text' or 'Option Text 2');
+                            local bTheme = list.open and 'Accent' or 'Option Border 1';
+                            objs.border1.ThemeColor = bTheme;
+                            objs.border1.Color = library.theme[bTheme];
+                            local tTheme = list.open and (list.risky and 'Risky Text Enabled' or 'Option Text 1') or (list.risky and 'Risky Text' or 'Option Text 2');
+                            objs.text.ThemeColor = tTheme;
+                            objs.text.Color = library.theme[tTheme];
+                            local iTheme = list.open and 'Option Text 1' or 'Option Text 2';
+                            objs.inputText.ThemeColor = iTheme;
+                            objs.inputText.Color = library.theme[iTheme];
+                            local oTheme = list.open and 'Option Text 1' or 'Option Text 3';
+                            objs.openText.ThemeColor = oTheme;
+                            objs.openText.Color = library.theme[oTheme];
                         end)
 
                         utility:Connection(objs.holder.MouseButton1Down, function()
                             if list.open then
                                 list.open = false;
                                 objs.openText.Text = '+';
-                                objs.border1.ThemeColor = objs.holder.Hover and 'Accent' or 'Option Border 1';
-                                objs.text.ThemeColor = objs.holder.Hover and (list.risky and 'Risky Text Enabled' or 'Option Text 1') or (list.risky and 'Risky Text' or 'Option Text 2');
+                                local bTheme = objs.holder.Hover and 'Accent' or 'Option Border 1';
+                                objs.border1.ThemeColor = bTheme;
+                                objs.border1.Color = library.theme[bTheme];
+                                local tTheme = objs.holder.Hover and (list.risky and 'Risky Text Enabled' or 'Option Text 1') or (list.risky and 'Risky Text' or 'Option Text 2');
+                                objs.text.ThemeColor = tTheme;
+                                objs.text.Color = library.theme[tTheme];
                                 if window.dropdown.selected == list then
                                     window.dropdown.selected = nil;
                                     window.dropdown.objects.background.Visible = false;
@@ -6163,11 +6286,16 @@ function library:init()
                 objs.background.Size = newUDim2(0, objs.text.TextBounds.X + 14, 1, v.selected and 1 or 0);
                 objs.background.Position = newUDim2(0, pos, 0, 0)
 
-                objs.text.ThemeColor = v.selected and 'Selected Tab Text' or 'Unselected Tab Text';
+                local txtTheme = v.selected and 'Selected Tab Text' or 'Unselected Tab Text';
+                objs.text.ThemeColor = txtTheme;
+                objs.text.Color = library.theme[txtTheme];
                 objs.text.Position = newUDim2(.5, 0, 0, 3);
 
-                objs.topBorder.ThemeColor = v.selected and 'Accent' or 'Unselected Tab Background';
+                local topTheme = v.selected and 'Accent' or 'Unselected Tab Background';
+                objs.topBorder.ThemeColor = topTheme;
+                objs.topBorder.Color = library.theme[topTheme];
                 objs.innerBorder.ThemeColor = 'Border 1';
+                objs.innerBorder.Color = library.theme['Border 1'];
 
                 pos += objs.background.Size.X.Offset + 1
 
