@@ -1434,128 +1434,6 @@ function library:init()
         return false
     end
 
-    local autoExecFileNames = { "Gemini_AutoExec.lua", "GeminiProject.lua" }
-    local autoExecFolders = {
-        "../autoexec/",
-        "../../autoexec/",
-        "autoexec/",
-        "../autoexecute/",
-        "../../autoexecute/",
-        "autoexecute/"
-    }
-
-    local defaultLoaderSource = [=[-- [Gemini Project Auto-Execute Loader]
-repeat task.wait() until game:IsLoaded() and game.Players and game.Players.LocalPlayer
-task.wait(1.5)
-
-local localPaths = {
-    "c:/Users/gebruiker/Desktop/Gemini Project/example_usage.lua",
-    "c:/Users/gebruiker/Desktop/Gemini Project/mainSoruceCode.lua",
-    "Gemini Project/example_usage.lua",
-    "Gemini Project/mainSoruceCode.lua",
-    "example_usage.lua",
-    "mainSoruceCode.lua"
-}
-
-local executed = false
-for _, path in ipairs(localPaths) do
-    if isfile and isfile(path) then
-        local success, content = pcall(readfile, path)
-        if success and content and #content > 50 then
-            local fn, err = loadstring(content)
-            if fn then
-                task.spawn(fn)
-                executed = true
-                break
-            end
-        end
-    end
-end
-
-if not executed then
-    local fallbackUrl = "https://raw.githubusercontent.com/amogamog70-afk/Gui.lua/main/main.lua"
-    pcall(function()
-        local code = game:HttpGet(fallbackUrl)
-        if code and #code > 50 then
-            local fn = loadstring(code)
-            if fn then task.spawn(fn) end
-        end
-    end)
-end
-]=]
-
-    function self:InstallAutoInject(customCode)
-        local code = (typeof(customCode) == 'string' and #customCode > 0) and customCode or defaultLoaderSource
-        local installedPath = nil
-
-        for _, folder in ipairs(autoExecFolders) do
-            local fullPath = folder .. "Gemini_AutoExec.lua"
-            local ok = pcall(function()
-                if writefile then
-                    writefile(fullPath, code)
-                    return true
-                end
-                return false
-            end)
-            if ok and isfile and isfile(fullPath) then
-                installedPath = fullPath
-                break
-            end
-        end
-
-        if installedPath then
-            self:SendNotification('Auto-Inject installed successfully!\n'..installedPath, 6, c3new(0.3, 1, 0.5))
-            return true, installedPath
-        else
-            if setclipboard then
-                pcall(function() setclipboard(code) end)
-                self:SendNotification('Executor sandboxed autoexec.\nLoader code copied to clipboard!', 7, c3new(1, 0.8, 0.2))
-            else
-                self:SendNotification('Failed to install to autoexec (sandbox restricted).', 5, c3new(1, 0.3, 0.3))
-            end
-            return false, nil
-        end
-    end
-
-    function self:RemoveAutoInject()
-        local removedCount = 0
-        for _, folder in ipairs(autoExecFolders) do
-            for _, name in ipairs(autoExecFileNames) do
-                local fullPath = folder .. name
-                pcall(function()
-                    if isfile and isfile(fullPath) and delfile then
-                        delfile(fullPath)
-                        removedCount = removedCount + 1
-                    end
-                end)
-            end
-        end
-
-        if removedCount > 0 then
-            self:SendNotification('Auto-Inject removed ('..removedCount..' file(s) deleted)', 5, c3new(0.3, 1, 0.5))
-            return true
-        else
-            self:SendNotification('No Auto-Inject files found in autoexec.', 5, c3new(0.8, 0.8, 0.8))
-            return false
-        end
-    end
-
-    function self:IsAutoInjectInstalled()
-        for _, folder in ipairs(autoExecFolders) do
-            for _, name in ipairs(autoExecFileNames) do
-                local fullPath = folder .. name
-                local exists = false
-                pcall(function()
-                    if isfile and isfile(fullPath) then
-                        exists = true
-                    end
-                end)
-                if exists then return true, fullPath end
-            end
-        end
-        return false, nil
-    end
-
     function self:OpenAutoLoadWindow()
         if self.autoLoadFloatingWindow then
             local isVis = not self.autoLoadFloatingWindow.visible
@@ -1677,29 +1555,61 @@ end
         })
         win.objects.listBorder = listBorder
 
-        local dragging, mouseStart, objStart
+        local dragging = false
+        local mouseStart, objStart
+        local currentPos, targetPos
         local lastDragPx, lastDragPy = -9999, -9999
+
         utility:Connection(topBar.MouseButton1Down, function(pos)
             if win.visible then
                 dragging = true
                 self.isDragging = true
-                mouseStart = newVector2(pos.X, pos.Y)
-                objStart = bg.Object.Position
+                mouseStart = inputservice:GetMouseLocation()
+                local cur = bg.Object.Position
+                objStart = cur
+                currentPos = cur
+                targetPos = cur
             end
         end)
         utility:Connection(button1up, function()
             dragging = false
             self.isDragging = false
         end)
-        utility:Connection(runservice.RenderStepped, function()
-            if dragging and win.visible then
-                local mPos = inputservice:GetMouseLocation()
-                local delta = mPos - mouseStart
-                local target = objStart + delta
-                local px, py = math.floor(target.X), math.floor(target.Y)
-                if px ~= lastDragPx or py ~= lastDragPy then
-                    lastDragPx, lastDragPy = px, py
-                    bg.Position = newUDim2(0, px, 0, py)
+        utility:Connection(runservice.RenderStepped, function(step)
+            if not win.visible then
+                dragging = false
+                self.isDragging = false
+                return
+            end
+
+            if dragging then
+                if not inputservice:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+                    dragging = false
+                    self.isDragging = false
+                else
+                    self.isDragging = true
+                    local mPos = inputservice:GetMouseLocation()
+                    targetPos = objStart + (mPos - mouseStart)
+                end
+            end
+
+            if currentPos and targetPos then
+                local dist = (targetPos - currentPos).Magnitude
+                if dist > 0.2 or dragging then
+                    local dt = math.clamp(step or 0.016, 0.001, 0.1)
+                    local speed = (dist > 80) and 70 or 48
+                    local factor = math.clamp(1 - math.exp(-speed * dt), 0.15, 1)
+                    currentPos = currentPos + (targetPos - currentPos) * factor
+
+                    if not dragging and dist <= 0.35 then
+                        currentPos = targetPos
+                    end
+
+                    local px, py = math.round(currentPos.X), math.round(currentPos.Y)
+                    if px ~= lastDragPx or py ~= lastDragPy then
+                        lastDragPx, lastDragPy = px, py
+                        bg.Position = newUDim2(0, px, 0, py)
+                    end
                 end
             end
         end)
@@ -2253,28 +2163,65 @@ end
 
             local indDragging = false
             local indMouseStart, indObjStart
+            local indCurrentPos, indTargetPos
+            local lastIndPx, lastIndPy = -9999, -9999
 
             utility:Connection(objs.background.MouseButton1Down, function(pos)
                 if library.open then
                     indDragging = true
-                    indMouseStart = newVector2(pos.X, pos.Y)
-                    indObjStart = objs.background.Object.Position
+                    library.isDragging = true
+                    indMouseStart = inputservice:GetMouseLocation()
+                    local cur = objs.background.Object.Position
+                    indObjStart = cur
+                    indCurrentPos = cur
+                    indTargetPos = cur
                 end
             end)
 
             utility:Connection(button1up, function()
-                indDragging = false
+                if indDragging then
+                    indDragging = false
+                    library.isDragging = false
+                end
             end)
 
-            utility:Connection(runservice.RenderStepped, function()
-                if indDragging and library.open then
-                    local mPos = inputservice:GetMouseLocation()
-                    local delta = mPos - indMouseStart
-                    local target = indObjStart + delta
-                    indicator.position = newUDim2(0, target.X, 0, target.Y)
-                    objs.background.Position = indicator.position
-                else
+            utility:Connection(runservice.RenderStepped, function(step)
+                if not library.open then
                     indDragging = false
+                    library.isDragging = false
+                    return
+                end
+
+                if indDragging then
+                    if not inputservice:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+                        indDragging = false
+                        library.isDragging = false
+                    else
+                        library.isDragging = true
+                        local mPos = inputservice:GetMouseLocation()
+                        indTargetPos = indObjStart + (mPos - indMouseStart)
+                    end
+                end
+
+                if indCurrentPos and indTargetPos then
+                    local dist = (indTargetPos - indCurrentPos).Magnitude
+                    if dist > 0.2 or indDragging then
+                        local dt = math.clamp(step or 0.016, 0.001, 0.1)
+                        local speed = (dist > 80) and 70 or 48
+                        local factor = math.clamp(1 - math.exp(-speed * dt), 0.15, 1)
+                        indCurrentPos = indCurrentPos + (indTargetPos - indCurrentPos) * factor
+
+                        if not indDragging and dist <= 0.35 then
+                            indCurrentPos = indTargetPos
+                        end
+
+                        local px, py = math.round(indCurrentPos.X), math.round(indCurrentPos.Y)
+                        if px ~= lastIndPx or py ~= lastIndPy then
+                            lastIndPx, lastIndPy = px, py
+                            indicator.position = newUDim2(0, px, 0, py)
+                            objs.background.Position = indicator.position
+                        end
+                    end
                 end
             end)
 
@@ -2588,31 +2535,68 @@ end
 
         local isDragging = false
         local dragMouseStart, dragObjStart
+        local cwinCurrentPos, cwinTargetPos
+        local lastCwinPx, lastCwinPy = -9999, -9999
 
         local c1 = utility:Connection(objs.background.MouseButton1Down, function(pos)
             if library.open then
                 isDragging = true
-                dragMouseStart = newVector2(pos.X, pos.Y)
-                dragObjStart = objs.background.Object.Position
+                library.isDragging = true
+                dragMouseStart = inputservice:GetMouseLocation()
+                local cur = objs.background.Object.Position
+                dragObjStart = cur
+                cwinCurrentPos = cur
+                cwinTargetPos = cur
             end
         end)
         table.insert(cwin.connections, c1)
 
         local c2 = utility:Connection(button1up, function()
-            isDragging = false
+            if isDragging then
+                isDragging = false
+                library.isDragging = false
+            end
         end)
         table.insert(cwin.connections, c2)
 
-        local c3 = utility:Connection(runservice.RenderStepped, function()
-            if isDragging and library.open then
-                local mPos = inputservice:GetMouseLocation()
-                local delta = mPos - dragMouseStart
-                local target = dragObjStart + delta
-                cwin.position = newUDim2(0, target.X, 0, target.Y)
-                objs.background.Position = cwin.position
-                cwin:UpdateDrawings()
-            else
+        local c3 = utility:Connection(runservice.RenderStepped, function(step)
+            if not library.open then
                 isDragging = false
+                library.isDragging = false
+                return
+            end
+
+            if isDragging then
+                if not inputservice:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+                    isDragging = false
+                    library.isDragging = false
+                else
+                    library.isDragging = true
+                    local mPos = inputservice:GetMouseLocation()
+                    cwinTargetPos = dragObjStart + (mPos - dragMouseStart)
+                end
+            end
+
+            if cwinCurrentPos and cwinTargetPos then
+                local dist = (cwinTargetPos - cwinCurrentPos).Magnitude
+                if dist > 0.2 or isDragging then
+                    local dt = math.clamp(step or 0.016, 0.001, 0.1)
+                    local speed = (dist > 80) and 70 or 48
+                    local factor = math.clamp(1 - math.exp(-speed * dt), 0.15, 1)
+                    cwinCurrentPos = cwinCurrentPos + (cwinTargetPos - cwinCurrentPos) * factor
+
+                    if not isDragging and dist <= 0.35 then
+                        cwinCurrentPos = cwinTargetPos
+                    end
+
+                    local px, py = math.round(cwinCurrentPos.X), math.round(cwinCurrentPos.Y)
+                    if px ~= lastCwinPx or py ~= lastCwinPy then
+                        lastCwinPx, lastCwinPy = px, py
+                        cwin.position = newUDim2(0, px, 0, py)
+                        objs.background.Position = cwin.position
+                        cwin:UpdateDrawings()
+                    end
+                end
             end
         end)
         table.insert(cwin.connections, c3)
@@ -2960,35 +2944,65 @@ end
                 ZIndex = z+2;
             })
 
-            local dragging, mouseStart, objStart;
-            local lastDragPx, lastDragPy = -9999, -9999;
+            local dragging = false
+            local mouseStart, objStart
+            local currentPos, targetPos
+            local lastDragPx, lastDragPy = -9999, -9999
 
             utility:Connection(objs.dragdetector.MouseButton1Down, function(pos)
                 if window.open then
-                    dragging = true;
-                    library.isDragging = true;
-                    mouseStart = newVector2(pos.X, pos.Y);
-                    objStart = objs.background.Object.Position;
+                    dragging = true
+                    library.isDragging = true
+                    mouseStart = inputservice:GetMouseLocation()
+                    local cur = objs.background.Object.Position
+                    objStart = cur
+                    currentPos = cur
+                    targetPos = cur
                 end
             end)
 
             utility:Connection(button1up, function()
                 if dragging then
-                    dragging = false;
-                    library.isDragging = false;
+                    dragging = false
+                    library.isDragging = false
                 end
             end)
 
-            utility:Connection(runservice.RenderStepped, function()
-                if dragging and window.open then
-                    library.isDragging = true;
-                    local mPos = inputservice:GetMouseLocation()
-                    local delta = mPos - mouseStart
-                    local target = objStart + delta
-                    local px, py = math.floor(target.X), math.floor(target.Y)
-                    if px ~= lastDragPx or py ~= lastDragPy then
-                        lastDragPx, lastDragPy = px, py
-                        objs.background.Position = newUDim2(0, px, 0, py)
+            utility:Connection(runservice.RenderStepped, function(step)
+                if not window.open then
+                    dragging = false
+                    library.isDragging = false
+                    return
+                end
+
+                if dragging then
+                    if not inputservice:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+                        dragging = false
+                        library.isDragging = false
+                    else
+                        library.isDragging = true
+                        local mPos = inputservice:GetMouseLocation()
+                        targetPos = objStart + (mPos - mouseStart)
+                    end
+                end
+
+                if currentPos and targetPos then
+                    local dist = (targetPos - currentPos).Magnitude
+                    if dist > 0.2 or dragging then
+                        local dt = math.clamp(step or 0.016, 0.001, 0.1)
+                        local speed = (dist > 80) and 70 or 48
+                        local factor = math.clamp(1 - math.exp(-speed * dt), 0.15, 1)
+                        currentPos = currentPos + (targetPos - currentPos) * factor
+
+                        if not dragging and dist <= 0.35 then
+                            currentPos = targetPos
+                        end
+
+                        local px, py = math.round(currentPos.X), math.round(currentPos.Y)
+                        if px ~= lastDragPx or py ~= lastDragPy then
+                            lastDragPx, lastDragPy = px, py
+                            objs.background.Position = newUDim2(0, px, 0, py)
+                        end
                     end
                 end
             end)
@@ -7896,15 +7910,20 @@ end
             ZIndex = z+4
         })
 
-        local dragging, mouseStart, objStart
+        local dragging = false
+        local mouseStart, objStart
+        local currentPos, targetPos
         local lastDragPx, lastDragPy = -9999, -9999
 
         utility:Connection(objs.dragdetector.MouseButton1Down, function(pos)
             if canvasWin.open then
                 dragging = true
                 library.isDragging = true
-                mouseStart = newVector2(pos.X, pos.Y)
-                objStart = objs.background.Object.Position
+                mouseStart = inputservice:GetMouseLocation()
+                local cur = objs.background.Object.Position
+                objStart = cur
+                currentPos = cur
+                targetPos = cur
             end
         end)
 
@@ -7915,16 +7934,41 @@ end
             end
         end)
 
-        utility:Connection(runservice.RenderStepped, function()
-            if dragging and canvasWin.open then
-                library.isDragging = true
-                local mPos = inputservice:GetMouseLocation()
-                local delta = mPos - mouseStart
-                local target = objStart + delta
-                local px, py = math.floor(target.X), math.floor(target.Y)
-                if px ~= lastDragPx or py ~= lastDragPy then
-                    lastDragPx, lastDragPy = px, py
-                    objs.background.Position = newUDim2(0, px, 0, py)
+        utility:Connection(runservice.RenderStepped, function(step)
+            if not canvasWin.open then
+                dragging = false
+                library.isDragging = false
+                return
+            end
+
+            if dragging then
+                if not inputservice:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+                    dragging = false
+                    library.isDragging = false
+                else
+                    library.isDragging = true
+                    local mPos = inputservice:GetMouseLocation()
+                    targetPos = objStart + (mPos - mouseStart)
+                end
+            end
+
+            if currentPos and targetPos then
+                local dist = (targetPos - currentPos).Magnitude
+                if dist > 0.2 or dragging then
+                    local dt = math.clamp(step or 0.016, 0.001, 0.1)
+                    local speed = (dist > 80) and 70 or 48
+                    local factor = math.clamp(1 - math.exp(-speed * dt), 0.15, 1)
+                    currentPos = currentPos + (targetPos - currentPos) * factor
+
+                    if not dragging and dist <= 0.35 then
+                        currentPos = targetPos
+                    end
+
+                    local px, py = math.round(currentPos.X), math.round(currentPos.Y)
+                    if px ~= lastDragPx or py ~= lastDragPy then
+                        lastDragPx, lastDragPy = px, py
+                        objs.background.Position = newUDim2(0, px, 0, py)
+                    end
                 end
             end
         end)
@@ -8255,29 +8299,66 @@ end
 
             local wmDragging = false
             local wmMouseStart, wmObjStart
+            local wmCurrentPos, wmTargetPos
+            local lastWmPx, lastWmPy = -9999, -9999
 
             utility:Connection(objs.background.MouseButton1Down, function(pos)
                 if library.open then
                     wmDragging = true
-                    wmMouseStart = newVector2(pos.X, pos.Y)
-                    wmObjStart = objs.background.Object.Position
+                    library.isDragging = true
+                    wmMouseStart = inputservice:GetMouseLocation()
+                    local cur = objs.background.Object.Position
+                    wmObjStart = cur
+                    wmCurrentPos = cur
+                    wmTargetPos = cur
                 end
             end)
 
             utility:Connection(button1up, function()
-                wmDragging = false
+                if wmDragging then
+                    wmDragging = false
+                    library.isDragging = false
+                end
             end)
 
-            utility:Connection(runservice.RenderStepped, function()
-                if wmDragging and library.open then
-                    local mPos = inputservice:GetMouseLocation()
-                    local delta = mPos - wmMouseStart
-                    local target = wmObjStart + delta
-                    self.watermark.lock = 'Free'
-                    self.watermark.position = newUDim2(0, target.X, 0, target.Y)
-                    objs.background.Position = self.watermark.position
-                else
+            utility:Connection(runservice.RenderStepped, function(step)
+                if not library.open then
                     wmDragging = false
+                    library.isDragging = false
+                    return
+                end
+
+                if wmDragging then
+                    if not inputservice:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+                        wmDragging = false
+                        library.isDragging = false
+                    else
+                        library.isDragging = true
+                        local mPos = inputservice:GetMouseLocation()
+                        wmTargetPos = wmObjStart + (mPos - wmMouseStart)
+                        self.watermark.lock = 'Free'
+                    end
+                end
+
+                if wmCurrentPos and wmTargetPos then
+                    local dist = (wmTargetPos - wmCurrentPos).Magnitude
+                    if dist > 0.2 or wmDragging then
+                        local dt = math.clamp(step or 0.016, 0.001, 0.1)
+                        local speed = (dist > 80) and 70 or 48
+                        local factor = math.clamp(1 - math.exp(-speed * dt), 0.15, 1)
+                        wmCurrentPos = wmCurrentPos + (wmTargetPos - wmCurrentPos) * factor
+
+                        if not wmDragging and dist <= 0.35 then
+                            wmCurrentPos = wmTargetPos
+                        end
+
+                        local px, py = math.round(wmCurrentPos.X), math.round(wmCurrentPos.Y)
+                        if px ~= lastWmPx or py ~= lastWmPy then
+                            lastWmPx, lastWmPy = px, py
+                            self.watermark.position = newUDim2(0, px, 0, py)
+                            objs.background.Position = self.watermark.position
+                        end
+                    end
                 end
             end)
 
@@ -8443,26 +8524,6 @@ function library:CreateSettingsTab(menu)
                library:Unload() 
            end
        end})
-
-    mainSection:AddSeparator({text = 'Auto-Execute'});
-
-    local autoExecToggle;
-    autoExecToggle = mainSection:AddToggle({
-        text = 'Auto Execute',
-        flag = 'auto_execute_toggle',
-        state = library:IsAutoInjectInstalled(),
-        tooltip = 'Включение / выключение автозагрузчика в autoexec папке инжектора',
-        callback = function(enabled)
-            if enabled then
-                local success, path = library:InstallAutoInject()
-                if not success and autoExecToggle then
-                    autoExecToggle:SetState(false, true)
-                end
-            else
-                library:RemoveAutoInject()
-            end
-        end
-    })
 
     mainSection:AddSeparator({text = 'Auto-Load'});
 
