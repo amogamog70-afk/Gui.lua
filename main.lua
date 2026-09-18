@@ -323,9 +323,17 @@ local function safeCreateDrawing(class)
                 end
                 return newVector2(50, 14)
             elseif k == "Size" then
-                return obj._size
+                if typeof(obj._size) == "UDim2" then
+                    local pSize = (workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize) or newVector2(1920, 1080)
+                    return newVector2(obj._size.X.Scale * pSize.X + obj._size.X.Offset, obj._size.Y.Scale * pSize.Y + obj._size.Y.Offset)
+                end
+                return (typeof(obj._size) == "Vector2" and obj._size) or (class == "Text" and obj._size) or newVector2(0, 0)
             elseif k == "Position" then
-                return obj._position
+                if typeof(obj._position) == "UDim2" then
+                    local pSize = (workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize) or newVector2(1920, 1080)
+                    return newVector2(obj._position.X.Scale * pSize.X + obj._position.X.Offset, obj._position.Y.Scale * pSize.Y + obj._position.Y.Offset)
+                end
+                return (typeof(obj._position) == "Vector2" and obj._position) or newVector2(0, 0)
             elseif k == "Visible" then
                 return obj._visible
             elseif k == "Color" then
@@ -360,9 +368,19 @@ local function safeCreateDrawing(class)
         __newindex = function(t, k, v)
             if obj._removed then return end
             if k == "Size" then
-                obj._size = v
+                if typeof(v) == "UDim2" then
+                    local pSize = (workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize) or newVector2(1920, 1080)
+                    obj._size = newVector2(v.X.Scale * pSize.X + v.X.Offset, v.Y.Scale * pSize.Y + v.Y.Offset)
+                else
+                    obj._size = v
+                end
             elseif k == "Position" then
-                obj._position = v
+                if typeof(v) == "UDim2" then
+                    local pSize = (workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize) or newVector2(1920, 1080)
+                    obj._position = newVector2(v.X.Scale * pSize.X + v.X.Offset, v.Y.Scale * pSize.Y + v.Y.Offset)
+                else
+                    obj._position = v
+                end
             elseif k == "Visible" then
                 obj._visible = (v and true or false)
             elseif k == "Color" then
@@ -1379,7 +1397,7 @@ do
                 if (i == 'Rounding' or i == 'CornerRadius') and class == 'Square' then
                     pcall(function() drawing.Object.Rounding = v end)
                     pcall(function() drawing.Object.CornerRadius = v end)
-                else
+                elseif i ~= 'Size' and i ~= 'Position' then
                     pcall(function()
                         drawing.Object[i] = v
                     end)
@@ -4783,9 +4801,13 @@ function library:init()
                 function section:SetText(text)
                     self.text = tostring(text);
                     self.objects.textlabel.Text = self.text;
-                    local x = self.objects.background.Object.Size.X - self.objects.textlabel.TextBounds.X - 13
+                    local bgSize = (self.objects.background and self.objects.background.AbsoluteSize) or (self.objects.background and self.objects.background.Object and self.objects.background.Object.Size) or newVector2(300, 20)
+                    local bgW = (typeof(bgSize) == "Vector2" and bgSize.X) or (typeof(bgSize) == "UDim2" and bgSize.X.Offset) or (typeof(bgSize) == "number" and bgSize) or 300
+                    local tb = (self.objects.textlabel and self.objects.textlabel.TextBounds) or newVector2(50, 14)
+                    local tbX = (typeof(tb) == "Vector2" and tb.X) or 50
+                    local x = math.max(0, math.floor(bgW - tbX - 13))
                     self.objects.topBorder2.Size = newUDim2(0, x, 0, 1)
-                    self.objects.topBorder2.Position = newUDim2(1, 1 + -x, 0, 0)
+                    self.objects.topBorder2.Position = newUDim2(1, 1 - x, 0, 0)
                 end
 
                 function section:UpdateOptions()
@@ -4986,12 +5008,15 @@ function library:init()
                         for i,option in next, self.options do
                             option.objects.holder.Visible = option.enabled and isTogVis;
                             if option.enabled and isTogVis then
+                                local optSz = option.objects.holder.AbsoluteSize or (option.objects.holder.Object and option.objects.holder.Object.Size) or newVector2(20, 20)
+                                local optX = (typeof(optSz) == "Vector2" and optSz.X) or (typeof(optSz) == "UDim2" and optSz.X.Offset) or 20
+                                local optY = (typeof(optSz) == "Vector2" and optSz.Y) or (typeof(optSz) == "UDim2" and optSz.Y.Offset) or 20
                                 if option.class == 'color' or option.class == 'bind' then
-                                    option.objects.holder.Position = newUDim2(1,-option.objects.holder.Object.Size.X-x,0,0);
-                                    x = x + option.objects.holder.Object.Size.X;
+                                    option.objects.holder.Position = newUDim2(1,-optX-x,0,0);
+                                    x = x + optX;
                                 elseif option.class == 'slider' or option.class == 'list' then
-                                    option.objects.holder.Position = newUDim2(0,0,1,-option.objects.holder.Object.Size.Y-y);
-                                    y = y + option.objects.holder.Object.Size.Y;
+                                    option.objects.holder.Position = newUDim2(0,0,1,-optY-y);
+                                    y = y + optY;
                                 end
                             end
                         end
@@ -8080,14 +8105,18 @@ function library:init()
                         section:UpdateOptions();
                         if section.side == 1 then
                             if last1 then
-                                section.objects.background.Position = last1.objects.background.Position + newUDim2(0,0,0,last1.objects.background.Object.Size.Y + padding);
+                                local s1 = last1.objects.background.AbsoluteSize or (last1.objects.background.Object and last1.objects.background.Object.Size)
+                                local h1 = (typeof(s1) == "Vector2" and s1.Y) or (typeof(s1) == "UDim2" and s1.Y.Offset) or (typeof(s1) == "number" and s1) or 0
+                                section.objects.background.Position = last1.objects.background.Position + newUDim2(0,0,0,h1 + padding);
                             else
                                 section.objects.background.Position = newUDim2(0,0,0,0);
                             end
                             last1 = section;
                         elseif section.side == 2 then
                             if last2 then
-                                section.objects.background.Position = last2.objects.background.Position + newUDim2(0,0,0,last2.objects.background.Object.Size.Y + padding);
+                                local s2 = last2.objects.background.AbsoluteSize or (last2.objects.background.Object and last2.objects.background.Object.Size)
+                                local h2 = (typeof(s2) == "Vector2" and s2.Y) or (typeof(s2) == "UDim2" and s2.Y.Offset) or (typeof(s2) == "number" and s2) or 0
+                                section.objects.background.Position = last2.objects.background.Position + newUDim2(0,0,0,h2 + padding);
                             else
                                 section.objects.background.Position = newUDim2(0,0,0,0);
                             end
