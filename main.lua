@@ -537,6 +537,19 @@ library.mousemove   = library.signal.new()
 library.unloaded    = library.signal.new();
 library.interactiveDrawings = {};
 library.isDragging = false;
+library.rounding = 6;
+
+function library:SetRounding(rad)
+    self.rounding = rad
+    for _, d in pairs(self.drawings) do
+        if d and d.Class == 'Square' and d.Object then
+            pcall(function()
+                d.Object.Rounding = rad
+                d.Object.CornerRadius = rad
+            end)
+        end
+    end
+end
 
 local button1down, button1up, mousemove = library.button1down, library.button1up, library.mousemove
 local mb1down = false;
@@ -617,8 +630,8 @@ do
             library.tweens[obj][prop] = tween;
 
             local isNum = typeof(startVal) == 'number';
-            local styleVal = style or Enum.EasingStyle.Linear;
-            local dirVal = direction or Enum.EasingDirection.In;
+            local styleVal = style or Enum.EasingStyle.Quad;
+            local dirVal = direction or Enum.EasingDirection.Out;
 
             tween.Connection = self:Connection(runservice.RenderStepped, function(dt)
                 a = a + (dt / time);
@@ -1047,10 +1060,15 @@ do
                     end
                 end
 
-                pcall(function()
-                    drawing.Object[i] = v
-                end)
-                if drawing[i] ~= nil or i == 'Parent' or i == 'ThemeColor' or i == 'OutlineThemeColor' or i == 'ThemeColorOutline' or i == 'ThemeColorOffset' or i == 'OutlineThemeColorOffset' or i == 'ZIndex' or i == 'Color' or i == 'Filled' then
+                if (i == 'Rounding' or i == 'CornerRadius') and class == 'Square' then
+                    pcall(function() drawing.Object.Rounding = v end)
+                    pcall(function() drawing.Object.CornerRadius = v end)
+                else
+                    pcall(function()
+                        drawing.Object[i] = v
+                    end)
+                end
+                if drawing[i] ~= nil or i == 'Parent' or i == 'ThemeColor' or i == 'OutlineThemeColor' or i == 'ThemeColorOutline' or i == 'ThemeColorOffset' or i == 'OutlineThemeColorOffset' or i == 'ZIndex' or i == 'Color' or i == 'Filled' or i == 'Rounding' or i == 'CornerRadius' then
                     drawing[i] = v
                 end
 
@@ -1133,8 +1151,13 @@ do
 
         properties = typeof(properties) == 'table' and properties or {}
 
-        if class == 'Square' and properties.Filled == nil then
-            properties.Filled = true;
+        if class == 'Square' then
+            if properties.Filled == nil then
+                properties.Filled = true;
+            end
+            if properties.Rounding == nil and library.rounding then
+                properties.Rounding = library.rounding
+            end
         end
 
         if properties.Visible == nil then
@@ -1161,6 +1184,7 @@ do
         
         for i = 1, layersCount do
             local op = opacities[i] or (0.32 / (i * 1.6))
+            local parentRound = (typeof(currentParent) == 'table' and (currentParent.Rounding or currentParent.CornerRadius)) or library.rounding or 6
             local glow = self:Draw('Square', {
                 Size = newUDim2(1, spreadStep * 2, 1, spreadStep * 2);
                 Position = newUDim2(0, -spreadStep, 0, -spreadStep);
@@ -1168,6 +1192,7 @@ do
                 Transparency = op;
                 ZIndex = zIndex - i;
                 Parent = currentParent;
+                Rounding = parentRound + (i * spreadStep);
             })
             table.insert(glowLayers, glow)
             table.insert(library.glowDrawings, glow)
@@ -2207,8 +2232,8 @@ function library:init()
                     local dist = (indTargetPos - indCurrentPos).Magnitude
                     if dist > 0.2 or indDragging then
                         local dt = math.clamp(step or 0.016, 0.001, 0.1)
-                        local speed = (dist > 80) and 70 or 48
-                        local factor = math.clamp(1 - math.exp(-speed * dt), 0.15, 1)
+                        local speed = (dist > 80) and 45 or 32
+                        local factor = math.clamp(1 - math.exp(-speed * dt), 0.12, 1)
                         indCurrentPos = indCurrentPos + (indTargetPos - indCurrentPos) * factor
 
                         if not indDragging and dist <= 0.35 then
@@ -2581,8 +2606,8 @@ function library:init()
                 local dist = (cwinTargetPos - cwinCurrentPos).Magnitude
                 if dist > 0.2 or isDragging then
                     local dt = math.clamp(step or 0.016, 0.001, 0.1)
-                    local speed = (dist > 80) and 70 or 48
-                    local factor = math.clamp(1 - math.exp(-speed * dt), 0.15, 1)
+                    local speed = (dist > 80) and 45 or 32
+                    local factor = math.clamp(1 - math.exp(-speed * dt), 0.12, 1)
                     cwinCurrentPos = cwinCurrentPos + (cwinTargetPos - cwinCurrentPos) * factor
 
                     if not isDragging and dist <= 0.35 then
@@ -2815,8 +2840,8 @@ function library:init()
 
         ----- Create Objects ----
         do
-            local size = data.size or newUDim2(0, 525, 0, 650);
-            local position = data.position or data.pos or newUDim2(0.5, -math.floor(size.X.Offset / 2) + 120, 0.5, -math.floor(size.Y.Offset / 2) + 5);
+            local size = data.size or newUDim2(0, 700, 0, 560);
+            local position = data.position or data.pos or newUDim2(0.5, 80, 0.5, -math.floor(size.Y.Offset / 2));
             local objs = window.objects;
             local z = library.zindexOrder.window;
 
@@ -2990,8 +3015,8 @@ function library:init()
                     local dist = (targetPos - currentPos).Magnitude
                     if dist > 0.2 or dragging then
                         local dt = math.clamp(step or 0.016, 0.001, 0.1)
-                        local speed = (dist > 80) and 70 or 48
-                        local factor = math.clamp(1 - math.exp(-speed * dt), 0.15, 1)
+                        local speed = (dist > 80) and 45 or 32
+                        local factor = math.clamp(1 - math.exp(-speed * dt), 0.12, 1)
                         currentPos = currentPos + (targetPos - currentPos) * factor
 
                         if not dragging and dist <= 0.35 then
@@ -4250,7 +4275,7 @@ function library:init()
                 local z = library.zindexOrder.window + 5;
 
                 objs.background = utility:Draw('Square', {
-                    Size = newUDim2(0,65,1,0);
+                    Size = newUDim2(0,85,1,0);
                     Parent = self.objects.tabHolder;
                     ThemeColor = 'Unselected Tab Background';
                     ZIndex = z;
@@ -7776,8 +7801,9 @@ function library:init()
                 v.selected = v == self.selectedTab;
                 local tabTheme = v.selected and 'Selected Tab Background' or 'Unselected Tab Background';
                 objs.background.ThemeColor = tabTheme;
-                local pad = (v.icon and v.icon ~= '') and 18 or 14;
-                objs.background.Size = newUDim2(0, objs.text.TextBounds.X + pad, 1, v.selected and 1 or 0);
+                local pad = (v.icon and v.icon ~= '') and 34 or 28;
+                local tabW = math.max(86, objs.text.TextBounds.X + pad);
+                objs.background.Size = newUDim2(0, tabW, 1, v.selected and 1 or 0);
                 objs.background.Position = newUDim2(0, pos, 0, 0)
 
                 local txtTheme = v.selected and 'Selected Tab Text' or 'Unselected Tab Text';
@@ -7791,7 +7817,7 @@ function library:init()
                 objs.innerBorder.ThemeColor = 'Border 1';
                 objs.innerBorder.Color = library.theme['Border 1'];
 
-                pos += objs.background.Size.X.Offset + 1
+                pos += objs.background.Size.X.Offset + 2
 
                 v:UpdateSections();
 
@@ -8344,8 +8370,8 @@ function library:init()
                     local dist = (wmTargetPos - wmCurrentPos).Magnitude
                     if dist > 0.2 or wmDragging then
                         local dt = math.clamp(step or 0.016, 0.001, 0.1)
-                        local speed = (dist > 80) and 70 or 48
-                        local factor = math.clamp(1 - math.exp(-speed * dt), 0.15, 1)
+                        local speed = (dist > 80) and 45 or 32
+                        local factor = math.clamp(1 - math.exp(-speed * dt), 0.12, 1)
                         wmCurrentPos = wmCurrentPos + (wmTargetPos - wmCurrentPos) * factor
 
                         if not wmDragging and dist <= 0.35 then
