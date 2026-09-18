@@ -14,7 +14,7 @@ local function gs(a)
 end
 
 -- // Variables
-local players, http, runservice, inputservice, tweenService, stats, actionservice = gs('Players'), gs('HttpService'), gs('RunService'), gs('UserInputService'), gs('TweenService'), gs('Stats'), gs('ContextActionService')
+local players, http, runservice, inputservice, tweenService, stats, actionservice, textservice = gs('Players'), gs('HttpService'), gs('RunService'), gs('UserInputService'), gs('TweenService'), gs('Stats'), gs('ContextActionService'), gs('TextService')
 local localplayer = players.LocalPlayer
 
 local setByConfig = false
@@ -64,24 +64,340 @@ local function decodeBase64(data)
     end))
 end
 
+local drawingGui = nil
+local function getDrawingGui()
+    if drawingGui and drawingGui.Parent then
+        return drawingGui
+    end
+    local parent = nil
+    pcall(function() parent = gethui and gethui() end)
+    if not parent then
+        pcall(function()
+            parent = game:GetService("CoreGui")
+        end)
+    end
+    if not parent then
+        pcall(function()
+            local lp = players.LocalPlayer
+            parent = lp and lp:FindFirstChildOfClass("PlayerGui") or lp:WaitForChild("PlayerGui", 3)
+        end)
+    end
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "GeminiUI_" .. tostring(math.random(100000, 999999))
+    gui.ResetOnSpawn = false
+    gui.DisplayOrder = 999999
+    gui.ZIndexBehavior = Enum.ZIndexBehavior.Global
+    gui.IgnoreGuiInset = true
+    if syn and syn.protect_gui then
+        pcall(syn.protect_gui, gui)
+    end
+    gui.Parent = parent
+    drawingGui = gui
+    return gui
+end
+
+local fontMap = {
+    [0] = Enum.Font.SourceSans,
+    [1] = Enum.Font.SourceSansBold,
+    [2] = Enum.Font.Gotham,
+    [3] = Enum.Font.Code
+}
+
 local function safeCreateDrawing(class)
-    local ok, obj = pcall(Drawing.new, class)
-    if ok and obj then return obj end
-    local dummy = {}
+    local gui = getDrawingGui()
+    local obj = {
+        _class = class,
+        _visible = false,
+        _size = (class == "Text" and 13 or newVector2(0, 0)),
+        _position = newVector2(0, 0),
+        _color = c3new(1, 1, 1),
+        _transparency = 1,
+        _zIndex = 0,
+        _filled = true,
+        _thickness = 1,
+        _rounding = 6,
+        _text = "",
+        _font = 2,
+        _center = false,
+        _outline = false,
+        _outlineColor = c3new(0, 0, 0),
+        _radius = 0,
+        _data = "",
+        _removed = false
+    }
+
+    local inst, corner, stroke
+    if class == "Square" then
+        inst = Instance.new("Frame")
+        inst.Name = "Drawing_Square"
+        inst.BorderSizePixel = 0
+        inst.BackgroundTransparency = 1
+        inst.ClipsDescendants = false
+        inst.Visible = false
+        inst.Parent = gui
+
+        corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 6)
+        corner.Parent = inst
+
+        stroke = Instance.new("UIStroke")
+        stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        stroke.LineJoinMode = Enum.LineJoinMode.Round
+        stroke.Thickness = 1
+        stroke.Enabled = false
+        stroke.Parent = inst
+    elseif class == "Text" then
+        inst = Instance.new("TextLabel")
+        inst.Name = "Drawing_Text"
+        inst.BorderSizePixel = 0
+        inst.BackgroundTransparency = 1
+        inst.ClipsDescendants = false
+        inst.Visible = false
+        inst.Text = ""
+        inst.TextColor3 = c3new(1, 1, 1)
+        inst.TextSize = 13
+        inst.Font = Enum.Font.Gotham
+        inst.TextXAlignment = Enum.TextXAlignment.Left
+        inst.TextYAlignment = Enum.TextYAlignment.Top
+        inst.Parent = gui
+    elseif class == "Circle" then
+        inst = Instance.new("Frame")
+        inst.Name = "Drawing_Circle"
+        inst.BorderSizePixel = 0
+        inst.BackgroundTransparency = 1
+        inst.ClipsDescendants = false
+        inst.Visible = false
+        inst.Parent = gui
+
+        corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(1, 0)
+        corner.Parent = inst
+
+        stroke = Instance.new("UIStroke")
+        stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        stroke.LineJoinMode = Enum.LineJoinMode.Round
+        stroke.Thickness = 1
+        stroke.Enabled = false
+        stroke.Parent = inst
+    elseif class == "Image" then
+        inst = Instance.new("ImageLabel")
+        inst.Name = "Drawing_Image"
+        inst.BorderSizePixel = 0
+        inst.BackgroundTransparency = 1
+        inst.ClipsDescendants = false
+        inst.Visible = false
+        inst.Parent = gui
+
+        corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 6)
+        corner.Parent = inst
+    else
+        local ok, nativeObj = pcall(Drawing.new, class)
+        if ok and nativeObj then
+            return nativeObj
+        end
+        local dummy = {}
+        local mt = {
+            __index = function(t, k)
+                if k == 'Remove' or k == 'Destroy' then
+                    return function() end
+                elseif k == 'TextBounds' then
+                    return newVector2(50, 14)
+                elseif k == 'Size' or k == 'Position' or k == 'PointA' or k == 'PointB' or k == 'PointC' then
+                    return newVector2(0, 0)
+                end
+                return 0
+            end,
+            __newindex = function(t, k, v) end
+        }
+        return setmetatable(dummy, mt)
+    end
+
+    local function updateVisuals()
+        if obj._removed or not inst then return end
+        inst.Visible = obj._visible
+        local zVal = math.clamp(math.floor(obj._zIndex + 1000), 1, 2147483647)
+        inst.ZIndex = zVal
+
+        if class == "Square" then
+            local sz = typeof(obj._size) == "Vector2" and obj._size or newVector2(0, 0)
+            local pos = typeof(obj._position) == "Vector2" and obj._position or newVector2(0, 0)
+            inst.Size = newUDim2(0, sz.X, 0, sz.Y)
+            inst.Position = newUDim2(0, pos.X, 0, pos.Y)
+
+            if sz.X <= 2 or sz.Y <= 2 then
+                corner.CornerRadius = UDim.new(0, 0)
+            else
+                local r = obj._rounding or (library and library.rounding) or 6
+                corner.CornerRadius = UDim.new(0, r)
+            end
+
+            if obj._filled then
+                inst.BackgroundTransparency = 1 - (obj._transparency or 1)
+                inst.BackgroundColor3 = obj._color or c3new(1, 1, 1)
+                stroke.Enabled = false
+            else
+                inst.BackgroundTransparency = 1
+                stroke.Enabled = true
+                stroke.Color = obj._color or c3new(1, 1, 1)
+                stroke.Thickness = math.max(1, obj._thickness or 1)
+                stroke.Transparency = 1 - (obj._transparency or 1)
+            end
+        elseif class == "Text" then
+            local pos = typeof(obj._position) == "Vector2" and obj._position or newVector2(0, 0)
+            inst.Position = newUDim2(0, pos.X, 0, pos.Y)
+            inst.Text = tostring(obj._text or "")
+            inst.TextSize = typeof(obj._size) == "number" and obj._size or 13
+            inst.Font = fontMap[obj._font] or Enum.Font.Gotham
+            inst.TextColor3 = obj._color or c3new(1, 1, 1)
+            inst.TextTransparency = 1 - (obj._transparency or 1)
+
+            if obj._center then
+                inst.AnchorPoint = newVector2(0.5, 0)
+                inst.TextXAlignment = Enum.TextXAlignment.Center
+            else
+                inst.AnchorPoint = newVector2(0, 0)
+                inst.TextXAlignment = Enum.TextXAlignment.Left
+            end
+
+            if obj._outline then
+                inst.TextStrokeTransparency = 1 - (obj._transparency or 1)
+                inst.TextStrokeColor3 = obj._outlineColor or c3new(0, 0, 0)
+            else
+                inst.TextStrokeTransparency = 1
+            end
+
+            local tb = inst.TextBounds
+            inst.Size = newUDim2(0, math.max(200, tb.X + 8), 0, tb.Y + 2)
+        elseif class == "Circle" then
+            local r = obj._radius or 0
+            local pos = typeof(obj._position) == "Vector2" and obj._position or newVector2(0, 0)
+            inst.Size = newUDim2(0, r * 2, 0, r * 2)
+            inst.Position = newUDim2(0, pos.X - r, 0, pos.Y - r)
+            if obj._filled then
+                inst.BackgroundTransparency = 1 - (obj._transparency or 1)
+                inst.BackgroundColor3 = obj._color or c3new(1, 1, 1)
+                stroke.Enabled = false
+            else
+                inst.BackgroundTransparency = 1
+                stroke.Enabled = true
+                stroke.Color = obj._color or c3new(1, 1, 1)
+                stroke.Thickness = math.max(1, obj._thickness or 1)
+                stroke.Transparency = 1 - (obj._transparency or 1)
+            end
+        elseif class == "Image" then
+            local sz = typeof(obj._size) == "Vector2" and obj._size or newVector2(0, 0)
+            local pos = typeof(obj._position) == "Vector2" and obj._position or newVector2(0, 0)
+            inst.Size = newUDim2(0, sz.X, 0, sz.Y)
+            inst.Position = newUDim2(0, pos.X, 0, pos.Y)
+            inst.ImageTransparency = 1 - (obj._transparency or 1)
+            inst.ImageColor3 = obj._color or c3new(1, 1, 1)
+            if typeof(obj._data) == "string" and #obj._data > 0 then
+                inst.Image = obj._data
+            end
+        end
+    end
+
+    local wrapper = {}
     local mt = {
         __index = function(t, k)
-            if k == 'Remove' or k == 'Destroy' then
-                return function() end
-            elseif k == 'TextBounds' then
+            if k == "Remove" or k == "Destroy" then
+                return function()
+                    if obj._removed then return end
+                    obj._removed = true
+                    pcall(function() inst:Destroy() end)
+                end
+            elseif k == "TextBounds" then
+                if class == "Text" and inst then
+                    local tb = inst.TextBounds
+                    if tb and tb.X > 0 and tb.Y > 0 then
+                        return tb
+                    end
+                    if textservice then
+                        local s, r = pcall(function()
+                            return textservice:GetTextSize(obj._text or "", typeof(obj._size) == "number" and obj._size or 13, fontMap[obj._font] or Enum.Font.Gotham, newVector2(10000, 10000))
+                        end)
+                        if s and r then return r end
+                    end
+                    return newVector2(#(obj._text or "") * 7, 14)
+                end
                 return newVector2(50, 14)
-            elseif k == 'Size' or k == 'Position' or k == 'PointA' or k == 'PointB' or k == 'PointC' then
-                return newVector2(0, 0)
+            elseif k == "Size" then
+                return obj._size
+            elseif k == "Position" then
+                return obj._position
+            elseif k == "Visible" then
+                return obj._visible
+            elseif k == "Color" then
+                return obj._color
+            elseif k == "Transparency" then
+                return obj._transparency
+            elseif k == "ZIndex" then
+                return obj._zIndex
+            elseif k == "Filled" then
+                return obj._filled
+            elseif k == "Thickness" then
+                return obj._thickness
+            elseif k == "Rounding" or k == "CornerRadius" then
+                return obj._rounding
+            elseif k == "Text" then
+                return obj._text
+            elseif k == "Font" then
+                return obj._font
+            elseif k == "Center" then
+                return obj._center
+            elseif k == "Outline" then
+                return obj._outline
+            elseif k == "OutlineColor" then
+                return obj._outlineColor
+            elseif k == "Radius" then
+                return obj._radius
+            elseif k == "Data" then
+                return obj._data
             end
-            return 0
+            return rawget(obj, k)
         end,
-        __newindex = function(t, k, v) end
+        __newindex = function(t, k, v)
+            if obj._removed then return end
+            if k == "Size" then
+                obj._size = v
+            elseif k == "Position" then
+                obj._position = v
+            elseif k == "Visible" then
+                obj._visible = (v and true or false)
+            elseif k == "Color" then
+                obj._color = v
+            elseif k == "Transparency" then
+                obj._transparency = v
+            elseif k == "ZIndex" then
+                obj._zIndex = v
+            elseif k == "Filled" then
+                obj._filled = (v and true or false)
+            elseif k == "Thickness" then
+                obj._thickness = v
+            elseif k == "Rounding" or k == "CornerRadius" then
+                obj._rounding = v
+            elseif k == "Text" then
+                obj._text = v
+            elseif k == "Font" then
+                obj._font = v
+            elseif k == "Center" then
+                obj._center = (v and true or false)
+            elseif k == "Outline" then
+                obj._outline = (v and true or false)
+            elseif k == "OutlineColor" then
+                obj._outlineColor = v
+            elseif k == "Radius" then
+                obj._radius = v
+            elseif k == "Data" then
+                obj._data = v
+            else
+                rawset(obj, k, v)
+            end
+            updateVisuals()
+        end
     }
-    return setmetatable(dummy, mt)
+    return setmetatable(wrapper, mt)
 end
 
 -- // Standalone Signal Implementation (zero external dependency, no script.Parent errors)
@@ -1246,6 +1562,10 @@ function library:Unload()
         obj:Remove()
     end
     table.clear(self.drawings)
+    if drawingGui then
+        pcall(function() drawingGui:Destroy() end)
+        drawingGui = nil
+    end
     getgenv().library = nil
 end
 
@@ -2147,6 +2467,7 @@ function library:init()
                 Position = indicator.position;
                 ThemeColor = 'Background';
                 ZIndex = z;
+                Rounding = 6;
             })
 
             objs.border1 = utility:Draw('Square', {
@@ -2155,6 +2476,7 @@ function library:init()
                 ThemeColor = 'Border 2';
                 Parent = objs.background;
                 ZIndex = z-1;
+                Rounding = 7;
             })
 
             objs.border2 = utility:Draw('Square', {
@@ -2163,6 +2485,7 @@ function library:init()
                 ThemeColor = 'Border 3';
                 Parent = objs.border1;
                 ZIndex = z-2;
+                Rounding = 8;
             })
 
             objs.glow = utility:AddGlow(objs.border2, z-2, 'Accent', 5, 1);
@@ -2172,6 +2495,7 @@ function library:init()
                 ThemeColor = 'Accent';
                 Parent = objs.background;
                 ZIndex = z+1;
+                Rounding = 0;
             })
 
             objs.textlabel = utility:Draw('Text', {
@@ -2224,7 +2548,13 @@ function library:init()
                     else
                         library.isDragging = true
                         local mPos = inputservice:GetMouseLocation()
-                        indTargetPos = indObjStart + (mPos - indMouseStart)
+                        local rawIndTarget = indObjStart + (mPos - indMouseStart)
+                        local scr = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or newVector2(1920, 1080)
+                        local indSz = objs.background.Object.Size
+                        indTargetPos = newVector2(
+                            math.clamp(rawIndTarget.X, 10, math.max(10, scr.X - indSz.X - 10)),
+                            math.clamp(rawIndTarget.Y, 10, math.max(10, scr.Y - indSz.Y - 10))
+                        )
                     end
                 end
 
@@ -2840,8 +3170,12 @@ function library:init()
 
         ----- Create Objects ----
         do
-            local size = data.size or newUDim2(0, 700, 0, 560);
-            local position = data.position or data.pos or newUDim2(0.5, 80, 0.5, -math.floor(size.Y.Offset / 2));
+            local size = data.size or newUDim2(0, 760, 0, 640);
+            local screenW = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize.X or 1920
+            local screenH = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize.Y or 1080
+            local defX = math.clamp(math.floor((screenW - size.X.Offset) / 2), 20, math.max(20, screenW - size.X.Offset - 20))
+            local defY = math.clamp(math.floor((screenH - size.Y.Offset) / 2), 20, math.max(20, screenH - size.Y.Offset - 20))
+            local position = data.position or data.pos or newUDim2(0, defX, 0, defY);
             local objs = window.objects;
             local z = library.zindexOrder.window;
 
@@ -2850,6 +3184,7 @@ function library:init()
                 Position = position;
                 ThemeColor = 'Background';
                 ZIndex = z;
+                Rounding = 8;
             })
 
             objs.innerBorder1 = utility:Draw('Square', {
@@ -2858,6 +3193,7 @@ function library:init()
                 ThemeColor = 'Border 3';
                 ZIndex = z-1;
                 Parent = objs.background;
+                Rounding = 9;
             })
 
             objs.innerBorder2 = utility:Draw('Square', {
@@ -2866,6 +3202,7 @@ function library:init()
                 ThemeColor = 'Border 1';
                 ZIndex = z-2;
                 Parent = objs.innerBorder1;
+                Rounding = 10;
             })
 
             objs.midBorder = utility:Draw('Square', {
@@ -2874,6 +3211,7 @@ function library:init()
                 ThemeColor = 'Border 2';
                 ZIndex = z-3;
                 Parent = objs.innerBorder2;
+                Rounding = 12;
             })
 
             objs.outerBorder1 = utility:Draw('Square', {
@@ -2882,6 +3220,7 @@ function library:init()
                 ThemeColor = 'Border 1';
                 ZIndex = z-4;
                 Parent = objs.midBorder;
+                Rounding = 13;
             })
 
             objs.outerBorder2 = utility:Draw('Square', {
@@ -2890,6 +3229,7 @@ function library:init()
                 ThemeColor = 'Border 3';
                 ZIndex = z-5;
                 Parent = objs.outerBorder1;
+                Rounding = 14;
             })
 
             objs.glow = utility:AddGlow(objs.outerBorder2, z-5, 'Accent', 6, 1);
@@ -2899,6 +3239,7 @@ function library:init()
                 ThemeColor = 'Accent';
                 ZIndex = z+1;
                 Parent = objs.background;
+                Rounding = 0;
             })
 
             objs.title = utility:Draw('Text', {
@@ -2918,6 +3259,7 @@ function library:init()
                 ThemeColor = 'Group Background';
                 ZIndex = z+5;
                 Parent = objs.background;
+                Rounding = 7;
             })
 
             objs.groupInnerBorder = utility:Draw('Square', {
@@ -2926,6 +3268,7 @@ function library:init()
                 ThemeColor = 'Border 1';
                 ZIndex = z+4;
                 Parent = objs.groupBackground;
+                Rounding = 8;
             })
 
             objs.groupOuterBorder = utility:Draw('Square', {
@@ -2934,6 +3277,7 @@ function library:init()
                 ThemeColor = 'Border 3';
                 ZIndex = z+3;
                 Parent = objs.groupInnerBorder;
+                Rounding = 9;
             })
 
             objs.tabHolder = utility:Draw('Square', {
@@ -3007,7 +3351,13 @@ function library:init()
                     else
                         library.isDragging = true
                         local mPos = inputservice:GetMouseLocation()
-                        targetPos = objStart + (mPos - mouseStart)
+                        local rawTarget = objStart + (mPos - mouseStart)
+                        local scr = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or newVector2(1920, 1080)
+                        local wSz = objs.background.Object.Size
+                        targetPos = newVector2(
+                            math.clamp(rawTarget.X, 10, math.max(10, scr.X - wSz.X - 10)),
+                            math.clamp(rawTarget.Y, 10, math.max(10, scr.Y - wSz.Y - 10))
+                        )
                     end
                 end
 
@@ -4279,6 +4629,7 @@ function library:init()
                     Parent = self.objects.tabHolder;
                     ThemeColor = 'Unselected Tab Background';
                     ZIndex = z;
+                    Rounding = 6;
                 })
 
                 objs.innerBorder = utility:Draw('Square', {
@@ -4287,6 +4638,7 @@ function library:init()
                     ThemeColor = 'Border 1';
                     ZIndex = z-1;
                     Parent = objs.background;
+                    Rounding = 7;
                 })
     
                 objs.outerBorder = utility:Draw('Square', {
@@ -4295,6 +4647,7 @@ function library:init()
                     ThemeColor = 'Border 3';
                     ZIndex = z-2;
                     Parent = objs.innerBorder;
+                    Rounding = 8;
                 })
 
                 objs.topBorder = utility:Draw('Square', {
@@ -4302,6 +4655,7 @@ function library:init()
                     ThemeColor = 'Unselected Tab Background';
                     ZIndex = z+1;
                     Parent = objs.background;
+                    Rounding = 0;
                 })
 
                 local disp = (tab.icon and tab.icon ~= '') and (tab.icon .. ' ' .. text) or text
@@ -4369,6 +4723,7 @@ function library:init()
                         ThemeColor = 'Section Background';
                         ZIndex = z;
                         Parent = window.objects['columnholder'..(section.side)];
+                        Rounding = 6;
                     })
 
                     objs.innerBorder = utility:Draw('Square', {
@@ -4377,6 +4732,7 @@ function library:init()
                         ThemeColor = 'Border 3';
                         ZIndex = z-1;
                         Parent = objs.background;
+                        Rounding = 7;
                     })
 
                     objs.outerBorder = utility:Draw('Square', {
@@ -4385,6 +4741,7 @@ function library:init()
                         ThemeColor = 'Border 1';
                         ZIndex = z-2;
                         Parent = objs.innerBorder;
+                        Rounding = 8;
                     })
 
                     objs.topBorder1 = utility:Draw('Square', {
@@ -4393,12 +4750,14 @@ function library:init()
                         ThemeColor = 'Accent';
                         ZIndex = z+1;
                         Parent = objs.background;
+                        Rounding = 0;
                     })
 
                     objs.topBorder2 = utility:Draw('Square', {
                         ThemeColor = 'Accent';
                         ZIndex = z+1;
                         Parent = objs.background;
+                        Rounding = 0;
                     })
 
                     objs.textlabel = utility:Draw('Text', {
@@ -4436,11 +4795,18 @@ function library:init()
 
                     local isSecVis = (self.objects.background.Visible and self.enabled) and true or false;
                     local ySize, padding = 15, 0;
+                    local maxColHeight = (window.objects.groupBackground and window.objects.groupBackground.AbsoluteSize.Y) or 580
+                    local secTop = (self.objects.background.Position and self.objects.background.Position.Y.Offset) or 0
+                    local availableH = math.max(100, maxColHeight - secTop - 12)
+
                     for i,option in next, self.options do
-                        option.objects.holder.Visible = option.enabled and isSecVis;
-                        if option.enabled and isSecVis then
+                        local optH = (option.objects.holder and option.objects.holder.Object and option.objects.holder.Object.Size.Y) or 20
+                        local fitsInView = (ySize + optH - 15) <= availableH
+                        local shouldShow = option.enabled and isSecVis and fitsInView
+                        option.objects.holder.Visible = shouldShow;
+                        if option.enabled and isSecVis and fitsInView then
                             option.objects.holder.Position = newUDim2(0,0,0,ySize-15);
-                            ySize += option.objects.holder.Object.Size.Y + padding;
+                            ySize += optH + padding;
                         end
                     end
 
@@ -6318,7 +6684,7 @@ function library:init()
                         local z = library.zindexOrder.window+25;
 
                         objs.holder = utility:Draw('Square', {
-                            Size = newUDim2(1,0,0,24);
+                            Size = newUDim2(1,0,0,20);
                             Transparency = 0;
                             ZIndex = z+5;
                             Parent = section.objects.optionholder;
@@ -6326,9 +6692,10 @@ function library:init()
 
                         objs.background = utility:Draw('Square', {
                             Size = newUDim2(0,20,0,14);
-                            Position = newUDim2(1,-22,0,5);
+                            Position = newUDim2(1,-22,0,3);
                             ZIndex = z+3;
                             Parent = objs.holder;
+                            Rounding = 4;
                         })
 
                         objs.gradient = utility:Draw('Square', {
@@ -6337,6 +6704,7 @@ function library:init()
                             Visible = false;
                             ZIndex = z+4;
                             Parent = objs.background;
+                            Rounding = 4;
                         })
 
                         objs.border1 = utility:Draw('Square', {
@@ -6345,6 +6713,7 @@ function library:init()
                             ThemeColor = 'Option Border 1';
                             ZIndex = z+2;
                             Parent = objs.background;
+                            Rounding = 5;
                         })
 
                         objs.border2 = utility:Draw('Square', {
@@ -6353,6 +6722,7 @@ function library:init()
                             ThemeColor = 'Option Border 2';
                             ZIndex = z+1;
                             Parent = objs.border1;
+                            Rounding = 6;
                         })
 
                         objs.text = utility:Draw('Text', {
@@ -7801,8 +8171,8 @@ function library:init()
                 v.selected = v == self.selectedTab;
                 local tabTheme = v.selected and 'Selected Tab Background' or 'Unselected Tab Background';
                 objs.background.ThemeColor = tabTheme;
-                local pad = (v.icon and v.icon ~= '') and 34 or 28;
-                local tabW = math.max(86, objs.text.TextBounds.X + pad);
+                local pad = (v.icon and v.icon ~= '') and 38 or 32;
+                local tabW = math.max(100, objs.text.TextBounds.X + pad);
                 objs.background.Size = newUDim2(0, tabW, 1, v.selected and 1 or 0);
                 objs.background.Position = newUDim2(0, pos, 0, 0)
 
@@ -8217,7 +8587,7 @@ function library:init()
                 {'00:00:00', true},
                 {'M, D, Y', true},
             };
-            lock = 'custom';
+            lock = 'Top Right';
             position = newUDim2(0,0,0,0);
             refreshrate = 400;
         }
@@ -8237,21 +8607,20 @@ function library:init()
                 local daySuffix = math.floor(date[2]%10)
                 date[2] = date[2]..(daySuffix == 1 and 'st' or daySuffix == 2 and 'nd' or daySuffix == 3 and 'rd' or 'th')
 
-                self.text[4][1] = library.stats.fps..' fps'
-                self.text[5][1] = floor(library.stats.ping)..'ms'
-                self.text[6][1] = os.date('%X', os.time())
-                self.text[7][1] = table.concat(date, ', ')
+                local fullText = ''
+                local dateStr = date[1]..' '..date[2]..', '..date[3]
+                local timeStr = os.date('%X',os.time())
 
-                local text = {};
-                for _,v in next, self.text do
+                self.text[4][1] = tostring(math.floor(smoothedFps))..' fps'
+                self.text[5][1] = tostring(math.floor(smoothedPing))..'ms'
+                self.text[6][1] = timeStr
+                self.text[7][1] = dateStr
+
+                for i,v in next, self.text do
                     if v[2] then
-                        table.insert(text, v[1]);
+                        fullText = fullText .. (fullText == '' and '' or ' | ') .. tostring(v[1])
                     end
                 end
-
-                local fullText = table.concat(text,' | ')
-                if self.lastText == fullText then return end
-                self.lastText = fullText
 
                 self.objects.text.Text = fullText
                 self.objects.background.Size = newUDim2(0, self.objects.text.TextBounds.X + 10, 0, 17)
@@ -8261,12 +8630,12 @@ function library:init()
 
                 if self.lock ~= 'Free' then
                     self.position = (
-                        self.lock == 'Top Right' and newUDim2(0, screensize.X - size.X - 15, 0, 15) or
-                        self.lock == 'Top Left' and newUDim2(0, 15, 0, 15) or
-                        self.lock == 'Bottom Right' and newUDim2(0, screensize.X - size.X - 15, 0, screensize.Y - size.Y - 15) or
-                        self.lock == 'Bottom Left' and newUDim2(0, 15, 0, screensize.Y - size.Y - 15) or
-                        self.lock == 'Top' and newUDim2(0, screensize.X / 2 - size.X / 2, 0, 15) or
-                        newUDim2((library.flags.watermark_x or 6) / 100, 0, (library.flags.watermark_y or 1) / 100, 0)
+                        self.lock == 'Top Right' and newUDim2(0, screensize.X - size.X - 25, 0, 18) or
+                        self.lock == 'Top Left' and newUDim2(0, 25, 0, 18) or
+                        self.lock == 'Bottom Right' and newUDim2(0, screensize.X - size.X - 25, 0, screensize.Y - size.Y - 25) or
+                        self.lock == 'Bottom Left' and newUDim2(0, 25, 0, screensize.Y - size.Y - 25) or
+                        self.lock == 'Top' and newUDim2(0, (screensize.X - size.X) / 2, 0, 18) or
+                        newUDim2(0, screensize.X - size.X - 25, 0, 18)
                     )
                 end
 
@@ -8284,6 +8653,7 @@ function library:init()
                 Position = newUDim2(0,800,0,100);
                 ThemeColor = 'Background';
                 ZIndex = z;
+                Rounding = 6;
             })
 
             objs.border1 = utility:Draw('Square', {
@@ -8292,6 +8662,7 @@ function library:init()
                 ThemeColor = 'Border 2';
                 Parent = objs.background;
                 ZIndex = z-1;
+                Rounding = 7;
             })
 
             objs.border2 = utility:Draw('Square', {
@@ -8300,6 +8671,7 @@ function library:init()
                 ThemeColor = 'Border 3';
                 Parent = objs.border1;
                 ZIndex = z-2;
+                Rounding = 8;
             })
 
             objs.glow = utility:AddGlow(objs.border2, z-2, 'Accent', 4, 1);
@@ -8309,6 +8681,7 @@ function library:init()
                 ThemeColor = 'Accent';
                 ZIndex = z+1;
                 Parent = objs.background;
+                Rounding = 0;
             })
 
             objs.text = utility:Draw('Text', {
@@ -8361,7 +8734,13 @@ function library:init()
                     else
                         library.isDragging = true
                         local mPos = inputservice:GetMouseLocation()
-                        wmTargetPos = wmObjStart + (mPos - wmMouseStart)
+                        local rawWmTarget = wmObjStart + (mPos - wmMouseStart)
+                        local scr = viewportSize
+                        local wmSz = objs.background.Object.Size
+                        wmTargetPos = newVector2(
+                            math.clamp(rawWmTarget.X, 10, math.max(10, scr.X - wmSz.X - 10)),
+                            math.clamp(rawWmTarget.Y, 10, math.max(10, scr.Y - wmSz.Y - 10))
+                        )
                         self.watermark.lock = 'Free'
                     end
                 end
@@ -8441,7 +8820,7 @@ function library:init()
         end
     end)
 
-    self.keyIndicator = self.NewIndicator({title = 'Keybinds', pos = newUDim2(0, 20, 1, -220), enabled = true});
+    self.keyIndicator = self.NewIndicator({title = 'Keybinds', pos = newUDim2(0, 25, 0.45, -70), enabled = true});
     
     self.targetIndicator = self.NewIndicator({title = 'Target Info', pos = newUDim2(0,15,0,350), enabled = false});
     self.targetName = self.targetIndicator:AddValue({key = 'Name     :', value = 'nil'})
