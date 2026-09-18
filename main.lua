@@ -97,9 +97,9 @@ local function getDrawingGui()
 end
 
 local fontMap = {
-    [0] = Enum.Font.SourceSans,
-    [1] = Enum.Font.SourceSansBold,
-    [2] = Enum.Font.Gotham,
+    [0] = Enum.Font.GothamMedium,
+    [1] = Enum.Font.GothamBold,
+    [2] = Enum.Font.GothamMedium,
     [3] = Enum.Font.Code
 }
 
@@ -213,6 +213,17 @@ local function safeCreateDrawing(class)
         return setmetatable(dummy, mt)
     end
 
+    local function updatePositionOnly()
+        if obj._removed or not inst then return end
+        local pos = typeof(obj._position) == "Vector2" and obj._position or newVector2(0, 0)
+        if class == "Circle" then
+            local r = obj._radius or 0
+            inst.Position = newUDim2(0, pos.X - r, 0, pos.Y - r)
+        else
+            inst.Position = newUDim2(0, pos.X, 0, pos.Y)
+        end
+    end
+
     local function updateVisuals()
         if obj._removed or not inst then return end
         inst.Visible = obj._visible
@@ -225,7 +236,7 @@ local function safeCreateDrawing(class)
             inst.Size = newUDim2(0, sz.X, 0, sz.Y)
             inst.Position = newUDim2(0, pos.X, 0, pos.Y)
 
-            if sz.X <= 2 or sz.Y <= 2 then
+            if sz.X <= 2 or sz.Y <= 2 or (obj._rounding == 0) then
                 corner.CornerRadius = UDim.new(0, 0)
             else
                 local r = obj._rounding or (library and library.rounding) or 6
@@ -322,6 +333,12 @@ local function safeCreateDrawing(class)
                     return newVector2(#(obj._text or "") * 7, 14)
                 end
                 return newVector2(50, 14)
+            elseif k == "_instance" or k == "Instance" then
+                return inst
+            elseif k == "AbsolutePosition" then
+                return (inst and inst.AbsolutePosition) or (typeof(obj._position) == "Vector2" and obj._position) or newVector2(0, 0)
+            elseif k == "AbsoluteSize" then
+                return (inst and inst.AbsoluteSize) or (typeof(obj._size) == "Vector2" and obj._size) or newVector2(0, 0)
             elseif k == "Size" then
                 if typeof(obj._size) == "UDim2" then
                     local pSize = (workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize) or newVector2(1920, 1080)
@@ -375,12 +392,18 @@ local function safeCreateDrawing(class)
                     obj._size = v
                 end
             elseif k == "Position" then
+                local newP
                 if typeof(v) == "UDim2" then
                     local pSize = (workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize) or newVector2(1920, 1080)
-                    obj._position = newVector2(v.X.Scale * pSize.X + v.X.Offset, v.Y.Scale * pSize.Y + v.Y.Offset)
+                    newP = newVector2(v.X.Scale * pSize.X + v.X.Offset, v.Y.Scale * pSize.Y + v.Y.Offset)
                 else
-                    obj._position = v
+                    newP = v
                 end
+                if obj._position ~= newP then
+                    obj._position = newP
+                    updatePositionOnly()
+                end
+                return
             elseif k == "Visible" then
                 obj._visible = (v and true or false)
             elseif k == "Color" then
@@ -1032,8 +1055,9 @@ do
             isVis = (rawObj.Visible ~= nil and rawObj.Visible)
         end
         if isVis == false then return false end
-        local pos = drawObj.AbsolutePosition or rawObj.Position
-        local size = drawObj.AbsoluteSize or rawObj.Size
+        local rawInst = rawObj._instance or rawObj.Instance
+        local pos = (rawInst and rawInst.AbsolutePosition) or drawObj.AbsolutePosition or rawObj.Position
+        local size = (rawInst and rawInst.AbsoluteSize) or drawObj.AbsoluteSize or rawObj.Size
         if not pos or not size then return false end
         mp = mp or inputservice:GetMouseLocation()
         margin = margin or 2
@@ -1102,8 +1126,9 @@ do
             if v.ActualVisible and v.Class == 'Square' then
                 local z = v.ZIndex or (v.Object and v.Object.ZIndex) or 0
                 if not modalMinZ or z >= modalMinZ then
-                    local pos = v.AbsolutePosition
-                    local size = v.AbsoluteSize
+                    local rawInst = v.Object and (v.Object._instance or v.Object.Instance)
+                    local pos = (rawInst and rawInst.AbsolutePosition) or v.AbsolutePosition
+                    local size = (rawInst and rawInst.AbsoluteSize) or v.AbsoluteSize
                     if pos and size then
                         local x1, y1 = pos.X, pos.Y
                         if mx >= x1 and mx <= x1 + size.X and my >= y1 and my <= y1 + size.Y then
@@ -2567,25 +2592,19 @@ function library:init()
                         library.isDragging = true
                         local mPos = inputservice:GetMouseLocation()
                         local rawIndTarget = indObjStart + (mPos - indMouseStart)
-                        local scr = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or newVector2(1920, 1080)
-                        local indSz = objs.background.Object.Size
-                        indTargetPos = newVector2(
-                            math.clamp(rawIndTarget.X, 10, math.max(10, scr.X - indSz.X - 10)),
-                            math.clamp(rawIndTarget.Y, 10, math.max(10, scr.Y - indSz.Y - 10))
-                        )
+                        indTargetPos = rawIndTarget
                     end
                 end
 
                 if indCurrentPos and indTargetPos then
                     local dist = (indTargetPos - indCurrentPos).Magnitude
-                    if dist > 0.2 or indDragging then
-                        local dt = math.clamp(step or 0.016, 0.001, 0.1)
-                        local speed = (dist > 80) and 45 or 32
-                        local factor = math.clamp(1 - math.exp(-speed * dt), 0.12, 1)
-                        indCurrentPos = indCurrentPos + (indTargetPos - indCurrentPos) * factor
-
-                        if not indDragging and dist <= 0.35 then
+                    if dist > 0.1 or indDragging then
+                        if indDragging then
                             indCurrentPos = indTargetPos
+                        else
+                            local dt = math.clamp(step or 0.016, 0.001, 0.1)
+                            indCurrentPos = indCurrentPos + (indTargetPos - indCurrentPos) * math.clamp(1 - math.exp(-35 * dt), 0.2, 1)
+                            if dist <= 0.35 then indCurrentPos = indTargetPos end
                         end
 
                         local px, py = math.round(indCurrentPos.X), math.round(indCurrentPos.Y)
@@ -2686,6 +2705,7 @@ function library:init()
                     ThemeColor = 'Background';
                     ZIndex = z;
                     Parent = indicator.objects.background;
+                    Rounding = 0;
                 })
     
                 objs.border1 = utility:Draw('Square', {
@@ -2694,6 +2714,7 @@ function library:init()
                     ThemeColor = 'Border 2';
                     Parent = objs.background;
                     ZIndex = z-1;
+                    Rounding = 0;
                 })
     
                 objs.border2 = utility:Draw('Square', {
@@ -2702,9 +2723,8 @@ function library:init()
                     ThemeColor = 'Border 3';
                     Parent = objs.border1;
                     ZIndex = z-2;
+                    Rounding = 0;
                 })
-
-                objs.glow = utility:AddGlow(objs.border2, z-2, 'Accent', 3, 1);
 
                 objs.activeBar = utility:Draw('Square', {
                     Size = newUDim2(0, 2, 0, 10);
@@ -3188,7 +3208,7 @@ function library:init()
 
         ----- Create Objects ----
         do
-            local size = data.size or newUDim2(0, 760, 0, 640);
+            local size = data.size or newUDim2(0, 680, 0, 540);
             local screenW = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize.X or 1920
             local screenH = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize.Y or 1080
             local defX = math.clamp(math.floor((screenW - size.X.Offset) / 2), 20, math.max(20, screenW - size.X.Offset - 20))
@@ -3370,25 +3390,19 @@ function library:init()
                         library.isDragging = true
                         local mPos = inputservice:GetMouseLocation()
                         local rawTarget = objStart + (mPos - mouseStart)
-                        local scr = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or newVector2(1920, 1080)
-                        local wSz = objs.background.Object.Size
-                        targetPos = newVector2(
-                            math.clamp(rawTarget.X, 10, math.max(10, scr.X - wSz.X - 10)),
-                            math.clamp(rawTarget.Y, 10, math.max(10, scr.Y - wSz.Y - 10))
-                        )
+                        targetPos = rawTarget
                     end
                 end
 
                 if currentPos and targetPos then
                     local dist = (targetPos - currentPos).Magnitude
-                    if dist > 0.2 or dragging then
-                        local dt = math.clamp(step or 0.016, 0.001, 0.1)
-                        local speed = (dist > 80) and 45 or 32
-                        local factor = math.clamp(1 - math.exp(-speed * dt), 0.12, 1)
-                        currentPos = currentPos + (targetPos - currentPos) * factor
-
-                        if not dragging and dist <= 0.35 then
+                    if dist > 0.1 or dragging then
+                        if dragging then
                             currentPos = targetPos
+                        else
+                            local dt = math.clamp(step or 0.016, 0.001, 0.1)
+                            currentPos = currentPos + (targetPos - currentPos) * math.clamp(1 - math.exp(-35 * dt), 0.2, 1)
+                            if dist <= 0.35 then currentPos = targetPos end
                         end
 
                         local px, py = math.round(currentPos.X), math.round(currentPos.Y)
@@ -3510,13 +3524,22 @@ function library:init()
                     end
                 end)
 
-                -- Main Saturation / Value Gradient Palette (16x8 Procedural Matrix - 100% bug free)
+                -- Main Saturation / Value Gradient Palette (Smooth Hardware Gradient)
                 objs.mainColor = utility:Draw('Square', {
                     Size = newUDim2(0, 208, 0, 104);
                     Position = newUDim2(0, 8, 0, 26);
-                    Color = fromrgb(20, 20, 20);
+                    Color = fromhsv(1, 1, 1);
                     ZIndex = z+2;
                     Parent = objs.background;
+                    Rounding = 0;
+                })
+
+                objs.mainGradient = utility:Draw('Image', {
+                    Size = newUDim2(1, 0, 1, 0);
+                    Position = newUDim2(0, 0, 0, 0);
+                    Data = "rbxassetid://4155801252";
+                    ZIndex = z+3;
+                    Parent = objs.mainColor;
                 })
 
                 objs.colorBorder = utility:Draw('Square', {
@@ -3525,25 +3548,8 @@ function library:init()
                     ThemeColor = 'Border';
                     ZIndex = z+1;
                     Parent = objs.mainColor;
+                    Rounding = 0;
                 })
-
-                objs.paletteCells = {}
-                local gridCols, gridRows = 16, 8
-                local cellW, cellH = 13, 13
-                for col = 0, gridCols - 1 do
-                    local s = col / (gridCols - 1)
-                    for row = 0, gridRows - 1 do
-                        local v = 1 - (row / (gridRows - 1))
-                        local cell = utility:Draw('Square', {
-                            Size = newUDim2(0, cellW, 0, cellH);
-                            Position = newUDim2(0, col * cellW, 0, row * cellH);
-                            Color = fromhsv(1, s, v);
-                            ZIndex = z+3;
-                            Parent = objs.mainColor;
-                        })
-                        table.insert(objs.paletteCells, {sq = cell, s = s, v = v})
-                    end
-                end
 
                 objs.pointer = utility:Draw('Square', {
                     Size = newUDim2(0, 5, 0, 5);
@@ -3551,6 +3557,7 @@ function library:init()
                     Color = c3new(1, 1, 1);
                     ZIndex = z+7;
                     Parent = objs.mainColor;
+                    Rounding = 2;
                 })
 
                 objs.pointerBorder = utility:Draw('Square', {
@@ -3559,6 +3566,7 @@ function library:init()
                     Color = c3new(0, 0, 0);
                     ZIndex = z+6;
                     Parent = objs.pointer;
+                    Rounding = 3;
                 })
 
                 objs.mainDetector = utility:Draw('Square', {
@@ -3566,31 +3574,17 @@ function library:init()
                     Transparency = 0;
                     ZIndex = z+10;
                     Parent = objs.mainColor;
+                    Rounding = 0;
                 })
 
                 -- Sliders: Rainbow Hue Bar (Horizontal)
-                objs.hue = utility:Draw('Square', {
+                objs.hue = utility:Draw('Image', {
                     Size = newUDim2(0, 174, 0, 12);
                     Position = newUDim2(0, 8, 0, 136);
-                    Color = c3new(1,0,0);
+                    Data = "rbxassetid://3641079629";
                     ZIndex = z+2;
                     Parent = objs.background;
                 })
-
-                objs.hueSegments = {}
-                local segCount = 29
-                local segWidth = 174 / segCount
-                for seg = 0, segCount - 1 do
-                    local segHue = seg / segCount
-                    local segSquare = utility:Draw('Square', {
-                        Size = newUDim2(0, math.ceil(segWidth), 1, 0);
-                        Position = newUDim2(0, math.floor(seg * segWidth), 0, 0);
-                        Color = fromhsv(segHue, 1, 1);
-                        ZIndex = z+3;
-                        Parent = objs.hue;
-                    })
-                    table.insert(objs.hueSegments, segSquare)
-                end
 
                 objs.hueBorder = utility:Draw('Square', {
                     Size = newUDim2(1, 2, 1, 2);
@@ -3598,6 +3592,7 @@ function library:init()
                     ThemeColor = 'Border';
                     ZIndex = z+1;
                     Parent = objs.hue;
+                    Rounding = 0;
                 })
 
                 objs.hueSlider = utility:Draw('Square', {
@@ -3606,6 +3601,7 @@ function library:init()
                     Color = c3new(1, 1, 1);
                     ZIndex = z+6;
                     Parent = objs.hue;
+                    Rounding = 1;
                 })
 
                 objs.hueSliderBorder = utility:Draw('Square', {
@@ -3614,6 +3610,7 @@ function library:init()
                     Color = c3new(0, 0, 0);
                     ZIndex = z+5;
                     Parent = objs.hueSlider;
+                    Rounding = 2;
                 })
 
                 objs.hueDetector = utility:Draw('Square', {
@@ -3621,30 +3618,18 @@ function library:init()
                     Transparency = 0;
                     ZIndex = z+10;
                     Parent = objs.hue;
+                    Rounding = 0;
                 })
 
-                -- Sliders: Opacity / Alpha Transparency Bar (Dynamic color-to-dark gradient)
+                -- Sliders: Opacity / Alpha Transparency Bar
                 objs.transColor = utility:Draw('Square', {
                     Size = newUDim2(0, 174, 0, 12);
                     Position = newUDim2(0, 8, 0, 153);
                     Color = fromrgb(22, 22, 24);
                     ZIndex = z+2;
                     Parent = objs.background;
+                    Rounding = 0;
                 })
-
-                objs.transSegments = {}
-                local transCount = 20
-                local transWidth = 174 / transCount
-                for seg = 0, transCount - 1 do
-                    local transSq = utility:Draw('Square', {
-                        Size = newUDim2(0, math.ceil(transWidth), 1, 0);
-                        Position = newUDim2(0, math.floor(seg * transWidth), 0, 0);
-                        Color = c3new(1, 1, 1);
-                        ZIndex = z+3;
-                        Parent = objs.transColor;
-                    })
-                    table.insert(objs.transSegments, transSq)
-                end
 
                 objs.transBorder = utility:Draw('Square', {
                     Size = newUDim2(1, 2, 1, 2);
@@ -3652,6 +3637,7 @@ function library:init()
                     ThemeColor = 'Border';
                     ZIndex = z+1;
                     Parent = objs.transColor;
+                    Rounding = 0;
                 })
 
                 objs.transSlider = utility:Draw('Square', {
@@ -3660,6 +3646,7 @@ function library:init()
                     Color = c3new(1, 1, 1);
                     ZIndex = z+6;
                     Parent = objs.transColor;
+                    Rounding = 1;
                 })
 
                 objs.transSliderBorder = utility:Draw('Square', {
@@ -3668,6 +3655,7 @@ function library:init()
                     Color = c3new(0, 0, 0);
                     ZIndex = z+5;
                     Parent = objs.transSlider;
+                    Rounding = 2;
                 })
 
                 objs.transDetector = utility:Draw('Square', {
@@ -3675,6 +3663,7 @@ function library:init()
                     Transparency = 0;
                     ZIndex = z+10;
                     Parent = objs.transColor;
+                    Rounding = 0;
                 })
 
                 -- Pipette / Swatch Button (Right of sliders)
@@ -3903,12 +3892,13 @@ function library:init()
                 local function updateSatVal(pos)
                     if window.colorpicker.selected ~= nil then
                         local hue, _, _ = window.colorpicker.selected.color:ToHSV()
-                        local sizeX = objs.mainColor.Object.Size.X
-                        local sizeY = objs.mainColor.Object.Size.Y
-                        if sizeX <= 0 then sizeX = 208 end
-                        if sizeY <= 0 then sizeY = 104 end
-                        local relX = math.clamp((pos.X - objs.mainColor.Object.Position.X) / sizeX, 0, 0.999)
-                        local relY = math.clamp((pos.Y - objs.mainColor.Object.Position.Y) / sizeY, 0, 0.999)
+                        local rawInst = objs.mainColor.Object and (objs.mainColor.Object._instance or objs.mainColor.Object.Instance)
+                        local instPos = (rawInst and rawInst.AbsolutePosition) or objs.mainColor.Object.Position
+                        local instSize = (rawInst and rawInst.AbsoluteSize) or objs.mainColor.Object.Size
+                        local sizeX = instSize.X > 0 and instSize.X or 208
+                        local sizeY = instSize.Y > 0 and instSize.Y or 104
+                        local relX = math.clamp((pos.X - instPos.X) / sizeX, 0, 0.999)
+                        local relY = math.clamp((pos.Y - instPos.Y) / sizeY, 0, 0.999)
                         local sat = relX
                         local val = 1 - relY
                         local newC3 = fromhsv(hue, math.clamp(sat, 0.001, 0.999), math.clamp(val, 0.001, 0.999))
@@ -3920,9 +3910,11 @@ function library:init()
                 local function updateHue(pos)
                     if window.colorpicker.selected ~= nil then
                         local _, sat, val = window.colorpicker.selected.color:ToHSV()
-                        local sizeX = objs.hue.Object.Size.X
-                        if sizeX <= 0 then sizeX = 174 end
-                        local hue = math.clamp((pos.X - objs.hue.Object.Position.X) / sizeX, 0, 0.999)
+                        local rawInst = objs.hue.Object and (objs.hue.Object._instance or objs.hue.Object.Instance)
+                        local instPos = (rawInst and rawInst.AbsolutePosition) or objs.hue.Object.Position
+                        local instSize = (rawInst and rawInst.AbsoluteSize) or objs.hue.Object.Size
+                        local sizeX = instSize.X > 0 and instSize.X or 174
+                        local hue = math.clamp((pos.X - instPos.X) / sizeX, 0, 0.999)
                         local newC3 = fromhsv(hue, math.clamp(sat, 0.001, 0.999), math.clamp(val, 0.001, 0.999))
                         window.colorpicker.selected:SetColor(newC3);
                         window.colorpicker:Visualize(newC3, window.colorpicker.selected.trans);
@@ -3931,9 +3923,11 @@ function library:init()
 
                 local function updateTrans(pos)
                     if window.colorpicker.selected ~= nil then
-                        local sizeX = objs.transColor.Object.Size.X
-                        if sizeX <= 0 then sizeX = 174 end
-                        local opacity = math.clamp((pos.X - objs.transColor.Object.Position.X) / sizeX, 0, 1)
+                        local rawInst = objs.transColor.Object and (objs.transColor.Object._instance or objs.transColor.Object.Instance)
+                        local instPos = (rawInst and rawInst.AbsolutePosition) or objs.transColor.Object.Position
+                        local instSize = (rawInst and rawInst.AbsoluteSize) or objs.transColor.Object.Size
+                        local sizeX = instSize.X > 0 and instSize.X or 174
+                        local opacity = math.clamp((pos.X - instPos.X) / sizeX, 0, 1)
                         local trans = 1 - opacity
                         window.colorpicker.selected:SetTrans(trans);
                         window.colorpicker:Visualize(window.colorpicker.selected.color, trans);
@@ -3989,19 +3983,9 @@ function library:init()
                 self.color = c3;
                 self.trans = a;
 
-                -- Update 16x8 HSV gradient palette
-                for _, cell in ipairs(self.objects.paletteCells) do
-                    cell.sq.Color = fromhsv(h, cell.s, cell.v)
-                end
+                self.objects.mainColor.Color = fromhsv(h, 1, 1);
 
                 local opacity = math.clamp(1 - (a or 0), 0, 1)
-
-                -- Update dynamic transparency bar (dark background fading smoothly to full c3 on the right)
-                local transCount = #self.objects.transSegments
-                for seg = 0, transCount - 1 do
-                    local frac = seg / math.max(transCount - 1, 1)
-                    self.objects.transSegments[seg + 1].Color = Color3.fromRGB(22, 22, 24):Lerp(c3, frac)
-                end
 
                 self.objects.hueSlider.Position = newUDim2(math.clamp(h, 0, 0.99), 0, 0, -1);
                 self.objects.transSlider.Position = newUDim2(math.clamp(opacity, 0, 0.99), 0, 0, -1);
@@ -8657,7 +8641,7 @@ function library:init()
                 end
 
                 self.objects.text.Text = fullText
-                self.objects.background.Size = newUDim2(0, self.objects.text.TextBounds.X + 10, 0, 17)
+                self.objects.background.Size = newUDim2(0, self.objects.text.TextBounds.X + 16, 0, 22)
 
                 local size = self.objects.background.Object.Size;
                 local screensize = viewportSize;
@@ -8683,7 +8667,7 @@ function library:init()
             
             objs.background = utility:Draw('Square', {
                 Visible = false;
-                Size = newUDim2(0, 200, 0, 17);
+                Size = newUDim2(0, 200, 0, 22);
                 Position = newUDim2(0,800,0,100);
                 ThemeColor = 'Background';
                 ZIndex = z;
@@ -8711,15 +8695,16 @@ function library:init()
             objs.glow = utility:AddGlow(objs.border2, z-2, 'Accent', 4, 1);
             
             objs.topbar = utility:Draw('Square', {
-                Size = newUDim2(1,0,0,1);
+                Size = newUDim2(1,-8,0,1);
+                Position = newUDim2(0,4,0,0);
                 ThemeColor = 'Accent';
                 ZIndex = z+1;
                 Parent = objs.background;
-                Rounding = 0;
+                Rounding = 1;
             })
 
             objs.text = utility:Draw('Text', {
-                Position = newUDim2(.5,0,0,2);
+                Position = newUDim2(.5,0,0,4);
                 ThemeColor = 'Primary Text';
                 Text = 'Watermark Text';
                 Size = 13;
@@ -8769,33 +8754,26 @@ function library:init()
                         library.isDragging = true
                         local mPos = inputservice:GetMouseLocation()
                         local rawWmTarget = wmObjStart + (mPos - wmMouseStart)
-                        local scr = viewportSize
-                        local wmSz = objs.background.Object.Size
-                        wmTargetPos = newVector2(
-                            math.clamp(rawWmTarget.X, 10, math.max(10, scr.X - wmSz.X - 10)),
-                            math.clamp(rawWmTarget.Y, 10, math.max(10, scr.Y - wmSz.Y - 10))
-                        )
-                        self.watermark.lock = 'Free'
+                        wmTargetPos = rawWmTarget
                     end
                 end
 
                 if wmCurrentPos and wmTargetPos then
                     local dist = (wmTargetPos - wmCurrentPos).Magnitude
-                    if dist > 0.2 or wmDragging then
-                        local dt = math.clamp(step or 0.016, 0.001, 0.1)
-                        local speed = (dist > 80) and 45 or 32
-                        local factor = math.clamp(1 - math.exp(-speed * dt), 0.12, 1)
-                        wmCurrentPos = wmCurrentPos + (wmTargetPos - wmCurrentPos) * factor
-
-                        if not wmDragging and dist <= 0.35 then
+                    if dist > 0.1 or wmDragging then
+                        if wmDragging then
                             wmCurrentPos = wmTargetPos
+                        else
+                            local dt = math.clamp(step or 0.016, 0.001, 0.1)
+                            wmCurrentPos = wmCurrentPos + (wmTargetPos - wmCurrentPos) * math.clamp(1 - math.exp(-35 * dt), 0.2, 1)
+                            if dist <= 0.35 then wmCurrentPos = wmTargetPos end
                         end
 
                         local px, py = math.round(wmCurrentPos.X), math.round(wmCurrentPos.Y)
                         if px ~= lastWmPx or py ~= lastWmPy then
                             lastWmPx, lastWmPy = px, py
-                            self.watermark.position = newUDim2(0, px, 0, py)
-                            objs.background.Position = self.watermark.position
+                            self.position = newUDim2(0, px, 0, py)
+                            objs.background.Position = self.position
                         end
                     end
                 end
