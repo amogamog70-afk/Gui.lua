@@ -8606,8 +8606,9 @@ function library:init()
                 end
 
                 local date = {os.date('%b',os.time()), os.date('%d',os.time()), os.date('%Y',os.time())}
-                local daySuffix = math.floor(date[2]%10)
-                date[2] = date[2]..(daySuffix == 1 and 'st' or daySuffix == 2 and 'nd' or daySuffix == 3 and 'rd' or 'th')
+                local dayNum = tonumber(date[2]) or 1
+                local daySuffix = math.floor(dayNum % 10)
+                date[2] = tostring(dayNum)..(daySuffix == 1 and 'st' or daySuffix == 2 and 'nd' or daySuffix == 3 and 'rd' or 'th')
 
                 local fullText = ''
                 local dateStr = date[1]..' '..date[2]..', '..date[3]
@@ -8807,8 +8808,8 @@ function library:init()
             library.stats.receivekbps = stats.DataReceiveKbps;
         end
 
-        library.stats.fps = floor(smoothedFps + 0.5);
-        library.stats.ping = floor(smoothedPing + 0.5);
+        library.stats.fps = floor((smoothedFps or 60) + 0.5);
+        library.stats.ping = floor((smoothedPing or 40) + 0.5);
 
         if camera then
             viewportSize = camera.ViewportSize
