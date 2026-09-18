@@ -8575,6 +8575,8 @@ function library:init()
         end
 
         local activeExecutor = getExecutorName()
+        local smoothedFps = 60
+        local smoothedPing = 40
 
         self.watermark = {
             objects = {};
@@ -8611,8 +8613,10 @@ function library:init()
                 local dateStr = date[1]..' '..date[2]..', '..date[3]
                 local timeStr = os.date('%X',os.time())
 
-                self.text[4][1] = tostring(math.floor(smoothedFps))..' fps'
-                self.text[5][1] = tostring(math.floor(smoothedPing))..'ms'
+                local curFps = smoothedFps or (library and library.stats and library.stats.fps) or 60
+                local curPing = smoothedPing or (library and library.stats and library.stats.ping) or 40
+                self.text[4][1] = tostring(math.floor(curFps))..' fps'
+                self.text[5][1] = tostring(math.floor(curPing))..'ms'
                 self.text[6][1] = timeStr
                 self.text[7][1] = dateStr
 
@@ -8770,8 +8774,8 @@ function library:init()
         end
     end
 
-    local smoothedFps = 60;
-    local smoothedPing = 40;
+    smoothedFps = smoothedFps or 60;
+    smoothedPing = smoothedPing or 40;
     local lasttick = tick();
     local lastPingUpdate = 0;
     local pingStatItem = nil;
